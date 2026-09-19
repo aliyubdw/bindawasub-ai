@@ -176,16 +176,22 @@ async function sendMessage() {
 
     const data = await response.json();
 
-    loading.remove();
+loading.remove();
 
-    const botMessage = document.createElement("div");
-    botMessage.className = "message bot";
+const botMessage = document.createElement("div");
+botMessage.className = "message bot";
 
-    botMessage.textContent =
-      data.answer || "Yi hakuri, ban samu amsa ba.";
+if (data.answer) {
+  botMessage.textContent = data.answer;
+} else if (data.error) {
+  botMessage.textContent =
+    "Backend error: " + data.error;
+} else {
+  botMessage.textContent =
+    "Unexpected response:\n" + JSON.stringify(data, null, 2);
+}
 
-    messages.appendChild(botMessage);
-
+messages.appendChild(botMessage);
   } catch (error) {
 
     loading.remove();
