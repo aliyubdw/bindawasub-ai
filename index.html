@@ -101,7 +101,6 @@
       cursor: not-allowed;
     }
 
-    /* Clickable product cards */
     .product-list {
       margin-top: 10px;
       margin-bottom: 12px;
@@ -145,6 +144,32 @@
       font-weight: bold;
       font-size: 16px;
       margin-top: 6px;
+    }
+
+    .confirm-button {
+      display: block;
+      width: 85%;
+      margin: 5px 0 12px auto;
+      background: #087f5b;
+      color: white;
+      border: none;
+      padding: 13px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .cancel-button {
+      display: block;
+      width: 85%;
+      margin: 5px 0 12px auto;
+      background: #eeeeee;
+      color: #333;
+      border: none;
+      padding: 13px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -193,25 +218,66 @@ const EDGE_FUNCTION_URL =
 
 
 /* =========================================
-   DISPLAY CLICKABLE PRODUCTS
+   CURRENT ORDER
+========================================= */
+
+let selectedProduct = null;
+let recipientPhone = null;
+let waitingForPhone = false;
+let waitingForConfirmation = false;
+
+
+/* =========================================
+   ADD MESSAGE
+========================================= */
+
+function addMessage(text, type) {
+
+  const messages =
+    document.getElementById("messages");
+
+  const message =
+    document.createElement("div");
+
+  message.className =
+    "message " + type;
+
+  message.textContent =
+    text;
+
+  messages.appendChild(message);
+
+  messages.scrollTop =
+    messages.scrollHeight;
+}
+
+
+/* =========================================
+   SHOW CLICKABLE PRODUCTS
 ========================================= */
 
 function showProducts(products) {
 
-  const messages = document.getElementById("messages");
+  const messages =
+    document.getElementById("messages");
 
-  const productList = document.createElement("div");
+  const productList =
+    document.createElement("div");
 
-  productList.className = "product-list";
+  productList.className =
+    "product-list";
 
 
   products.forEach(product => {
 
-    const card = document.createElement("button");
+    const card =
+      document.createElement("button");
 
-    card.className = "product-card";
+    card.className =
+      "product-card";
 
-    card.type = "button";
+    card.type =
+      "button";
 
 
     card.innerHTML = `
@@ -232,29 +298,42 @@ function showProducts(products) {
 
 
     /* =========================================
-       WHEN CUSTOMER CLICKS PACKAGE
+       PACKAGE CLICK
     ========================================= */
 
     card.onclick = function() {
 
-      /* Show customer's selection */
+      selectedProduct = product;
 
-      const userMessage =
-        document.createElement("div");
+      waitingForPhone = true;
 
-      userMessage.className = "message user";
-
-      userMessage.textContent =
-        `I want ${product.product_name}`;
-
-      messages.appendChild(userMessage);
+      waitingForConfirmation = false;
 
 
-      /* Send selection to backend */
-
-      sendMessage(
-        `I want ${product.product_name}`
+      addMessage(
+        `Na zabi ${product.product_name}`,
+        "user"
       );
+
+
+      addMessage(
+        `Ka turo min lambar wayar da za a saka data.
+
+Misali: 08012345678`,
+        "bot"
+      );
+
+
+      const input =
+        document.getElementById("messageInput");
+
+      input.placeholder =
+        "Shigar da lambar wayar...";
+
+      input.focus();
+
+
+      productList.remove();
 
     };
 
@@ -272,6 +351,185 @@ function showProducts(products) {
 
 
 /* =========================================
+   VALIDATE NIGERIAN PHONE NUMBER
+========================================= */
+
+function validatePhone(phone) {
+
+  let number =
+    phone.replace(/\s+/g, "")
+         .replace(/-/g, "");
+
+
+  /* +2348012345678 */
+
+  if (number.startsWith("+234")) {
+
+    number =
+      "0" + number.substring(4);
+
+  }
+
+
+  /* 2348012345678 */
+
+  else if (number.startsWith("234")) {
+
+    number =
+      "0" + number.substring(3);
+
+  }
+
+
+  /* Nigerian local number */
+
+  if (
+    /^0[789][0-9]{9}$/.test(number)
+  ) {
+
+    return number;
+
+  }
+
+
+  return null;
+}
+
+
+/* =========================================
+   SHOW ORDER CONFIRMATION
+========================================= */
+
+function showConfirmation() {
+
+  const messages =
+    document.getElementById("messages");
+
+
+  const box =
+    document.createElement("div");
+
+  box.className =
+    "message bot";
+
+
+  box.textContent =
+`Ga bayanan sayayyarka:
+
+${selectedProduct.product_name}
+Farashi: ₦${Number(selectedProduct.selling_price).toLocaleString()}
+Lamba: ${recipientPhone}
+
+Kana tabbatar da wannan sayayya?`;
+
+
+  messages.appendChild(box);
+
+
+  /* CONFIRM BUTTON */
+
+  const confirm =
+    document.createElement("button");
+
+  confirm.className =
+    "confirm-button";
+
+  confirm.textContent =
+    "✅ Eh, tabbatar da sayayya";
+
+
+  confirm.onclick =
+    function() {
+
+      addMessage(
+        "Eh, na tabbatar.",
+        "user"
+      );
+
+      addMessage(
+        "An tabbatar da oda. Za mu ci gaba da duba wallet kafin a kammala sayayya.",
+        "bot"
+      );
+
+      /*
+
+        IMPORTANT:
+        No money is deducted here.
+        No data is sent here.
+
+        This is only the confirmation stage.
+
+      */
+
+      waitingForConfirmation = false;
+
+      confirm.remove();
+
+      if (cancel) {
+        cancel.remove();
+      }
+
+    };
+
+
+  messages.appendChild(confirm);
+
+
+  /* CANCEL BUTTON */
+
+  const cancel =
+    document.createElement("button");
+
+  cancel.className =
+    "cancel-button";
+
+  cancel.textContent =
+    "❌ A'a, canza bayanai";
+
+
+  cancel.onclick =
+    function() {
+
+      addMessage(
+        "A'a, ina son canza bayanin.",
+        "user"
+      );
+
+      addMessage(
+        "To, ka sake zabar package ko ka turo sabon lambar waya.",
+        "bot"
+      );
+
+
+      selectedProduct = null;
+      recipientPhone = null;
+
+      waitingForPhone = false;
+      waitingForConfirmation = false;
+
+
+      confirm.remove();
+      cancel.remove();
+
+
+      const input =
+        document.getElementById("messageInput");
+
+      input.placeholder =
+        "Rubuta saƙonka...";
+
+    };
+
+
+  messages.appendChild(cancel);
+
+
+  waitingForConfirmation = true;
+
+}
+
+
+/* =========================================
    SEND MESSAGE
 ========================================= */
 
@@ -283,50 +541,101 @@ async function sendMessage(customMessage = null) {
   const button =
     document.getElementById("sendButton");
 
-  const messages =
-    document.getElementById("messages");
-
-
-  /* Use custom message when package is clicked */
 
   const message =
-    customMessage || input.value.trim();
+    customMessage ||
+    input.value.trim();
 
 
   if (!message) return;
 
 
   /* =========================================
-     SHOW NORMAL CUSTOMER MESSAGE
-     Package clicks are already displayed above.
+     PHONE NUMBER STAGE
+  ========================================= */
+
+  if (
+    waitingForPhone &&
+    !customMessage
+  ) {
+
+    const phone =
+      validatePhone(message);
+
+
+    addMessage(
+      message,
+      "user"
+    );
+
+
+    input.value = "";
+
+
+    if (!phone) {
+
+      addMessage(
+        `Lambar wayar ba ta dace ba.
+
+Ka shigar da lambar Najeriya mai lamba 11.
+
+Misali: 08012345678`,
+        "bot"
+      );
+
+      input.focus();
+
+      return;
+
+    }
+
+
+    recipientPhone =
+      phone;
+
+
+    waitingForPhone = false;
+
+
+    showConfirmation();
+
+
+    input.placeholder =
+      "Rubuta saƙonka...";
+
+
+    input.focus();
+
+    return;
+
+  }
+
+
+  /* =========================================
+     NORMAL MESSAGE
   ========================================= */
 
   if (!customMessage) {
 
-    const userMessage =
-      document.createElement("div");
-
-    userMessage.className =
-      "message user";
-
-    userMessage.textContent =
-      message;
-
-    messages.appendChild(userMessage);
+    addMessage(
+      message,
+      "user"
+    );
 
     input.value = "";
 
   }
 
 
-  /* Disable send button */
-
   button.disabled = true;
 
 
   /* =========================================
-     LOADING MESSAGE
+     LOADING
   ========================================= */
+
+  const messages =
+    document.getElementById("messages");
 
   const loading =
     document.createElement("div");
@@ -346,7 +655,7 @@ async function sendMessage(customMessage = null) {
   try {
 
     /* =========================================
-       SEND REQUEST TO SUPABASE
+       SEND TO SUPABASE
     ========================================= */
 
     const response =
@@ -367,10 +676,6 @@ async function sendMessage(customMessage = null) {
       );
 
 
-    /* =========================================
-       READ RESPONSE
-    ========================================= */
-
     const data =
       await response.json();
 
@@ -379,49 +684,45 @@ async function sendMessage(customMessage = null) {
 
 
     /* =========================================
-       BOT MESSAGE
+       BOT RESPONSE
     ========================================= */
-
-    const botMessage =
-      document.createElement("div");
-
-    botMessage.className =
-      "message bot";
-
 
     if (data.answer) {
 
-      botMessage.textContent =
-        data.answer;
+      addMessage(
+        data.answer,
+        "bot"
+      );
 
     }
 
     else if (data.error) {
 
-      botMessage.textContent =
+      addMessage(
         "Backend error: " +
-        data.error;
+        data.error,
+        "bot"
+      );
 
     }
 
     else {
 
-      botMessage.textContent =
+      addMessage(
         "Unexpected response:\n" +
         JSON.stringify(
           data,
           null,
           2
-        );
+        ),
+        "bot"
+      );
 
     }
 
 
-    messages.appendChild(botMessage);
-
-
     /* =========================================
-       SHOW CLICKABLE PACKAGES
+       SHOW PACKAGES
     ========================================= */
 
     if (
@@ -443,28 +744,16 @@ async function sendMessage(customMessage = null) {
     loading.remove();
 
 
-    const errorMessage =
-      document.createElement("div");
-
-    errorMessage.className =
-      "message bot";
-
-    errorMessage.textContent =
-      "An samu matsala wajen haɗawa da Bindawasub AI.";
-
-
-    messages.appendChild(
-      errorMessage
+    addMessage(
+      "An samu matsala wajen haɗawa da Bindawasub AI.",
+      "bot"
     );
+
 
     console.error(error);
 
   }
 
-
-  /* =========================================
-     RE-ENABLE SEND BUTTON
-  ========================================= */
 
   button.disabled = false;
 
@@ -476,7 +765,7 @@ async function sendMessage(customMessage = null) {
 
 
 /* =========================================
-   ENTER KEY SUPPORT
+   ENTER KEY
 ========================================= */
 
 document
@@ -485,7 +774,9 @@ document
     "keydown",
     function(event) {
 
-      if (event.key === "Enter") {
+      if (
+        event.key === "Enter"
+      ) {
 
         sendMessage();
 
