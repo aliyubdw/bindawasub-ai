@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -218,6 +217,20 @@ const EDGE_FUNCTION_URL =
 
 
 /* =========================================
+   TEST CUSTOMER
+========================================= */
+
+/*
+  IMPORTANT:
+  Replace the value below with the actual UUID
+  of your Test Customer in Supabase.
+*/
+
+const TEST_CUSTOMER_UUID =
+  "YOUR_TEST_CUSTOMER_UUID";
+
+
+/* =========================================
    CURRENT ORDER
 ========================================= */
 
@@ -426,7 +439,9 @@ Kana tabbatar da wannan sayayya?`;
   messages.appendChild(box);
 
 
-  /* CONFIRM BUTTON */
+  /* =========================================
+     CONFIRM BUTTON
+  ========================================= */
 
   const confirm =
     document.createElement("button");
@@ -439,31 +454,150 @@ Kana tabbatar da wannan sayayya?`;
 
 
   confirm.onclick =
-    function() {
+    async function() {
 
       addMessage(
         "Eh, na tabbatar.",
         "user"
       );
 
+
+      confirm.disabled = true;
+
+
+      if (cancel) {
+        cancel.disabled = true;
+      }
+
+
       addMessage(
-        "An tabbatar da oda. Za mu ci gaba da duba wallet kafin a kammala sayayya.",
+        "Ana duba wallet dinka...",
         "bot"
       );
 
-      /*
 
-        IMPORTANT:
-        No money is deducted here.
-        No data is sent here.
+      try {
 
-        This is only the confirmation stage.
+        /* =====================================
+           CHECK WALLET
+        ===================================== */
 
-      */
+        const response =
+          await fetch(
+            EDGE_FUNCTION_URL,
+            {
+              method: "POST",
 
-      waitingForConfirmation = false;
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+
+                action:
+                  "check_wallet",
+
+                user_id:
+                  14297ce6-226d-47f5-b7a0-b00f34dd7e68,
+
+                amount:
+                  Number(
+                    selectedProduct.selling_price
+                  )
+
+              })
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        /* =====================================
+           SUFFICIENT BALANCE
+        ===================================== */
+
+        if (
+          data.success &&
+          data.wallet_status === "sufficient"
+        ) {
+
+          addMessage(
+            data.answer,
+            "bot"
+          );
+
+
+          addMessage(
+            "✅ Wallet check ya yi nasara. A wannan matakin ba a cire kudi kuma ba a tura data.",
+            "bot"
+          );
+
+        }
+
+
+        /* =====================================
+           INSUFFICIENT BALANCE
+        ===================================== */
+
+        else if (
+          data.success &&
+          data.wallet_status === "insufficient"
+        ) {
+
+          addMessage(
+            data.answer,
+            "bot"
+          );
+
+
+          addMessage(
+            "❌ Ba za a ci gaba da sayayya ba sai an samu isasshen kudi a wallet.",
+            "bot"
+          );
+
+        }
+
+
+        /* =====================================
+           BACKEND ERROR
+        ===================================== */
+
+        else {
+
+          addMessage(
+            "An samu matsala wajen duba wallet.\n\n" +
+            (data.error ||
+             "Unknown error"),
+            "bot"
+          );
+
+        }
+
+      }
+
+
+      catch (error) {
+
+        console.error(error);
+
+
+        addMessage(
+          "An samu matsala wajen haɗawa da wallet.",
+          "bot"
+        );
+
+      }
+
+
+      waitingForConfirmation =
+        false;
+
 
       confirm.remove();
+
 
       if (cancel) {
         cancel.remove();
@@ -475,7 +609,9 @@ Kana tabbatar da wannan sayayya?`;
   messages.appendChild(confirm);
 
 
-  /* CANCEL BUTTON */
+  /* =========================================
+     CANCEL BUTTON
+  ========================================= */
 
   const cancel =
     document.createElement("button");
@@ -495,6 +631,7 @@ Kana tabbatar da wannan sayayya?`;
         "user"
       );
 
+
       addMessage(
         "To, ka sake zabar package ko ka turo sabon lambar waya.",
         "bot"
@@ -502,13 +639,16 @@ Kana tabbatar da wannan sayayya?`;
 
 
       selectedProduct = null;
+
       recipientPhone = null;
 
       waitingForPhone = false;
+
       waitingForConfirmation = false;
 
 
       confirm.remove();
+
       cancel.remove();
 
 
@@ -524,7 +664,8 @@ Kana tabbatar da wannan sayayya?`;
   messages.appendChild(cancel);
 
 
-  waitingForConfirmation = true;
+  waitingForConfirmation =
+    true;
 
 }
 
@@ -583,6 +724,7 @@ Misali: 08012345678`,
         "bot"
       );
 
+
       input.focus();
 
       return;
@@ -594,7 +736,8 @@ Misali: 08012345678`,
       phone;
 
 
-    waitingForPhone = false;
+    waitingForPhone =
+      false;
 
 
     showConfirmation();
@@ -645,6 +788,7 @@ Misali: 08012345678`,
 
   loading.textContent =
     "Ana tunani...";
+
 
   messages.appendChild(loading);
 
@@ -761,6 +905,7 @@ Misali: 08012345678`,
 
   messages.scrollTop =
     messages.scrollHeight;
+
 }
 
 
@@ -789,4 +934,3 @@ document
 
 </body>
 </html>
-```
