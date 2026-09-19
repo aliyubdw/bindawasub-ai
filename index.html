@@ -96,5 +96,406 @@
       cursor: pointer;
     }
 
-    button:d
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Clickable product cards */
+    .product-list {
+      margin-top: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .product-card {
+      width: 100%;
+      background: white;
+      color: #087f5b;
+      border: 2px solid #087f5b;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .product-card:hover {
+      background: #e9f8f2;
+    }
+
+    .product-card:active {
+      transform: scale(0.98);
+    }
+
+    .product-name {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .product-details {
+      font-size: 13px;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    .product-price {
+      font-weight: bold;
+      font-size: 16px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="chat">
+
+  <div class="header">
+    <h2>🤖 Bindawasub AI</h2>
+    <p>Sannu! Ta yaya zan taimaka maka?</p>
+  </div>
+
+  <div id="messages">
+
+    <div class="message bot">
+      Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?
+    </div>
+
+  </div>
+
+  <div class="input-area">
+
+    <input
+      id="messageInput"
+      type="text"
+      placeholder="Rubuta saƙonka..."
+      autocomplete="off"
+    >
+
+    <button
+      id="sendButton"
+      onclick="sendMessage()"
+    >
+      Send
+    </button>
+
+  </div>
+
+</div>
+
+<script>
+
+const EDGE_FUNCTION_URL =
+  "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
+
+
+/* =========================================
+   DISPLAY CLICKABLE PRODUCTS
+========================================= */
+
+function showProducts(products) {
+
+  const messages = document.getElementById("messages");
+
+  const productList = document.createElement("div");
+
+  productList.className = "product-list";
+
+
+  products.forEach(product => {
+
+    const card = document.createElement("button");
+
+    card.className = "product-card";
+
+    card.type = "button";
+
+
+    card.innerHTML = `
+
+      <div class="product-name">
+        ${product.product_name}
+      </div>
+
+      <div class="product-details">
+        ${product.duration || ""}
+      </div>
+
+      <div class="product-price">
+        ₦${Number(product.selling_price).toLocaleString()}
+      </div>
+
+    `;
+
+
+    /* =========================================
+       WHEN CUSTOMER CLICKS PACKAGE
+    ========================================= */
+
+    card.onclick = function() {
+
+      /* Show customer's selection */
+
+      const userMessage =
+        document.createElement("div");
+
+      userMessage.className = "message user";
+
+      userMessage.textContent =
+        `I want ${product.product_name}`;
+
+      messages.appendChild(userMessage);
+
+
+      /* Send selection to backend */
+
+      sendMessage(
+        `I want ${product.product_name}`
+      );
+
+    };
+
+
+    productList.appendChild(card);
+
+  });
+
+
+  messages.appendChild(productList);
+
+  messages.scrollTop =
+    messages.scrollHeight;
+}
+
+
+/* =========================================
+   SEND MESSAGE
+========================================= */
+
+async function sendMessage(customMessage = null) {
+
+  const input =
+    document.getElementById("messageInput");
+
+  const button =
+    document.getElementById("sendButton");
+
+  const messages =
+    document.getElementById("messages");
+
+
+  /* Use custom message when package is clicked */
+
+  const message =
+    customMessage || input.value.trim();
+
+
+  if (!message) return;
+
+
+  /* =========================================
+     SHOW NORMAL CUSTOMER MESSAGE
+     Package clicks are already displayed above.
+  ========================================= */
+
+  if (!customMessage) {
+
+    const userMessage =
+      document.createElement("div");
+
+    userMessage.className =
+      "message user";
+
+    userMessage.textContent =
+      message;
+
+    messages.appendChild(userMessage);
+
+    input.value = "";
+
+  }
+
+
+  /* Disable send button */
+
+  button.disabled = true;
+
+
+  /* =========================================
+     LOADING MESSAGE
+  ========================================= */
+
+  const loading =
+    document.createElement("div");
+
+  loading.className =
+    "message bot";
+
+  loading.textContent =
+    "Ana tunani...";
+
+  messages.appendChild(loading);
+
+  messages.scrollTop =
+    messages.scrollHeight;
+
+
+  try {
+
+    /* =========================================
+       SEND REQUEST TO SUPABASE
+    ========================================= */
+
+    const response =
+      await fetch(
+        EDGE_FUNCTION_URL,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body: JSON.stringify({
+            message: message
+          })
+        }
+      );
+
+
+    /* =========================================
+       READ RESPONSE
+    ========================================= */
+
+    const data =
+      await response.json();
+
+
+    loading.remove();
+
+
+    /* =========================================
+       BOT MESSAGE
+    ========================================= */
+
+    const botMessage =
+      document.createElement("div");
+
+    botMessage.className =
+      "message bot";
+
+
+    if (data.answer) {
+
+      botMessage.textContent =
+        data.answer;
+
+    }
+
+    else if (data.error) {
+
+      botMessage.textContent =
+        "Backend error: " +
+        data.error;
+
+    }
+
+    else {
+
+      botMessage.textContent =
+        "Unexpected response:\n" +
+        JSON.stringify(
+          data,
+          null,
+          2
+        );
+
+    }
+
+
+    messages.appendChild(botMessage);
+
+
+    /* =========================================
+       SHOW CLICKABLE PACKAGES
+    ========================================= */
+
+    if (
+      data.products &&
+      data.products.length > 0
+    ) {
+
+      showProducts(
+        data.products
+      );
+
+    }
+
+  }
+
+
+  catch (error) {
+
+    loading.remove();
+
+
+    const errorMessage =
+      document.createElement("div");
+
+    errorMessage.className =
+      "message bot";
+
+    errorMessage.textContent =
+      "An samu matsala wajen haɗawa da Bindawasub AI.";
+
+
+    messages.appendChild(
+      errorMessage
+    );
+
+    console.error(error);
+
+  }
+
+
+  /* =========================================
+     RE-ENABLE SEND BUTTON
+  ========================================= */
+
+  button.disabled = false;
+
+  input.focus();
+
+  messages.scrollTop =
+    messages.scrollHeight;
+}
+
+
+/* =========================================
+   ENTER KEY SUPPORT
+========================================= */
+
+document
+  .getElementById("messageInput")
+  .addEventListener(
+    "keydown",
+    function(event) {
+
+      if (event.key === "Enter") {
+
+        sendMessage();
+
+      }
+
+    }
+  );
+
+</script>
+
+</body>
+</html>
 ```
