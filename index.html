@@ -1,1 +1,224 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bindawasub AI</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f7f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .chat {
+      width: 100%;
+      max-width: 500px;
+      height: 90vh;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    .header {
+      background: #087f5b;
+      color: white;
+      padding: 20px;
+    }
+
+    .header h2 {
+      margin: 0;
+    }
+
+    .header p {
+      margin: 5px 0 0;
+      font-size: 14px;
+    }
+
+    #messages {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+    .message {
+      margin-bottom: 12px;
+      padding: 10px 13px;
+      border-radius: 12px;
+      max-width: 85%;
+      white-space: pre-wrap;
+    }
+
+    .user {
+      background: #dff5ec;
+      margin-left: auto;
+    }
+
+    .bot {
+      background: #f0f0f0;
+      margin-right: auto;
+    }
+
+    .input-area {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid #ddd;
+      gap: 8px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      background: #087f5b;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="chat">
+
+  <div class="header">
+    <h2>🤖 Bindawasub AI</h2>
+    <p>Sannu! Ta yaya zan taimaka maka?</p>
+  </div>
+
+  <div id="messages">
+    <div class="message bot">
+      Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?
+    </div>
+  </div>
+
+  <div class="input-area">
+    <input
+      id="messageInput"
+      type="text"
+      placeholder="Rubuta saƙonka..."
+      autocomplete="off"
+    >
+    <button id="sendButton" onclick="sendMessage()">Send</button>
+  </div>
+
+</div>
+
+<script>
+
+const EDGE_FUNCTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
+
+async function sendMessage() {
+
+  const input = document.getElementById("messageInput");
+  const button = document.getElementById("sendButton");
+  const messages = document.getElementById("messages");
+
+  const message = input.value.trim();
+
+  if (!message) return;
+
+  // Show customer's message
+  const userMessage = document.createElement("div");
+  userMessage.className = "message user";
+  userMessage.textContent = message;
+  messages.appendChild(userMessage);
+
+  input.value = "";
+  button.disabled = true;
+
+  // Temporary loading message
+  const loading = document.createElement("div");
+  loading.className = "message bot";
+  loading.textContent = "Ana tunani...";
+  messages.appendChild(loading);
+
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        message: message
+      })
+    });
+
+    const data = await response.json();
+
+    loading.remove();
+
+    const botMessage = document.createElement("div");
+    botMessage.className = "message bot";
+
+    botMessage.textContent =
+      data.answer || "Yi hakuri, ban samu amsa ba.";
+
+    messages.appendChild(botMessage);
+
+  } catch (error) {
+
+    loading.remove();
+
+    const errorMessage = document.createElement("div");
+    errorMessage.className = "message bot";
+
+    errorMessage.textContent =
+      "An samu matsala wajen haɗawa da Bindawasub AI.";
+
+    messages.appendChild(errorMessage);
+
+  }
+
+  button.disabled = false;
+  input.focus();
+
+  messages.scrollTop = messages.scrollHeight;
+}
+
+document
+  .getElementById("messageInput")
+  .addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter") {
+      sendMessage();
+    }
+
+  });
+
+</script>
+
+</body>
+</html>
+```
 
