@@ -220,12 +220,6 @@ const EDGE_FUNCTION_URL =
    TEST CUSTOMER
 ========================================= */
 
-/*
-  IMPORTANT:
-  Replace the value below with the actual UUID
-  of your Test Customer in Supabase.
-*/
-
 const TEST_CUSTOMER_UUID =
   "14297ce6-226d-47f5-b7a0-b00f34dd7e68";
 
@@ -374,8 +368,6 @@ function validatePhone(phone) {
          .replace(/-/g, "");
 
 
-  /* +2348012345678 */
-
   if (number.startsWith("+234")) {
 
     number =
@@ -384,8 +376,6 @@ function validatePhone(phone) {
   }
 
 
-  /* 2348012345678 */
-
   else if (number.startsWith("234")) {
 
     number =
@@ -393,8 +383,6 @@ function validatePhone(phone) {
 
   }
 
-
-  /* Nigerian local number */
 
   if (
     /^0[789][0-9]{9}$/.test(number)
@@ -471,7 +459,7 @@ Kana tabbatar da wannan sayayya?`;
 
 
       addMessage(
-        "Ana duba wallet dinka...",
+        "Ana sarrafa sayayyar... Kada ka rufe shafin.",
         "bot"
       );
 
@@ -479,7 +467,20 @@ Kana tabbatar da wannan sayayya?`;
       try {
 
         /* =====================================
-           CHECK WALLET
+           CREATE UNIQUE TRANSACTION REFERENCE
+        ===================================== */
+
+        const reference =
+          "BW-" +
+          Date.now() +
+          "-" +
+          Math.random()
+            .toString(36)
+            .substring(2, 8);
+
+
+        /* =====================================
+           PROCESS WALLET PURCHASE
         ===================================== */
 
         const response =
@@ -496,15 +497,19 @@ Kana tabbatar da wannan sayayya?`;
               body: JSON.stringify({
 
                 action:
-                  "check_wallet",
+                  "purchase",
 
                 user_id:
                   TEST_CUSTOMER_UUID,
 
-                amount:
-                  Number(
-                    selectedProduct.selling_price
-                  )
+                product_id:
+                  selectedProduct.id,
+
+                phone_number:
+                  recipientPhone,
+
+                reference:
+                  reference
 
               })
             }
@@ -516,22 +521,41 @@ Kana tabbatar da wannan sayayya?`;
 
 
         /* =====================================
-           SUFFICIENT BALANCE
+           PURCHASE SUCCESS
         ===================================== */
 
         if (
+          response.ok &&
           data.success &&
-          data.wallet_status === "sufficient"
+          data.purchase
         ) {
 
-          addMessage(
-            data.answer,
-            "bot"
-          );
+          const purchase =
+            data.purchase;
 
 
           addMessage(
-            "✅ Wallet check ya yi nasara. A wannan matakin ba a cire kudi kuma ba a tura data.",
+            `✅ An karɓi sayayyar.
+
+Package: ${selectedProduct.product_name}
+Lamba: ${recipientPhone}
+Farashi: ₦${Number(
+              purchase.purchase_amount
+            ).toLocaleString()}
+
+Balance kafin sayayya: ₦${Number(
+              purchase.balance_before
+            ).toLocaleString()}
+
+Balance bayan sayayya: ₦${Number(
+              purchase.balance_after
+            ).toLocaleString()}
+
+Transaction status: ${purchase.status}
+
+Reference: ${purchase.reference}
+
+A halin yanzu sayayyar tana jiran VTU processing. Ba a tura data zuwa provider ba tukuna.`,
             "bot"
           );
 
@@ -539,41 +563,30 @@ Kana tabbatar da wannan sayayya?`;
 
 
         /* =====================================
-           INSUFFICIENT BALANCE
-        ===================================== */
-
-        else if (
-          data.success &&
-          data.wallet_status === "insufficient"
-        ) {
-
-          addMessage(
-            data.answer,
-            "bot"
-          );
-
-
-          addMessage(
-            "❌ Ba za a ci gaba da sayayya ba sai an samu isasshen kudi a wallet.",
-            "bot"
-          );
-
-        }
-
-
-        /* =====================================
-           BACKEND ERROR
+           PURCHASE ERROR
         ===================================== */
 
         else {
 
           addMessage(
-            "An samu matsala wajen duba wallet.\n\n" +
-            (data.error ||
-             "Unknown error"),
+            "❌ An kasa kammala sayayyar.\n\n" +
+            (
+              data.error ||
+              "Unknown error"
+            ),
             "bot"
           );
 
+
+          confirm.disabled = false;
+
+
+          if (cancel) {
+            cancel.disabled = false;
+          }
+
+
+          return;
         }
 
       }
@@ -585,15 +598,33 @@ Kana tabbatar da wannan sayayya?`;
 
 
         addMessage(
-          "An samu matsala wajen haɗawa da wallet.",
+          "❌ An samu matsala wajen haɗawa da tsarin sayayya.",
           "bot"
         );
 
+
+        confirm.disabled = false;
+
+
+        if (cancel) {
+          cancel.disabled = false;
+        }
+
+
+        return;
       }
 
 
       waitingForConfirmation =
         false;
+
+
+      selectedProduct =
+        null;
+
+
+      recipientPhone =
+        null;
 
 
       confirm.remove();
