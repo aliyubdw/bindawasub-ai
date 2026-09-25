@@ -254,8 +254,27 @@
     .admin-error { color: #a61b1b; }
 
     /* ADMIN MODE: hide customer-only chat UI */
+    #customerInterface {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
     #customerInterface.admin-hidden {
       display: none !important;
+    }
+
+    #messages {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .input-area {
+      flex: 0 0 auto;
+      width: 100%;
     }
 
     .chat.admin-mode #adminPanel {
