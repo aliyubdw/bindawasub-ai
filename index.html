@@ -444,7 +444,9 @@ async function initAuth() {
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session) {
       showChatScreen();
-      await verifyAdminMode();
+      setTimeout(() => {
+        verifyAdminMode();
+      }, 0);
     } else {
       hideAdminMode();
       document.getElementById("chatScreen").style.display = "none";
@@ -467,7 +469,13 @@ let adminSelectedCustomer = null;
 async function verifyAdminMode() {
   try {
     const response = await callEdgeFunction({ action: "admin_status" });
-    isAdminUser = response.is_admin === true && response.role === "admin";
+    const data = await response.json();
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(data.error || "Admin status check failed.");
+    }
+
+    isAdminUser = data.is_admin === true && data.role === "admin";
 
     if (isAdminUser) {
       document.getElementById("adminBadge").style.display = "inline-block";
@@ -475,7 +483,7 @@ async function verifyAdminMode() {
       document.getElementById("headerSubtitle").textContent =
         "Admin mode — customer tools are available below.";
       document.getElementById("adminStatus").textContent =
-        "Logged in as " + (response.user?.name || "Admin");
+        "Logged in as " + (data.user?.name || "Admin");
     }
 
     return isAdminUser;
