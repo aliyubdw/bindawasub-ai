@@ -278,6 +278,16 @@
     }
   }
 
+
+  async function verifyAdminAccess() {
+    const result = await callAdminFunction({ action: "admin_status" });
+    if (!result.is_admin || result.role !== "admin") {
+      await supabaseClient.auth.signOut();
+      throw new Error("This account is not authorized to access the admin dashboard.");
+    }
+    return result;
+  }
+
   loginForm.addEventListener("submit", async function(event) {
     event.preventDefault();
     showMessage(loginMessage, "", "");
@@ -289,6 +299,7 @@
       const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (!data.session) throw new Error("Login succeeded but no session was created.");
+      await verifyAdminAccess();
       loginCard.classList.add("hidden");
       adminPanel.classList.remove("hidden");
     } catch (error) {
@@ -481,8 +492,14 @@
   async function checkExistingSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
-      loginCard.classList.add("hidden");
-      adminPanel.classList.remove("hidden");
+      try {
+        await verifyAdminAccess();
+        loginCard.classList.add("hidden");
+        adminPanel.classList.remove("hidden");
+      } catch (error) {
+        await supabaseClient.auth.signOut();
+        showMessage(loginMessage, error.message || "Admin access required.", "error");
+      }
     }
   }
 
