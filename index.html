@@ -491,6 +491,8 @@ async function verifyAdminMode() {
 
     if (isAdminUser) {
       document.getElementById("chatScreen").classList.add("admin-mode");
+      document.getElementById("messages").style.display = "none";
+      document.querySelector(".input-area").style.display = "none";
       document.getElementById("adminBadge").style.display = "inline-block";
       document.getElementById("adminPanel").style.display = "block";
       document.getElementById("headerSubtitle").textContent =
@@ -702,6 +704,8 @@ function hideAdminMode() {
   isAdminUser = false;
   adminSelectedCustomer = null;
   document.getElementById("chatScreen").classList.remove("admin-mode");
+  document.getElementById("messages").style.display = "";
+  document.querySelector(".input-area").style.display = "";
   document.getElementById("adminBadge").style.display = "none";
   document.getElementById("adminPanel").style.display = "none";
   document.getElementById("headerSubtitle").textContent =
