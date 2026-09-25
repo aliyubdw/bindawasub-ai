@@ -1374,41 +1374,74 @@ Misali: 08012345678`,
       message: message
     });
 
+    /* Read the raw response first so we never
+       lose the real backend error. */
+    const rawText = await response.text();
 
-    const data =
-      await response.json();
+    let data = null;
 
+    try {
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch (parseError) {
+      data = {
+        error: "Backend returned a non-JSON response.",
+        raw_response: rawText
+      };
+    }
 
     loading.remove();
 
-
     /* =========================================
-       BOT RESPONSE
+       SHOW ACTUAL BACKEND RESPONSE / ERROR
     ========================================= */
 
-    if (data.answer) {
+    if (!response.ok) {
+
+      const backendMessage =
+        data?.error ||
+        data?.message ||
+        data?.answer ||
+        data?.raw_response ||
+        "No error message was returned by the backend.";
+
+      addMessage(
+        "❌ Backend error (HTTP " +
+        response.status +
+        "):\\n" +
+        backendMessage,
+        "bot"
+      );
+
+      console.error("Bindawasub AI backend error:", {
+        status: response.status,
+        statusText: response.statusText,
+        response: data
+      });
+
+      return;
+    }
+
+    if (data?.answer) {
 
       addMessage(
         data.answer,
         "bot"
       );
 
-    }
-
-    else if (data.error) {
+    } else if (data?.error) {
 
       addMessage(
-        "Backend error: " +
+        "⚠️ Backend response: " +
         data.error,
         "bot"
       );
 
-    }
+      console.error("Bindawasub AI backend response error:", data);
 
-    else {
+    } else if (data) {
 
       addMessage(
-        "Unexpected response:\n" +
+        "Backend response received:\\n" +
         JSON.stringify(
           data,
           null,
@@ -1417,15 +1450,27 @@ Misali: 08012345678`,
         "bot"
       );
 
-    }
+      console.log("Bindawasub AI backend response:", data);
 
+    } else {
+
+      addMessage(
+        "⚠️ Backend returned an empty response.",
+        "bot"
+      );
+
+      console.error(
+        "Bindawasub AI returned an empty response."
+      );
+
+    }
 
     /* =========================================
        SHOW PACKAGES
     ========================================= */
 
     if (
-      data.products &&
+      data?.products &&
       data.products.length > 0
     ) {
 
@@ -1435,24 +1480,27 @@ Misali: 08012345678`,
 
     }
 
-  }
-
-
-  catch (error) {
+  } catch (error) {
 
     loading.remove();
 
+    const errorMessage =
+      error?.message ||
+      String(error) ||
+      "Unknown frontend error.";
 
     addMessage(
-      "An samu matsala wajen haɗawa da Bindawasub AI.",
+      "❌ Frontend error:\\n" +
+      errorMessage,
       "bot"
     );
 
-
-    console.error(error);
+    console.error(
+      "Bindawasub AI frontend error:",
+      error
+    );
 
   }
-
 
   button.disabled = false;
 
