@@ -409,27 +409,50 @@ async function loginUser() {
   errorBox.textContent = "";
 
   if (!email || !password) {
-    errorBox.textContent = "Shigar da email da password."; 
+    errorBox.textContent = "Shigar da email da password.";
     return;
   }
 
   loginButton.disabled = true;
   loginButton.textContent = "Ana shiga...";
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
     email,
     password
   });
 
-  if (error) {
-    errorBox.textContent = error.message;
+  if (error || !data.session) {
+    errorBox.textContent = error?.message || "Login failed.";
     loginButton.disabled = false;
     loginButton.textContent = "Login";
     return;
   }
 
-  showChatScreen();
-  await verifyAdminMode();
+  // Do NOT show the customer interface first.
+  // Determine admin/customer mode before displaying the app.
+  try {
+    const isAdmin = await verifyAdminMode();
+
+    showChatScreen();
+
+    if (isAdmin) {
+      document.getElementById("customerInterface").classList.add("admin-hidden");
+    } else {
+      document.getElementById("customerInterface").classList.remove("admin-hidden");
+    }
+  } catch (error) {
+    console.error("Post-login setup failed:", error);
+    await supabaseClient.auth.signOut();
+    errorBox.textContent = "An kasa tabbatar da asusun. Sake gwadawa.";
+    document.getElementById("loginScreen").style.display = "block";
+    document.getElementById("chatScreen").style.display = "none";
+    loginButton.disabled = false;
+    loginButton.textContent = "Login";
+    return;
+  }
+
+  loginButton.disabled = false;
+  loginButton.textContent = "Login";
 }
 
 async function logoutUser() {
@@ -443,31 +466,59 @@ async function logoutUser() {
 function showChatScreen() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("chatScreen").style.display = "flex";
-  document.getElementById("messageInput").focus();
+  if (!isAdminUser) {
+    document.getElementById("messageInput").focus();
+  }
 }
 
 async function initAuth() {
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session) {
-    showChatScreen();
-    await verifyAdminMode();
+    try {
+      const isAdmin = await verifyAdminMode();
+      showChatScreen();
+
+      if (isAdmin) {
+        document.getElementById("customerInterface").classList.add("admin-hidden");
+      } else {
+        document.getElementById("customerInterface").classList.remove("admin-hidden");
+      }
+    } catch (error) {
+      console.error("Session setup failed:", error);
+      await supabaseClient.auth.signOut();
+    }
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (session) {
-      showChatScreen();
-      setTimeout(() => {
-        verifyAdminMode();
+    console.log("Auth event:", event, "has session:", !!session);
+
+    // Only a real signed-in/initial session should display the app.
+    if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
+      setTimeout(async () => {
+        try {
+          const isAdmin = await verifyAdminMode();
+          showChatScreen();
+
+          if (isAdmin) {
+            document.getElementById("customerInterface").classList.add("admin-hidden");
+          } else {
+            document.getElementById("customerInterface").classList.remove("admin-hidden");
+          }
+        } catch (error) {
+          console.error("Auth setup failed:", error);
+        }
       }, 0);
-    } else {
+    }
+
+    // Do NOT log the user out on TOKEN_REFRESHED or other transient auth events.
+    if (event === "SIGNED_OUT") {
       hideAdminMode();
       document.getElementById("chatScreen").style.display = "none";
       document.getElementById("loginScreen").style.display = "block";
     }
   });
 }
-
 
 /* =========================================
    ADMIN MODE
