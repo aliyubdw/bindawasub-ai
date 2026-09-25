@@ -253,6 +253,18 @@
     .admin-success { color: #126b42; }
     .admin-error { color: #a61b1b; }
 
+    /* ADMIN MODE: hide customer-only chat UI */
+    .chat.admin-mode #messages,
+    .chat.admin-mode .input-area {
+      display: none;
+    }
+
+    .chat.admin-mode #adminPanel {
+      flex: 1;
+      max-height: none;
+      overflow-y: auto;
+    }
+
     @media (max-width: 420px) {
       .admin-grid { grid-template-columns: 1fr; }
     }
@@ -478,6 +490,7 @@ async function verifyAdminMode() {
     isAdminUser = data.is_admin === true && data.role === "admin";
 
     if (isAdminUser) {
+      document.getElementById("chatScreen").classList.add("admin-mode");
       document.getElementById("adminBadge").style.display = "inline-block";
       document.getElementById("adminPanel").style.display = "block";
       document.getElementById("headerSubtitle").textContent =
@@ -688,6 +701,7 @@ async function resetAdminCustomerPassword() {
 function hideAdminMode() {
   isAdminUser = false;
   adminSelectedCustomer = null;
+  document.getElementById("chatScreen").classList.remove("admin-mode");
   document.getElementById("adminBadge").style.display = "none";
   document.getElementById("adminPanel").style.display = "none";
   document.getElementById("headerSubtitle").textContent =
