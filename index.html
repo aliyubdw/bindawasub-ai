@@ -1289,6 +1289,54 @@ function showTransactionHistory(transactions) {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function showFundingHistory(funding) {
+  const messages = document.getElementById("messages");
+
+  const box = document.createElement("div");
+  box.className = "message bot";
+  box.style.maxWidth = "95%";
+
+  const title = document.createElement("div");
+  title.style.fontWeight = "bold";
+  title.style.marginBottom = "10px";
+  title.textContent = "💰 Your recent wallet funding";
+  box.appendChild(title);
+
+  funding.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.style.padding = "9px 0";
+    row.style.borderTop = index === 0 ? "none" : "1px solid #ddd";
+
+    const date = item.date
+      ? new Date(item.date).toLocaleString("en-NG", {
+          dateStyle: "medium",
+          timeStyle: "short"
+        })
+      : "Date unavailable";
+
+    const status = String(item.status || "unknown").toLowerCase();
+    const statusLabel =
+      status === "successful" ? "✅ Successful" :
+      status === "failed" ? "❌ Failed" :
+      status === "pending" ? "⏳ Pending" :
+      "ℹ️ " + status;
+
+    const method = item.payment_method || "—";
+
+    row.innerHTML =
+      "<strong>₦" + Number(item.amount || 0).toLocaleString() + "</strong>" +
+      "<br>Method: " + method +
+      "<br>Status: " + statusLabel +
+      "<br>Reference: " + (item.reference || "—") +
+      "<br><small>" + date + "</small>";
+
+    box.appendChild(row);
+  });
+
+  messages.appendChild(box);
+  messages.scrollTop = messages.scrollHeight;
+}
+
 /* =========================================
    SEND MESSAGE
 ========================================= */
@@ -1526,6 +1574,18 @@ Misali: 08012345678`,
       data.transactions.length > 0
     ) {
       showTransactionHistory(data.transactions);
+    }
+
+    /* =========================================
+       SHOW FUNDING HISTORY
+    ========================================= */
+
+    if (
+      data?.funding &&
+      Array.isArray(data.funding) &&
+      data.funding.length > 0
+    ) {
+      showFundingHistory(data.funding);
     }
 
     /* =========================================
