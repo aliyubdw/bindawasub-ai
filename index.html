@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bindawasub AI</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     * {
@@ -19,6 +20,22 @@
       align-items: center;
       min-height: 100vh;
     }
+
+    .login {
+      width: 100%;
+      max-width: 420px;
+      background: white;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    .login h2 { margin-top: 0; color: #087f5b; }
+    .login p { color: #555; font-size: 14px; }
+    .login input { width: 100%; margin-bottom: 10px; }
+    .login button { width: 100%; }
+    .login-error { color: #b00020; font-size: 14px; margin-top: 10px; }
+    .logout-button { float: right; background: rgba(255,255,255,0.18); padding: 7px 10px; font-size: 12px; }
 
     .chat {
       width: 100%;
@@ -175,9 +192,19 @@
 
 <body>
 
-<div class="chat">
+<div class="login" id="loginScreen">
+  <h2>🤖 Bindawasub AI</h2>
+  <p>Shiga cikin asusunka domin amfani da Bindawasub.</p>
+  <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
+  <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+  <button id="loginButton" type="button">Login</button>
+  <div id="loginError" class="login-error"></div>
+</div>
+
+<div class="chat" id="chatScreen" style="display:none;">
 
   <div class="header">
+    <button id="logoutButton" class="logout-button" type="button">Logout</button>
     <h2>🤖 Bindawasub AI</h2>
     <p>Sannu! Ta yaya zan taimaka maka?</p>
   </div>
@@ -212,16 +239,110 @@
 
 <script>
 
+const SUPABASE_URL =
+  "https://fuktxjweuanatmurlzpg.supabase.co";
+
+const SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
+
 const EDGE_FUNCTION_URL =
   "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
 
+const supabaseClient =
+  window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+  );
+
+async function getAccessToken() {
+  const { data, error } =
+    await supabaseClient.auth.getSession();
+
+  if (error || !data.session) {
+    throw new Error("Ba a shiga cikin asusu ba.");
+  }
+
+  return data.session.access_token;
+}
+
+async function callEdgeFunction(payload) {
+  const token = await getAccessToken();
+
+  return fetch(EDGE_FUNCTION_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_PUBLISHABLE_KEY,
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+async function loginUser() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errorBox = document.getElementById("loginError");
+  const loginButton = document.getElementById("loginButton");
+
+  errorBox.textContent = "";
+
+  if (!email || !password) {
+    errorBox.textContent = "Shigar da email da password."; 
+    return;
+  }
+
+  loginButton.disabled = true;
+  loginButton.textContent = "Ana shiga...";
+
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    errorBox.textContent = error.message;
+    loginButton.disabled = false;
+    loginButton.textContent = "Login";
+    return;
+  }
+
+  showChatScreen();
+}
+
+async function logoutUser() {
+  await supabaseClient.auth.signOut();
+  document.getElementById("chatScreen").style.display = "none";
+  document.getElementById("loginScreen").style.display = "block";
+  document.getElementById("loginPassword").value = "";
+}
+
+function showChatScreen() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("chatScreen").style.display = "flex";
+  document.getElementById("messageInput").focus();
+}
+
+async function initAuth() {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (data.session) {
+    showChatScreen();
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      showChatScreen();
+    } else {
+      document.getElementById("chatScreen").style.display = "none";
+      document.getElementById("loginScreen").style.display = "block";
+    }
+  });
+}
 
 /* =========================================
-   TEST CUSTOMER
+   CURRENT ORDER
 ========================================= */
-
-const TEST_CUSTOMER_UUID =
-  "14297ce6-226d-47f5-b7a0-b00f34dd7e68";
 
 
 /* =========================================
@@ -483,37 +604,12 @@ Kana tabbatar da wannan sayayya?`;
            PROCESS WALLET PURCHASE
         ===================================== */
 
-        const response =
-          await fetch(
-            EDGE_FUNCTION_URL,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body: JSON.stringify({
-
-                action:
-                  "purchase",
-
-                user_id:
-                  TEST_CUSTOMER_UUID,
-
-                product_id:
-                  selectedProduct.id,
-
-                phone_number:
-                  recipientPhone,
-
-                reference:
-                  reference
-
-              })
-            }
-          );
+        const response = await callEdgeFunction({
+          action: "purchase",
+          product_id: selectedProduct.id,
+          phone_number: recipientPhone,
+          reference: reference
+        });
 
 
         const data =
@@ -833,22 +929,9 @@ Misali: 08012345678`,
        SEND TO SUPABASE
     ========================================= */
 
-    const response =
-      await fetch(
-        EDGE_FUNCTION_URL,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body: JSON.stringify({
-            message: message
-          })
-        }
-      );
+    const response = await callEdgeFunction({
+      message: message
+    });
 
 
     const data =
@@ -943,6 +1026,22 @@ Misali: 08012345678`,
 /* =========================================
    ENTER KEY
 ========================================= */
+
+document
+  .getElementById("loginButton")
+  .addEventListener("click", loginUser);
+
+document
+  .getElementById("logoutButton")
+  .addEventListener("click", logoutUser);
+
+document
+  .getElementById("loginPassword")
+  .addEventListener("keydown", function(event) {
+    if (event.key === "Enter") loginUser();
+  });
+
+initAuth();
 
 document
   .getElementById("messageInput")
