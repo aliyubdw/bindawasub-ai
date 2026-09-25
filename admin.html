@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bindawasub Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f7f6; color: #17211d; }
+    .container { width: 100%; max-width: 720px; margin: 0 auto; padding: 24px 16px 40px; }
+    .header { background: #087f5b; color: white; border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+    .header h1 { margin: 0 0 6px; font-size: 25px; }
+    .header p { margin: 0; opacity: 0.9; font-size: 14px; }
+    .card { background: white; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+    h2 { margin-top: 0; font-size: 19px; }
+    label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 7px; }
+    input, textarea, button { width: 100%; font: inherit; }
+    input, textarea { padding: 12px; border: 1px solid #ccd5d1; border-radius: 9px; outline: none; background: white; }
+    input:focus, textarea:focus { border-color: #087f5b; }
+    textarea { min-height: 90px; resize: vertical; }
+    .field { margin-bottom: 15px; }
+    button { border: none; border-radius: 9px; padding: 13px 16px; background: #087f5b; color: white; font-weight: bold; cursor: pointer; }
+    button:hover { background: #066b4d; }
+    button:disabled { background: #9ca9a4; cursor: not-allowed; }
+    .danger { background: #b42318; }
+    .danger:hover { background: #941b12; }
+    .hidden { display: none !important; }
+    .message { padding: 12px; border-radius: 9px; margin-bottom: 15px; font-size: 14px; line-height: 1.5; }
+    .success { background: #e8f7ef; color: #126b42; }
+    .error { background: #fdecec; color: #a61b1b; }
+    .info { background: #eef5ff; color: #24558c; }
+    .customer-list { margin-top: 12px; }
+    .customer { border: 1px solid #d8e0dc; border-radius: 10px; padding: 13px; margin-bottom: 9px; cursor: pointer; transition: .15s; }
+    .customer:hover { border-color: #087f5b; background: #f4fbf8; }
+    .customer.selected { border: 2px solid #087f5b; background: #eefaf5; }
+    .customer-name { font-weight: bold; margin-bottom: 4px; }
+    .customer-phone { color: #52615b; font-size: 14px; }
+    .customer-role { display: inline-block; margin-top: 7px; padding: 3px 7px; border-radius: 20px; background: #edf1ef; color: #52615b; font-size: 11px; }
+    .customer-balance { margin-top: 9px; font-weight: bold; color: #087f5b; }
+    .selected-customer { background: #eefaf5; border: 1px solid #9ed6be; border-radius: 10px; padding: 15px; margin-bottom: 16px; }
+    .selected-customer strong { display: block; margin-bottom: 6px; }
+    .selected-phone { color: #52615b; font-size: 14px; }
+    .selected-balance { margin-top: 10px; font-size: 18px; font-weight: bold; color: #087f5b; }
+    .reference-box { padding: 12px; background: #f4f8f6; border: 1px solid #d8e0dc; border-radius: 9px; font-family: monospace; font-size: 14px; word-break: break-all; color: #33413b; }
+    .reference-help { margin-top: 6px; font-size: 12px; color: #69766f; }
+    .balance-result { margin-top: 15px; padding: 15px; background: #f4f8f6; border-radius: 10px; }
+    .balance-value { font-size: 25px; font-weight: bold; color: #087f5b; margin-top: 5px; }
+    .transaction-reference { margin-top: 12px; padding: 10px; background: white; border: 1px solid #d8e0dc; border-radius: 8px; font-family: monospace; font-size: 13px; word-break: break-all; }
+    .warning-help { margin: -6px 0 15px; font-size: 12px; color: #69766f; line-height: 1.5; }
+    @media (max-width: 500px) { .container { padding: 15px 12px 30px; } .card { padding: 16px; } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Bindawasub Admin</h1>
+    <p>Secure wallet management</p>
+  </div>
+
+  <div id="loginCard" class="card">
+    <h2>Admin Login</h2>
+    <div id="loginMessage"></div>
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="Admin email" autocomplete="email" required />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" required />
+      </div>
+      <button id="loginButton" type="submit">Login</button>
+    </form>
+  </div>
+
+  <div id="adminPanel" class="hidden">
+    <div class="card">
+      <h2>Customer Search</h2>
+      <div id="searchMessage"></div>
+      <div class="field">
+        <label for="customerSearch">Search customer</label>
+        <input id="customerSearch" type="text" placeholder="Enter customer name or phone" autocomplete="off" />
+      </div>
+      <button id="searchButton" type="button">Search Customer</button>
+      <div id="customerList" class="customer-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>Fund Customer Wallet</h2>
+      <div id="fundingMessage"></div>
+      <div id="selectedCustomer" class="selected-customer hidden">
+        <strong id="selectedCustomerName"></strong>
+        <div id="selectedCustomerPhone" class="selected-phone"></div>
+        <div id="selectedCustomerBalance" class="selected-balance"></div>
+      </div>
+      <div class="field">
+        <label for="amount">Amount (₦)</label>
+        <input id="amount" type="number" min="1" step="0.01" placeholder="e.g. 500" />
+      </div>
+      <div class="field">
+        <label>Payment Reference</label>
+        <div id="generatedReference" class="reference-box">Will be generated automatically</div>
+        <div class="reference-help">A unique transaction reference will be generated automatically when you fund the wallet.</div>
+      </div>
+      <div class="field">
+        <label for="note">Note (optional)</label>
+        <textarea id="note" placeholder="e.g. Cash payment received"></textarea>
+      </div>
+      <button id="fundButton" type="button" disabled>Fund Wallet</button>
+      <div id="balanceResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>Reset Customer Password</h2>
+      <div id="resetPasswordMessage"></div>
+      <div class="field">
+        <label for="resetEmail">Customer email</label>
+        <input id="resetEmail" type="email" placeholder="e.g. test@bindawasub.com" autocomplete="off" required />
+      </div>
+      <div class="field">
+        <label for="newPassword">New password</label>
+        <input id="newPassword" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" minlength="8" required />
+      </div>
+      <div class="field">
+        <label for="confirmPassword">Confirm new password</label>
+        <input id="confirmPassword" type="password" placeholder="Repeat the new password" autocomplete="new-password" minlength="8" required />
+      </div>
+      <div class="warning-help">
+        This uses the secure admin-only password reset function. Your service-role key is never exposed in this dashboard.
+      </div>
+      <button id="resetPasswordButton" type="button">Reset Password</button>
+    </div>
+
+    <div class="card">
+      <button id="logoutButton" type="button" class="danger">Logout</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://fuktxjweuanatmurlzpg.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
+  const EDGE_FUNCTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
+  const RESET_PASSWORD_FUNCTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/admin-reset-password";
+
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  const loginCard = document.getElementById("loginCard");
+  const adminPanel = document.getElementById("adminPanel");
+  const loginForm = document.getElementById("loginForm");
+  const loginButton = document.getElementById("loginButton");
+  const loginMessage = document.getElementById("loginMessage");
+  const customerSearch = document.getElementById("customerSearch");
+  const searchButton = document.getElementById("searchButton");
+  const customerList = document.getElementById("customerList");
+  const searchMessage = document.getElementById("searchMessage");
+  const selectedCustomer = document.getElementById("selectedCustomer");
+  const selectedCustomerName = document.getElementById("selectedCustomerName");
+  const selectedCustomerPhone = document.getElementById("selectedCustomerPhone");
+  const selectedCustomerBalance = document.getElementById("selectedCustomerBalance");
+  const amount = document.getElementById("amount");
+  const generatedReference = document.getElementById("generatedReference");
+  const note = document.getElementById("note");
+  const fundButton = document.getElementById("fundButton");
+  const fundingMessage = document.getElementById("fundingMessage");
+  const balanceResult = document.getElementById("balanceResult");
+  const logoutButton = document.getElementById("logoutButton");
+  const resetEmail = document.getElementById("resetEmail");
+  const newPassword = document.getElementById("newPassword");
+  const confirmPassword = document.getElementById("confirmPassword");
+  const resetPasswordButton = document.getElementById("resetPasswordButton");
+  const resetPasswordMessage = document.getElementById("resetPasswordMessage");
+
+  let selectedCustomerData = null;
+  let currentFundingReference = null;
+
+  function showMessage(element, message, type) {
+    element.innerHTML = "";
+    if (!message) return;
+    const div = document.createElement("div");
+    div.className = "message " + type;
+    div.textContent = message;
+    element.appendChild(div);
+  }
+
+  function generateFundingReference() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const time = String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0") + String(now.getSeconds()).padStart(2, "0");
+    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return "FUND-" + year + month + day + "-" + time + "-" + randomPart;
+  }
+
+  function createFundingReference() {
+    currentFundingReference = generateFundingReference();
+    generatedReference.textContent = currentFundingReference;
+    return currentFundingReference;
+  }
+
+  async function getAccessToken() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) throw new Error("Your admin session has expired. Please log in again.");
+    return session.access_token;
+  }
+
+  async function callAdminFunction(payload) {
+    const token = await getAccessToken();
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify(payload)
+    });
+    let result;
+    try { result = await response.json(); }
+    catch { throw new Error("The server returned an invalid response."); }
+    if (!response.ok || result.success === false) throw new Error(result.error || result.message || "Request failed.");
+    return result;
+  }
+
+  async function resetCustomerPassword() {
+    showMessage(resetPasswordMessage, "", "");
+    const email = resetEmail.value.trim();
+    const password = newPassword.value;
+    const confirmation = confirmPassword.value;
+
+    if (!email) {
+      showMessage(resetPasswordMessage, "Enter the customer's email address.", "error");
+      resetEmail.focus();
+      return;
+    }
+    if (password.length < 8) {
+      showMessage(resetPasswordMessage, "Password must be at least 8 characters.", "error");
+      newPassword.focus();
+      return;
+    }
+    if (password !== confirmation) {
+      showMessage(resetPasswordMessage, "The passwords do not match.", "error");
+      confirmPassword.focus();
+      return;
+    }
+
+    const confirmed = window.confirm("Reset the password for " + email + "?");
+    if (!confirmed) return;
+
+    resetPasswordButton.disabled = true;
+    resetPasswordButton.textContent = "Resetting...";
+
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(RESET_PASSWORD_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      let result;
+      try { result = await response.json(); }
+      catch { throw new Error("The password reset server returned an invalid response."); }
+
+      if (!response.ok || result.success === false) {
+        throw new Error(result.error || result.message || "Password reset failed.");
+      }
+
+      showMessage(resetPasswordMessage, "Password reset successfully for " + email + ".", "success");
+      newPassword.value = "";
+      confirmPassword.value = "";
+    } catch (error) {
+      showMessage(resetPasswordMessage, error.message || "Password reset failed.", "error");
+    } finally {
+      resetPasswordButton.disabled = false;
+      resetPasswordButton.textContent = "Reset Password";
+    }
+  }
+
+  loginForm.addEventListener("submit", async function(event) {
+    event.preventDefault();
+    showMessage(loginMessage, "", "");
+    loginButton.disabled = true;
+    loginButton.textContent = "Logging in...";
+    try {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.session) throw new Error("Login succeeded but no session was created.");
+      loginCard.classList.add("hidden");
+      adminPanel.classList.remove("hidden");
+    } catch (error) {
+      showMessage(loginMessage, error.message || "Login failed.", "error");
+    } finally {
+      loginButton.disabled = false;
+      loginButton.textContent = "Login";
+    }
+  });
+
+  function getCustomerBalance(customer) {
+    if (customer && customer.wallets && customer.wallets.length > 0) return Number(customer.wallets[0].balance || 0);
+    return 0;
+  }
+
+  async function searchCustomers() {
+    const search = customerSearch.value.trim();
+    customerList.innerHTML = "";
+    showMessage(searchMessage, "", "");
+    if (!search) {
+      showMessage(searchMessage, "Enter a customer name or phone number.", "error");
+      return;
+    }
+    searchButton.disabled = true;
+    searchButton.textContent = "Searching...";
+    try {
+      const result = await callAdminFunction({ action: "customer_search", search });
+      const customers = result.customers || [];
+      if (customers.length === 0) {
+        showMessage(searchMessage, "No customer found.", "info");
+        return;
+      }
+      customers.forEach(function(customer) {
+        const item = document.createElement("div");
+        item.className = "customer";
+        const name = document.createElement("div");
+        name.className = "customer-name";
+        name.textContent = customer.name || "Unnamed customer";
+        const phone = document.createElement("div");
+        phone.className = "customer-phone";
+        phone.textContent = customer.phone || "No phone number";
+        const role = document.createElement("span");
+        role.className = "customer-role";
+        role.textContent = customer.role || "customer";
+        const balance = document.createElement("div");
+        balance.className = "customer-balance";
+        balance.textContent = "Balance: ₦" + getCustomerBalance(customer).toLocaleString();
+        item.appendChild(name);
+        item.appendChild(phone);
+        item.appendChild(role);
+        item.appendChild(balance);
+        item.addEventListener("click", function() { selectCustomer(customer, item); });
+        customerList.appendChild(item);
+      });
+    } catch (error) {
+      showMessage(searchMessage, error.message || "Customer search failed.", "error");
+    } finally {
+      searchButton.disabled = false;
+      searchButton.textContent = "Search Customer";
+    }
+  }
+
+  searchButton.addEventListener("click", searchCustomers);
+  customerSearch.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") { event.preventDefault(); searchCustomers(); }
+  });
+
+  function selectCustomer(customer, element) {
+    selectedCustomerData = customer;
+    document.querySelectorAll(".customer").forEach(function(item) { item.classList.remove("selected"); });
+    element.classList.add("selected");
+    const currentBalance = getCustomerBalance(customer);
+    selectedCustomerName.textContent = customer.name || "Unnamed customer";
+    selectedCustomerPhone.textContent = customer.phone || "No phone number";
+    selectedCustomerBalance.textContent = "Current balance: ₦" + currentBalance.toLocaleString();
+    selectedCustomer.classList.remove("hidden");
+    fundButton.disabled = false;
+    balanceResult.innerHTML = "";
+    showMessage(fundingMessage, "Customer selected. Enter the funding details below.", "info");
+    createFundingReference();
+    amount.focus();
+  }
+
+  fundButton.addEventListener("click", async function() {
+    showMessage(fundingMessage, "", "");
+    balanceResult.innerHTML = "";
+    if (!selectedCustomerData) {
+      showMessage(fundingMessage, "Select a customer first.", "error");
+      return;
+    }
+    const fundingAmount = Number(amount.value);
+    const fundingNote = note.value.trim();
+    if (!Number.isFinite(fundingAmount) || fundingAmount <= 0) {
+      showMessage(fundingMessage, "Enter a valid funding amount.", "error");
+      amount.focus();
+      return;
+    }
+    const fundingReference = currentFundingReference || createFundingReference();
+    const confirmed = window.confirm(
+      "Fund " + (selectedCustomerData.name || "this customer") +
+      "'s wallet with ₦" + fundingAmount.toLocaleString() +
+      "?\n\nReference: " + fundingReference
+    );
+    if (!confirmed) return;
+    fundButton.disabled = true;
+    fundButton.textContent = "Funding...";
+    try {
+      const result = await callAdminFunction({
+        action: "manual_fund",
+        customer_user_id: selectedCustomerData.id,
+        amount: fundingAmount,
+        reference: fundingReference,
+        note: fundingNote || null
+      });
+      const funding = result.funding;
+      showMessage(fundingMessage, "Wallet funded successfully.", "success");
+      if (funding) {
+        const newBalance = Number(funding.balance_after || 0);
+        if (selectedCustomerData.wallets && selectedCustomerData.wallets.length > 0) {
+          selectedCustomerData.wallets[0].balance = newBalance;
+        } else {
+          selectedCustomerData.wallets = [{ balance: newBalance }];
+        }
+        selectedCustomerBalance.textContent = "Current balance: ₦" + newBalance.toLocaleString();
+        document.querySelectorAll(".customer").forEach(function(item) {
+          const phoneElement = item.querySelector(".customer-phone");
+          if (phoneElement && phoneElement.textContent === (selectedCustomerData.phone || "No phone number")) {
+            const balanceElement = item.querySelector(".customer-balance");
+            if (balanceElement) balanceElement.textContent = "Balance: ₦" + newBalance.toLocaleString();
+          }
+        });
+        balanceResult.innerHTML = `
+          <div class="balance-result">
+            <div>Customer</div>
+            <strong>${escapeHtml(funding.customer_name || selectedCustomerData.name || "")}</strong>
+            <div style="margin-top:8px;">${escapeHtml(funding.customer_phone || selectedCustomerData.phone || "")}</div>
+            <div style="margin-top:14px;">New wallet balance</div>
+            <div class="balance-value">₦${newBalance.toLocaleString()}</div>
+            <div class="transaction-reference">
+              <strong>Transaction Reference</strong><br />
+              ${escapeHtml(funding.reference || fundingReference)}
+            </div>
+          </div>`;
+      }
+      amount.value = "";
+      note.value = "";
+      createFundingReference();
+    } catch (error) {
+      showMessage(fundingMessage, error.message || "Wallet funding failed.", "error");
+    } finally {
+      fundButton.disabled = !selectedCustomerData;
+      fundButton.textContent = "Fund Wallet";
+    }
+  });
+
+  resetPasswordButton.addEventListener("click", resetCustomerPassword);
+  confirmPassword.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") { event.preventDefault(); resetCustomerPassword(); }
+  });
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  logoutButton.addEventListener("click", async function() {
+    await supabaseClient.auth.signOut();
+    selectedCustomerData = null;
+    currentFundingReference = null;
+    adminPanel.classList.add("hidden");
+    loginCard.classList.remove("hidden");
+    customerList.innerHTML = "";
+    selectedCustomer.classList.add("hidden");
+    fundButton.disabled = true;
+    amount.value = "";
+    note.value = "";
+    generatedReference.textContent = "Will be generated automatically";
+    balanceResult.innerHTML = "";
+    resetEmail.value = "";
+    newPassword.value = "";
+    confirmPassword.value = "";
+    showMessage(resetPasswordMessage, "", "");
+    showMessage(loginMessage, "You have been logged out.", "info");
+  });
+
+  async function checkExistingSession() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+      loginCard.classList.add("hidden");
+      adminPanel.classList.remove("hidden");
+    }
+  }
+
+  checkExistingSession();
+</script>
+</body>
+</html>
