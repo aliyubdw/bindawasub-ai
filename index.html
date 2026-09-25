@@ -254,9 +254,8 @@
     .admin-error { color: #a61b1b; }
 
     /* ADMIN MODE: hide customer-only chat UI */
-    .chat.admin-mode #messages,
-    .chat.admin-mode .input-area {
-      display: none;
+    #customerInterface.admin-hidden {
+      display: none !important;
     }
 
     .chat.admin-mode #adminPanel {
@@ -329,15 +328,16 @@
     <div id="adminActionMessage" class="admin-status"></div>
   </div>
 
-  <div id="messages">
+  <div id="customerInterface">
+    <div id="messages">
 
-    <div class="message bot">
-      Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?
+      <div class="message bot">
+        Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?
+      </div>
+
     </div>
 
-  </div>
-
-  <div class="input-area">
+    <div class="input-area">
 
     <input
       id="messageInput"
@@ -346,13 +346,14 @@
       autocomplete="off"
     >
 
-    <button
-      id="sendButton"
-      onclick="sendMessage()"
-    >
-      Send
-    </button>
+      <button
+        id="sendButton"
+        onclick="sendMessage()"
+      >
+        Send
+      </button>
 
+    </div>
   </div>
 
 </div>
@@ -491,8 +492,7 @@ async function verifyAdminMode() {
 
     if (isAdminUser) {
       document.getElementById("chatScreen").classList.add("admin-mode");
-      document.getElementById("messages").style.display = "none";
-      document.querySelector(".input-area").style.display = "none";
+      document.getElementById("customerInterface").classList.add("admin-hidden");
       document.getElementById("adminBadge").style.display = "inline-block";
       document.getElementById("adminPanel").style.display = "block";
       document.getElementById("headerSubtitle").textContent =
@@ -704,8 +704,7 @@ function hideAdminMode() {
   isAdminUser = false;
   adminSelectedCustomer = null;
   document.getElementById("chatScreen").classList.remove("admin-mode");
-  document.getElementById("messages").style.display = "";
-  document.querySelector(".input-area").style.display = "";
+  document.getElementById("customerInterface").classList.remove("admin-hidden");
   document.getElementById("adminBadge").style.display = "none";
   document.getElementById("adminPanel").style.display = "none";
   document.getElementById("headerSubtitle").textContent =
