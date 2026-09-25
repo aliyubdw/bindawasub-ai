@@ -175,6 +175,88 @@
       cursor: pointer;
     }
 
+
+    .admin-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .admin-panel {
+      display: none;
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      background: #f7fbf9;
+      max-height: 38vh;
+      overflow-y: auto;
+    }
+
+    .admin-panel h3 {
+      margin: 0 0 10px;
+      color: #087f5b;
+      font-size: 16px;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .admin-panel input,
+    .admin-panel textarea {
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 10px;
+      border: 1px solid #ccd5d1;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .admin-panel button {
+      width: 100%;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .admin-customer {
+      padding: 9px;
+      margin-bottom: 7px;
+      border: 1px solid #d8e0dc;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .admin-customer:hover {
+      border-color: #087f5b;
+    }
+
+    .admin-selected {
+      padding: 9px;
+      margin: 8px 0;
+      border-radius: 8px;
+      background: #e9f8f2;
+      color: #14533f;
+      font-size: 13px;
+    }
+
+    .admin-status {
+      font-size: 12px;
+      margin: 4px 0 8px;
+    }
+
+    .admin-success { color: #126b42; }
+    .admin-error { color: #a61b1b; }
+
+    @media (max-width: 420px) {
+      .admin-grid { grid-template-columns: 1fr; }
+    }
+
     .cancel-button {
       display: block;
       width: 85%;
@@ -206,7 +288,33 @@
   <div class="header">
     <button id="logoutButton" class="logout-button" type="button">Logout</button>
     <h2>🤖 Bindawasub AI</h2>
-    <p>Sannu! Ta yaya zan taimaka maka?</p>
+    <p id="headerSubtitle">Sannu! Ta yaya zan taimaka maka?</p>
+    <div id="adminBadge" class="admin-badge" style="display:none;">ADMIN MODE</div>
+  </div>
+
+  <div id="adminPanel" class="admin-panel">
+    <h3>Admin Features</h3>
+    <div id="adminStatus" class="admin-status"></div>
+
+    <input id="adminCustomerSearch" type="text" placeholder="Search customer by name or phone">
+    <button id="adminSearchButton" type="button">Search Customer</button>
+    <div id="adminCustomerResults"></div>
+
+    <div id="adminSelectedCustomer" class="admin-selected" style="display:none;"></div>
+
+    <div class="admin-grid">
+      <input id="adminFundAmount" type="number" min="1" step="0.01" placeholder="Funding amount (₦)">
+      <input id="adminFundNote" type="text" placeholder="Funding note (optional)">
+    </div>
+    <button id="adminFundButton" type="button" disabled>Fund Customer Wallet</button>
+
+    <div class="admin-grid">
+      <input id="adminResetEmail" type="email" placeholder="Customer email">
+      <input id="adminResetPassword" type="password" placeholder="New password (8+ chars)">
+    </div>
+    <button id="adminResetButton" type="button">Reset Customer Password</button>
+
+    <div id="adminActionMessage" class="admin-status"></div>
   </div>
 
   <div id="messages">
@@ -308,6 +416,7 @@ async function loginUser() {
   }
 
   showChatScreen();
+  await verifyAdminMode();
 }
 
 async function logoutUser() {
@@ -315,6 +424,7 @@ async function logoutUser() {
   document.getElementById("chatScreen").style.display = "none";
   document.getElementById("loginScreen").style.display = "block";
   document.getElementById("loginPassword").value = "";
+  hideAdminMode();
 }
 
 function showChatScreen() {
@@ -328,16 +438,252 @@ async function initAuth() {
 
   if (data.session) {
     showChatScreen();
+    await verifyAdminMode();
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session) {
       showChatScreen();
+      await verifyAdminMode();
     } else {
+      hideAdminMode();
       document.getElementById("chatScreen").style.display = "none";
       document.getElementById("loginScreen").style.display = "block";
     }
   });
+}
+
+
+/* =========================================
+   ADMIN MODE
+========================================= */
+
+const RESET_PASSWORD_FUNCTION_URL =
+  "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/admin-reset-password";
+
+let isAdminUser = false;
+let adminSelectedCustomer = null;
+
+async function verifyAdminMode() {
+  try {
+    const response = await callEdgeFunction({ action: "admin_status" });
+    isAdminUser = response.is_admin === true && response.role === "admin";
+
+    if (isAdminUser) {
+      document.getElementById("adminBadge").style.display = "inline-block";
+      document.getElementById("adminPanel").style.display = "block";
+      document.getElementById("headerSubtitle").textContent =
+        "Admin mode — customer tools are available below.";
+      document.getElementById("adminStatus").textContent =
+        "Logged in as " + (response.user?.name || "Admin");
+    }
+
+    return isAdminUser;
+  } catch (error) {
+    console.error("Admin mode check failed:", error);
+    return false;
+  }
+}
+
+async function adminCall(payload) {
+  if (!isAdminUser) throw new Error("Admin access required.");
+  const response = await callEdgeFunction(payload);
+  const data = await response.json();
+  if (!response.ok || data.success === false) {
+    throw new Error(data.error || "Admin request failed.");
+  }
+  return data;
+}
+
+function showAdminMessage(message, isError = false) {
+  const box = document.getElementById("adminActionMessage");
+  box.textContent = message || "";
+  box.className = "admin-status " + (isError ? "admin-error" : "admin-success");
+}
+
+function selectAdminCustomer(customer) {
+  adminSelectedCustomer = customer;
+  const wallet = Array.isArray(customer.wallets) ? customer.wallets[0] : customer.wallets;
+  const balance = Number(wallet?.balance || 0);
+
+  const box = document.getElementById("adminSelectedCustomer");
+  box.style.display = "block";
+  box.textContent =
+    (customer.name || "Unnamed customer") +
+    " • " +
+    (customer.phone || "No phone") +
+    " • Balance: ₦" +
+    balance.toLocaleString();
+
+  document.getElementById("adminFundButton").disabled = false;
+}
+
+async function searchAdminCustomers() {
+  const query = document.getElementById("adminCustomerSearch").value.trim();
+  const results = document.getElementById("adminCustomerResults");
+
+  results.innerHTML = "";
+  showAdminMessage("");
+
+  if (!query) {
+    showAdminMessage("Enter a customer name or phone number.", true);
+    return;
+  }
+
+  const button = document.getElementById("adminSearchButton");
+  button.disabled = true;
+  button.textContent = "Searching...";
+
+  try {
+    const data = await adminCall({
+      action: "customer_search",
+      search: query
+    });
+
+    const customers = data.customers || [];
+
+    if (!customers.length) {
+      results.textContent = "No customer found.";
+      return;
+    }
+
+    customers.forEach(customer => {
+      const item = document.createElement("div");
+      item.className = "admin-customer";
+
+      const wallet = Array.isArray(customer.wallets)
+        ? customer.wallets[0]
+        : customer.wallets;
+
+      item.textContent =
+        (customer.name || "Unnamed customer") +
+        " — " +
+        (customer.phone || "No phone") +
+        " — ₦" +
+        Number(wallet?.balance || 0).toLocaleString();
+
+      item.onclick = () => selectAdminCustomer(customer);
+      results.appendChild(item);
+    });
+  } catch (error) {
+    showAdminMessage(error.message || "Customer search failed.", true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Search Customer";
+  }
+}
+
+async function fundAdminCustomer() {
+  if (!adminSelectedCustomer) {
+    showAdminMessage("Select a customer first.", true);
+    return;
+  }
+
+  const amount = Number(document.getElementById("adminFundAmount").value);
+  const note = document.getElementById("adminFundNote").value.trim();
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showAdminMessage("Enter a valid funding amount.", true);
+    return;
+  }
+
+  const customerName = adminSelectedCustomer.name || adminSelectedCustomer.phone || "customer";
+  if (!window.confirm(
+    "Fund " + customerName + "'s wallet with ₦" +
+    amount.toLocaleString() + "?"
+  )) return;
+
+  const button = document.getElementById("adminFundButton");
+  button.disabled = true;
+  button.textContent = "Funding...";
+
+  try {
+    const reference =
+      "FUND-" +
+      new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14) +
+      "-" +
+      Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const data = await adminCall({
+      action: "manual_fund",
+      customer_user_id: adminSelectedCustomer.id,
+      amount,
+      reference,
+      note: note || null
+    });
+
+    const balanceAfter = Number(data.funding?.balance_after || 0);
+    document.getElementById("adminSelectedCustomer").textContent =
+      (adminSelectedCustomer.name || "Unnamed customer") +
+      " • " +
+      (adminSelectedCustomer.phone || "No phone") +
+      " • Balance: ₦" +
+      balanceAfter.toLocaleString();
+
+    document.getElementById("adminFundAmount").value = "";
+    document.getElementById("adminFundNote").value = "";
+
+    showAdminMessage(
+      "Wallet funded successfully. New balance: ₦" +
+      balanceAfter.toLocaleString()
+    );
+  } catch (error) {
+    showAdminMessage(error.message || "Wallet funding failed.", true);
+  } finally {
+    button.disabled = !adminSelectedCustomer;
+    button.textContent = "Fund Customer Wallet";
+  }
+}
+
+async function resetAdminCustomerPassword() {
+  const email = document.getElementById("adminResetEmail").value.trim();
+  const password = document.getElementById("adminResetPassword").value;
+
+  if (!email || password.length < 8) {
+    showAdminMessage("Enter a customer email and a password of at least 8 characters.", true);
+    return;
+  }
+
+  if (!window.confirm("Reset the password for " + email + "?")) return;
+
+  const button = document.getElementById("adminResetButton");
+  button.disabled = true;
+  button.textContent = "Resetting...";
+
+  try {
+    const token = await getAccessToken();
+    const response = await fetch(RESET_PASSWORD_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      throw new Error(data.error || "Password reset failed.");
+    }
+
+    document.getElementById("adminResetPassword").value = "";
+    showAdminMessage("Password reset successfully for " + email + ".");
+  } catch (error) {
+    showAdminMessage(error.message || "Password reset failed.", true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Reset Customer Password";
+  }
+}
+
+function hideAdminMode() {
+  isAdminUser = false;
+  adminSelectedCustomer = null;
+  document.getElementById("adminBadge").style.display = "none";
+  document.getElementById("adminPanel").style.display = "none";
+  document.getElementById("headerSubtitle").textContent =
+    "Sannu! Ta yaya zan taimaka maka?";
 }
 
 /* =========================================
@@ -1034,6 +1380,28 @@ document
 document
   .getElementById("logoutButton")
   .addEventListener("click", logoutUser);
+document
+  .getElementById("adminSearchButton")
+  .addEventListener("click", searchAdminCustomers);
+
+document
+  .getElementById("adminCustomerSearch")
+  .addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      searchAdminCustomers();
+    }
+  });
+
+document
+  .getElementById("adminFundButton")
+  .addEventListener("click", fundAdminCustomer);
+
+document
+  .getElementById("adminResetButton")
+  .addEventListener("click", resetAdminCustomerPassword);
+
+
 
 document
   .getElementById("loginPassword")
