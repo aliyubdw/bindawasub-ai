@@ -1,509 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bindawasub Admin</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: Arial, sans-serif; background: #f4f7f6; color: #17211d; }
-    .container { width: 100%; max-width: 720px; margin: 0 auto; padding: 24px 16px 40px; }
-    .header { background: #087f5b; color: white; border-radius: 14px; padding: 22px; margin-bottom: 18px; }
-    .header h1 { margin: 0 0 6px; font-size: 25px; }
-    .header p { margin: 0; opacity: 0.9; font-size: 14px; }
-    .card { background: white; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
-    h2 { margin-top: 0; font-size: 19px; }
-    label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 7px; }
-    input, textarea, button { width: 100%; font: inherit; }
-    input, textarea { padding: 12px; border: 1px solid #ccd5d1; border-radius: 9px; outline: none; background: white; }
-    input:focus, textarea:focus { border-color: #087f5b; }
-    textarea { min-height: 90px; resize: vertical; }
-    .field { margin-bottom: 15px; }
-    button { border: none; border-radius: 9px; padding: 13px 16px; background: #087f5b; color: white; font-weight: bold; cursor: pointer; }
-    button:hover { background: #066b4d; }
-    button:disabled { background: #9ca9a4; cursor: not-allowed; }
-    .danger { background: #b42318; }
-    .danger:hover { background: #941b12; }
-    .hidden { display: none !important; }
-    .message { padding: 12px; border-radius: 9px; margin-bottom: 15px; font-size: 14px; line-height: 1.5; }
-    .success { background: #e8f7ef; color: #126b42; }
-    .error { background: #fdecec; color: #a61b1b; }
-    .info { background: #eef5ff; color: #24558c; }
-    .customer-list { margin-top: 12px; }
-    .customer { border: 1px solid #d8e0dc; border-radius: 10px; padding: 13px; margin-bottom: 9px; cursor: pointer; transition: .15s; }
-    .customer:hover { border-color: #087f5b; background: #f4fbf8; }
-    .customer.selected { border: 2px solid #087f5b; background: #eefaf5; }
-    .customer-name { font-weight: bold; margin-bottom: 4px; }
-    .customer-phone { color: #52615b; font-size: 14px; }
-    .customer-role { display: inline-block; margin-top: 7px; padding: 3px 7px; border-radius: 20px; background: #edf1ef; color: #52615b; font-size: 11px; }
-    .customer-balance { margin-top: 9px; font-weight: bold; color: #087f5b; }
-    .selected-customer { background: #eefaf5; border: 1px solid #9ed6be; border-radius: 10px; padding: 15px; margin-bottom: 16px; }
-    .selected-customer strong { display: block; margin-bottom: 6px; }
-    .selected-phone { color: #52615b; font-size: 14px; }
-    .selected-balance { margin-top: 10px; font-size: 18px; font-weight: bold; color: #087f5b; }
-    .reference-box { padding: 12px; background: #f4f8f6; border: 1px solid #d8e0dc; border-radius: 9px; font-family: monospace; font-size: 14px; word-break: break-all; color: #33413b; }
-    .reference-help { margin-top: 6px; font-size: 12px; color: #69766f; }
-    .balance-result { margin-top: 15px; padding: 15px; background: #f4f8f6; border-radius: 10px; }
-    .balance-value { font-size: 25px; font-weight: bold; color: #087f5b; margin-top: 5px; }
-    .transaction-reference { margin-top: 12px; padding: 10px; background: white; border: 1px solid #d8e0dc; border-radius: 8px; font-family: monospace; font-size: 13px; word-break: break-all; }
-    .warning-help { margin: -6px 0 15px; font-size: 12px; color: #69766f; line-height: 1.5; }
-    @media (max-width: 500px) { .container { padding: 15px 12px 30px; } .card { padding: 16px; } }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindawasub Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:#f4f7f6;color:#17211d}.shell{max-width:1200px;margin:auto;padding:20px}.header{background:#087f5b;color:#fff;border-radius:16px;padding:22px;margin-bottom:16px}.header h1{margin:0 0 5px}.header p{margin:0;opacity:.9}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.nav button{width:auto;background:#fff;color:#345047;border:1px solid #d8e0dc}.nav button.active{background:#087f5b;color:#fff;border-color:#087f5b}.panel{display:none}.panel.active{display:block}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.card{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.metric{padding:17px}.metric .label{font-size:13px;color:#69766f}.metric .value{font-size:25px;font-weight:800;margin-top:5px;color:#087f5b}.section-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.section-title h2{margin:0;font-size:19px}label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:11px;border:1px solid #ccd5d1;border-radius:9px;background:#fff}textarea{min-height:80px;resize:vertical}.field{margin-bottom:12px}button{border:0;border-radius:9px;padding:11px 14px;background:#087f5b;color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#edf3f0;color:#315148}button.danger{background:#b42318}button:disabled{opacity:.55;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px;border-bottom:1px solid #e5ebe8;white-space:nowrap}th{color:#69766f;font-size:12px}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#edf3f0;font-size:11px}.badge.on{background:#e7f7ee;color:#126b42}.badge.off{background:#fdecec;color:#a61b1b}.msg{padding:10px;border-radius:9px;margin-bottom:12px;font-size:13px}.success{background:#e8f7ef;color:#126b42}.error{background:#fdecec;color:#a61b1b}.info{background:#eef5ff;color:#24558c}.hidden{display:none!important}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:15px;z-index:10}.modalbox{background:#fff;width:min(650px,100%);max-height:90vh;overflow:auto;border-radius:16px;padding:20px}.chart{display:flex;align-items:flex-end;gap:5px;height:190px;border-bottom:1px solid #d8e0dc;padding:10px 4px 0}.bar{flex:1;min-width:5px;background:#087f5b;border-radius:4px 4px 0 0;position:relative}.bar span{position:absolute;bottom:-23px;left:50%;transform:translateX(-50%);font-size:9px;color:#69766f}.legend{font-size:12px;color:#69766f;margin-top:25px}.login{max-width:420px;margin:70px auto}.muted{color:#69766f;font-size:13px}.danger-text{color:#b42318}@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}@media(max-width:520px){.shell{padding:12px}.grid{grid-template-columns:1fr}.header{padding:18px}.card{padding:15px}}
+</style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <h1>Bindawasub Admin</h1>
-    <p>Secure wallet management</p>
-  </div>
-
-  <div id="loginCard" class="card">
-    <h2>Admin Login</h2>
-    <div id="loginMessage"></div>
-    <form id="loginForm">
-      <div class="field">
-        <label for="email">Email</label>
-        <input id="email" type="email" placeholder="Admin email" autocomplete="email" required />
-      </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input id="password" type="password" placeholder="Password" autocomplete="current-password" required />
-      </div>
-      <button id="loginButton" type="submit">Login</button>
-    </form>
-  </div>
-
-  <div id="adminPanel" class="hidden">
-    <div class="card">
-      <h2>Customer Search</h2>
-      <div id="searchMessage"></div>
-      <div class="field">
-        <label for="customerSearch">Search customer</label>
-        <input id="customerSearch" type="text" placeholder="Enter customer name or phone" autocomplete="off" />
-      </div>
-      <button id="searchButton" type="button">Search Customer</button>
-      <div id="customerList" class="customer-list"></div>
-    </div>
-
-    <div class="card">
-      <h2>Fund Customer Wallet</h2>
-      <div id="fundingMessage"></div>
-      <div id="selectedCustomer" class="selected-customer hidden">
-        <strong id="selectedCustomerName"></strong>
-        <div id="selectedCustomerPhone" class="selected-phone"></div>
-        <div id="selectedCustomerBalance" class="selected-balance"></div>
-      </div>
-      <div class="field">
-        <label for="amount">Amount (₦)</label>
-        <input id="amount" type="number" min="1" step="0.01" placeholder="e.g. 500" />
-      </div>
-      <div class="field">
-        <label>Payment Reference</label>
-        <div id="generatedReference" class="reference-box">Will be generated automatically</div>
-        <div class="reference-help">A unique transaction reference will be generated automatically when you fund the wallet.</div>
-      </div>
-      <div class="field">
-        <label for="note">Note (optional)</label>
-        <textarea id="note" placeholder="e.g. Cash payment received"></textarea>
-      </div>
-      <button id="fundButton" type="button" disabled>Fund Wallet</button>
-      <div id="balanceResult"></div>
-    </div>
-
-    <div class="card">
-      <h2>Reset Customer Password</h2>
-      <div id="resetPasswordMessage"></div>
-      <div class="field">
-        <label for="resetEmail">Customer email</label>
-        <input id="resetEmail" type="email" placeholder="e.g. test@bindawasub.com" autocomplete="off" required />
-      </div>
-      <div class="field">
-        <label for="newPassword">New password</label>
-        <input id="newPassword" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" minlength="8" required />
-      </div>
-      <div class="field">
-        <label for="confirmPassword">Confirm new password</label>
-        <input id="confirmPassword" type="password" placeholder="Repeat the new password" autocomplete="new-password" minlength="8" required />
-      </div>
-      <div class="warning-help">
-        This uses the secure admin-only password reset function. Your service-role key is never exposed in this dashboard.
-      </div>
-      <button id="resetPasswordButton" type="button">Reset Password</button>
-    </div>
-
-    <div class="card">
-      <button id="logoutButton" type="button" class="danger">Logout</button>
-    </div>
-  </div>
+<div id="loginView" class="login card">
+<h2>Bindawasub Admin</h2><p class="muted">Secure administration dashboard</p><div id="loginMsg"></div>
+<form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Password</label><input id="password" type="password" required></div><button id="loginBtn">Login</button></form>
 </div>
 
+<div id="app" class="shell hidden">
+<div class="header"><h1>Bindawasub Admin</h1><p>Manage providers, plans, pricing, customers and business analytics.</p></div>
+<div class="nav">
+<button data-tab="overview" class="active">Overview</button>
+<button data-tab="providers">APIs & Providers</button>
+<button data-tab="products">Products & Plans</button>
+<button data-tab="analytics">Analytics</button>
+<button data-tab="operations">Operations</button>
+<button id="logout" class="danger">Logout</button>
+</div>
+
+<section id="overview" class="panel active">
+<div id="overviewMsg"></div>
+<div class="grid">
+<div class="card metric"><div class="label">Customers</div><div id="mCustomers" class="value">—</div></div>
+<div class="card metric"><div class="label">Products / Plans</div><div id="mProducts" class="value">—</div></div>
+<div class="card metric"><div class="label">Providers</div><div id="mProviders" class="value">—</div></div>
+<div class="card metric"><div class="label">Wallet Liability</div><div id="mWallet" class="value">—</div></div>
+<div class="card metric"><div class="label">Sales</div><div id="mSales" class="value">—</div></div>
+<div class="card metric"><div class="label">Profit</div><div id="mProfit" class="value">—</div></div>
+<div class="card metric"><div class="label">Successful</div><div id="mSuccess" class="value">—</div></div>
+<div class="card metric"><div class="label">Pending</div><div id="mPending" class="value">—</div></div>
+</div>
+<div class="card"><div class="section-title"><h2>System foundation</h2><button id="refreshOverview" class="secondary">Refresh</button></div>
+<p class="muted">The dashboard is now separated from the customer AI function. Provider credentials remain server-side; this screen stores only secret names/references, never API keys.</p></div>
+</section>
+
+<section id="providers" class="panel">
+<div class="card"><div class="section-title"><h2>API Providers</h2><button id="newProvider">+ Add API</button></div><div id="providerMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Code</th><th>Base URL</th><th>Status</th><th>Webhook</th><th>Secret reference</th><th>Action</th></tr></thead><tbody id="providerRows"></tbody></table></div></div>
+</section>
+
+<section id="products" class="panel">
+<div class="card"><div class="section-title"><h2>Products & Plans</h2><button id="newProduct">+ Add Product / Plan</button></div><div id="productMsg"></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Service</th><th>Network</th><th>Sell</th><th>Cost</th><th>Provider</th><th>Status</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
+</section>
+
+<section id="analytics" class="panel">
+<div class="card"><div class="section-title"><h2>Business Analytics</h2><div class="actions"><select id="analyticsDays"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">365 days</option></select><button id="refreshAnalytics" class="secondary">Refresh</button></div></div><div id="analyticsMsg"></div><div class="grid2"><div><h3>Sales</h3><div id="salesChart" class="chart"></div><div class="legend">Daily successful sales</div></div><div><h3>Profit</h3><div id="profitChart" class="chart"></div><div class="legend">Daily successful profit</div></div></div></div>
+<div class="card"><h2>Daily figures</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Sales</th><th>Profit</th><th>Transactions</th><th>Successful</th><th>Failed</th><th>Funding</th><th>New customers</th></tr></thead><tbody id="analyticsRows"></tbody></table></div></div>
+</section>
+
+<section id="operations" class="panel">
+<div class="grid2">
+<div class="card"><h2>Customer Search</h2><div id="searchMsg"></div><div class="field"><input id="customerSearch" placeholder="Name or phone"></div><button id="searchCustomer">Search</button><div id="customerRows"></div></div>
+<div class="card"><h2>Fund Customer Wallet</h2><div id="fundMsg"></div><div class="field"><label>Selected customer</label><input id="selectedCustomer" readonly placeholder="Select from search"></div><div class="field"><label>Amount (₦)</label><input id="fundAmount" type="number" min="1" step=".01"></div><div class="field"><label>Note</label><textarea id="fundNote" placeholder="Optional note"></textarea></div><button id="fundWallet" disabled>Fund Wallet</button></div>
+</div>
+<div class="card"><h2>Reset Customer Password</h2><div id="resetMsg"></div><div class="grid2"><div class="field"><label>Customer email</label><input id="resetEmail" type="email"></div><div class="field"><label>New password</label><input id="resetPassword" type="password" minlength="8"></div></div><button id="resetBtn">Reset Password</button></div>
+</section>
+</div>
+
+<div id="modal" class="modal hidden"><div class="modalbox"><div class="section-title"><h2 id="modalTitle"></h2><button id="closeModal" class="secondary">Close</button></div><div id="modalMsg"></div><div id="modalBody"></div></div></div>
+
 <script>
-  const SUPABASE_URL = "https://fuktxjweuanatmurlzpg.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
-  const EDGE_FUNCTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
-  const RESET_PASSWORD_FUNCTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/admin-reset-password";
+const SUPABASE_URL="https://fuktxjweuanatmurlzpg.supabase.co";
+const KEY="sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
+const ADMIN_URL=SUPABASE_URL+"/functions/v1/bindawasub-admin";
+const AI_URL=SUPABASE_URL+"/functions/v1/bindawasub-ai";
+const RESET_URL=SUPABASE_URL+"/functions/v1/admin-reset-password";
+const sb=window.supabase.createClient(SUPABASE_URL,KEY);
+let selectedCustomer=null, providers=[], products=[];
 
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const $=id=>document.getElementById(id);
+const money=n=>"₦"+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+function msg(el,text,type="info"){el.innerHTML=text?'<div class="msg '+type+'">'+escapeHtml(text)+'</div>':""}
+function escapeHtml(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+async function token(){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired. Please log in again.");return session.access_token}
+async function admin(payload){const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||"Admin request failed.");return d}
+async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||d.message||"Request failed.");return d}
 
-  const loginCard = document.getElementById("loginCard");
-  const adminPanel = document.getElementById("adminPanel");
-  const loginForm = document.getElementById("loginForm");
-  const loginButton = document.getElementById("loginButton");
-  const loginMessage = document.getElementById("loginMessage");
-  const customerSearch = document.getElementById("customerSearch");
-  const searchButton = document.getElementById("searchButton");
-  const customerList = document.getElementById("customerList");
-  const searchMessage = document.getElementById("searchMessage");
-  const selectedCustomer = document.getElementById("selectedCustomer");
-  const selectedCustomerName = document.getElementById("selectedCustomerName");
-  const selectedCustomerPhone = document.getElementById("selectedCustomerPhone");
-  const selectedCustomerBalance = document.getElementById("selectedCustomerBalance");
-  const amount = document.getElementById("amount");
-  const generatedReference = document.getElementById("generatedReference");
-  const note = document.getElementById("note");
-  const fundButton = document.getElementById("fundButton");
-  const fundingMessage = document.getElementById("fundingMessage");
-  const balanceResult = document.getElementById("balanceResult");
-  const logoutButton = document.getElementById("logoutButton");
-  const resetEmail = document.getElementById("resetEmail");
-  const newPassword = document.getElementById("newPassword");
-  const confirmPassword = document.getElementById("confirmPassword");
-  const resetPasswordButton = document.getElementById("resetPasswordButton");
-  const resetPasswordMessage = document.getElementById("resetPasswordMessage");
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginBtn").disabled=true;msg($("loginMsg"),"");try{const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)throw error;const d=await admin({action:"dashboard_summary"});if(!d.success)throw Error("Admin access required.");$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch(e){msg($("loginMsg"),e.message,"error")}finally{$("loginBtn").disabled=false}});
+$("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
+document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active")});
 
-  let selectedCustomerData = null;
-  let currentFundingReference = null;
+async function loadOverview(){try{const d=await admin({action:"dashboard_summary"});const s=d.summary;$("mCustomers").textContent=s.customers;$("mProducts").textContent=s.products;$("mProviders").textContent=s.providers;$("mWallet").textContent=money(s.wallet_liability);$("mSales").textContent=money(s.sales);$("mProfit").textContent=money(s.profit);$("mSuccess").textContent=s.successful_transactions;$("mPending").textContent=s.pending_transactions;msg($("overviewMsg"),"Dashboard refreshed.","success")}catch(e){msg($("overviewMsg"),e.message,"error")}}
+async function loadProviders(){try{const d=await admin({action:"list_providers"});providers=d.providers||[];renderProviders()}catch(e){msg($("providerMsg"),e.message,"error")}}
+function renderProviders(){ $("providerRows").innerHTML=providers.map(p=>'<tr><td><strong>'+escapeHtml(p.name)+'</strong></td><td>'+escapeHtml(p.code)+'</td><td>'+escapeHtml(p.base_url||"—")+'</td><td><span class="badge '+(p.status==="active"?"on":"off")+'">'+escapeHtml(p.status)+'</span></td><td>'+ (p.supports_webhook?"Yes":"No") +'</td><td>'+escapeHtml(p.api_secret_name||"—")+'</td><td><button class="secondary" onclick="editProvider(\''+p.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="7" class="muted">No providers added yet.</td></tr>'}
+window.editProvider=id=>openProvider(providers.find(p=>p.id===id));
+$("newProvider").onclick=()=>openProvider(null);
+function openProvider(p){$("modalTitle").textContent=p?"Edit API Provider":"Add API Provider";$("modalBody").innerHTML='<div class="field"><label>Name</label><input id="pName" value="'+escapeHtml(p?.name||"")+'"></div><div class="grid2"><div class="field"><label>Code</label><input id="pCode" value="'+escapeHtml(p?.code||"")+'"></div><div class="field"><label>Status</label><select id="pStatus"><option>active</option><option>inactive</option><option>maintenance</option></select></div></div><div class="field"><label>Base URL</label><input id="pUrl" value="'+escapeHtml(p?.base_url||"")+'"></div><div class="grid2"><div class="field"><label>API secret name</label><input id="pSecret" value="'+escapeHtml(p?.api_secret_name||"")+'" placeholder="e.g. VTU_PROVIDER_API_KEY"></div><div class="field"><label>Webhook secret name</label><input id="pWebhookSecret" value="'+escapeHtml(p?.webhook_secret_name||"")+'"></div></div><div class="field"><label><input id="pWebhook" type="checkbox" style="width:auto" '+(p?.supports_webhook?"checked":"")+'> Supports webhook</label></div><div class="field"><label>Notes</label><textarea id="pNotes">'+escapeHtml(p?.notes||"")+'</textarea></div><p class="muted">Do not paste the actual API key here. Store the secret in Supabase Edge Function secrets and enter only its secret name.</p><button id="saveProvider">Save Provider</button>';$("pStatus").value=p?.status||"inactive";$("modal").classList.remove("hidden");$("saveProvider").onclick=async()=>{try{await admin({action:"save_provider",id:p?.id,name:$("pName").value,code:$("pCode").value,base_url:$("pUrl").value,status:$("pStatus").value,api_secret_name:$("pSecret").value,webhook_secret_name:$("pWebhookSecret").value,supports_webhook:$("pWebhook").checked,notes:$("pNotes").value});$("modal").classList.add("hidden");await loadProviders();await loadOverview()}catch(e){msg($("modalMsg"),e.message,"error")}}}
 
-  function showMessage(element, message, type) {
-    element.innerHTML = "";
-    if (!message) return;
-    const div = document.createElement("div");
-    div.className = "message " + type;
-    div.textContent = message;
-    element.appendChild(div);
-  }
+async function loadProducts(){try{const d=await admin({action:"list_products"});products=d.products||[];renderProducts()}catch(e){msg($("productMsg"),e.message,"error")}}
+function renderProducts(){$("productRows").innerHTML=products.map(p=>'<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(p.service_type)+'</td><td>'+escapeHtml(p.network||"—")+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td>'+escapeHtml(p.api_providers?.name||p.provider||"—")+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No products/plans.</td></tr>'}
+window.editProduct=id=>openProduct(products.find(p=>p.id===id));$("newProduct").onclick=()=>openProduct(null);
+function openProduct(p){const opts=providers.map(x=>'<option value="'+x.id+'" '+(p?.provider_id===x.id?"selected":"")+'>'+escapeHtml(x.name)+'</option>').join("");$("modalTitle").textContent=p?"Edit Product / Plan":"Add Product / Plan";$("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Product name</label><input id="xName" value="'+escapeHtml(p?.product_name||"")+'"></div><div class="field"><label>SKU</label><input id="xSku" value="'+escapeHtml(p?.sku||"")+'"></div></div><div class="grid2"><div class="field"><label>Service type</label><select id="xService"><option value="data">Data</option><option value="airtime">Airtime</option><option value="electricity">Electricity</option><option value="tv">TV</option><option value="exam_pin">Exam PIN</option><option value="other">Other</option></select></div><div class="field"><label>Network</label><input id="xNetwork" value="'+escapeHtml(p?.network||"")+'" placeholder="MTN / AIRTEL / GLO / 9MOBILE"></div></div><div class="grid2"><div class="field"><label>Volume / amount</label><input id="xVolume" value="'+escapeHtml(p?.volume||"")+'"></div><div class="field"><label>Duration</label><input id="xDuration" value="'+escapeHtml(p?.duration||"")+'"></div></div><div class="grid2"><div class="field"><label>Selling price (₦)</label><input id="xSell" type="number" min="0" step=".01" value="'+(p?.selling_price??"")+'"></div><div class="field"><label>Cost price (₦)</label><input id="xCost" type="number" min="0" step=".01" value="'+(p?.cost_price??"")+'"></div></div><div class="grid2"><div class="field"><label>Provider</label><select id="xProvider"><option value="">— none —</option>'+opts+'</select></div><div class="field"><label>Provider product ID</label><input id="xProviderProduct" value="'+escapeHtml(p?.provider_product_id||"")+'"></div></div><div class="grid2"><div class="field"><label>Display order</label><input id="xOrder" type="number" value="'+(p?.display_order??100)+'"></div><div class="field"><label><input id="xActive" type="checkbox" style="width:auto" '+(p?.active!==false?"checked":"")+'> Active</label></div></div><button id="saveProduct">Save Product / Plan</button>';$("xService").value=p?.service_type||"data";$("modal").classList.remove("hidden");$("saveProduct").onclick=async()=>{try{await admin({action:"save_product",id:p?.id,product_name:$("xName").value,sku:$("xSku").value,service_type:$("xService").value,network:$("xNetwork").value,volume:$("xVolume").value,duration:$("xDuration").value,selling_price:$("xSell").value,cost_price:$("xCost").value,provider_id:$("xProvider").value||null,provider_product_id:$("xProviderProduct").value,display_order:$("xOrder").value,active:$("xActive").checked});$("modal").classList.add("hidden");await loadProducts();await loadOverview()}catch(e){msg($("modalMsg"),e.message,"error")}}}
 
-  function generateFundingReference() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const time = String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0") + String(now.getSeconds()).padStart(2, "0");
-    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-    return "FUND-" + year + month + day + "-" + time + "-" + randomPart;
-  }
+async function loadAnalytics(){try{const d=await admin({action:"analytics",days:$("analyticsDays").value});const rows=d.series||[];$("analyticsRows").innerHTML=rows.slice().reverse().map(x=>'<tr><td>'+escapeHtml(x.date)+'</td><td>'+money(x.sales)+'</td><td>'+money(x.profit)+'</td><td>'+x.transactions+'</td><td>'+x.successful+'</td><td>'+x.failed+'</td><td>'+money(x.funding)+'</td><td>'+x.new_customers+'</td></tr>').join("")||'<tr><td colspan="8" class="muted">No activity in this period.</td></tr>';drawChart("salesChart",rows.map(x=>x.sales));drawChart("profitChart",rows.map(x=>x.profit));msg($("analyticsMsg"),"Analytics refreshed.","success")}catch(e){msg($("analyticsMsg"),e.message,"error")}}
+function drawChart(id,values){const max=Math.max(...values,1);$(id).innerHTML=values.slice(-60).map((v,i)=>'<div class="bar" title="'+money(v)+'" style="height:'+Math.max(3,(Number(v)/max)*160)+'px"><span>'+((i+1)%5===0?i+1:"")+'</span></div>').join("")||'<span class="muted">No data</span>'}
 
-  function createFundingReference() {
-    currentFundingReference = generateFundingReference();
-    generatedReference.textContent = currentFundingReference;
-    return currentFundingReference;
-  }
+async function searchCustomers(){try{const d=await aiAdmin({action:"customer_search",search:$("customerSearch").value.trim()});const rows=d.customers||[];$("customerRows").innerHTML=rows.map(c=>'<div class="card" style="padding:11px;margin:8px 0;cursor:pointer" onclick="selectCustomer('+escapeHtml(JSON.stringify(c))+')"><strong>'+escapeHtml(c.name||"Unnamed")+'</strong><br><span class="muted">'+escapeHtml(c.phone||"")+'</span></div>').join("")||'<p class="muted">No customer found.</p>'}catch(e){msg($("searchMsg"),e.message,"error")}}
+window.selectCustomer=c=>{selectedCustomer=c;$("selectedCustomer").value=(c.name||"Unnamed")+" — "+(c.phone||"");$("fundWallet").disabled=false};
+$("searchCustomer").onclick=searchCustomers;
+$("fundWallet").onclick=async()=>{try{if(!selectedCustomer)throw Error("Select a customer first.");const amount=Number($("fundAmount").value);if(!(amount>0))throw Error("Enter a valid amount.");const reference="FUND-"+Date.now()+"-"+Math.random().toString(36).slice(2,8).toUpperCase();if(!confirm("Fund "+(selectedCustomer.name||"customer")+" with "+money(amount)+"?"))return;await aiAdmin({action:"manual_fund",customer_user_id:selectedCustomer.id,amount,reference,note:$("fundNote").value.trim()||null});msg($("fundMsg"),"Wallet funded successfully. Reference: "+reference,"success");$("fundAmount").value="";$("fundNote").value=""}catch(e){msg($("fundMsg"),e.message,"error")}};
+$("resetBtn").onclick=async()=>{try{const email=$("resetEmail").value.trim(),password=$("resetPassword").value;if(password.length<8)throw Error("Password must be at least 8 characters.");if(!confirm("Reset this customer's password?"))return;const r=await fetch(RESET_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok||d.success===false)throw Error(d.error||"Reset failed.");msg($("resetMsg"),"Password reset successfully.","success");$("resetPassword").value=""}catch(e){msg($("resetMsg"),e.message,"error")}};
 
-  async function getAccessToken() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) throw new Error("Your admin session has expired. Please log in again.");
-    return session.access_token;
-  }
-
-  async function callAdminFunction(payload) {
-    const token = await getAccessToken();
-    const response = await fetch(EDGE_FUNCTION_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify(payload)
-    });
-    let result;
-    try { result = await response.json(); }
-    catch { throw new Error("The server returned an invalid response."); }
-    if (!response.ok || result.success === false) throw new Error(result.error || result.message || "Request failed.");
-    return result;
-  }
-
-  async function resetCustomerPassword() {
-    showMessage(resetPasswordMessage, "", "");
-    const email = resetEmail.value.trim();
-    const password = newPassword.value;
-    const confirmation = confirmPassword.value;
-
-    if (!email) {
-      showMessage(resetPasswordMessage, "Enter the customer's email address.", "error");
-      resetEmail.focus();
-      return;
-    }
-    if (password.length < 8) {
-      showMessage(resetPasswordMessage, "Password must be at least 8 characters.", "error");
-      newPassword.focus();
-      return;
-    }
-    if (password !== confirmation) {
-      showMessage(resetPasswordMessage, "The passwords do not match.", "error");
-      confirmPassword.focus();
-      return;
-    }
-
-    const confirmed = window.confirm("Reset the password for " + email + "?");
-    if (!confirmed) return;
-
-    resetPasswordButton.disabled = true;
-    resetPasswordButton.textContent = "Resetting...";
-
-    try {
-      const token = await getAccessToken();
-      const response = await fetch(RESET_PASSWORD_FUNCTION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + token
-        },
-        body: JSON.stringify({ email, password })
-      });
-
-      let result;
-      try { result = await response.json(); }
-      catch { throw new Error("The password reset server returned an invalid response."); }
-
-      if (!response.ok || result.success === false) {
-        throw new Error(result.error || result.message || "Password reset failed.");
-      }
-
-      showMessage(resetPasswordMessage, "Password reset successfully for " + email + ".", "success");
-      newPassword.value = "";
-      confirmPassword.value = "";
-    } catch (error) {
-      showMessage(resetPasswordMessage, error.message || "Password reset failed.", "error");
-    } finally {
-      resetPasswordButton.disabled = false;
-      resetPasswordButton.textContent = "Reset Password";
-    }
-  }
-
-
-  async function verifyAdminAccess() {
-    const result = await callAdminFunction({ action: "admin_status" });
-    if (!result.is_admin || result.role !== "admin") {
-      await supabaseClient.auth.signOut();
-      throw new Error("This account is not authorized to access the admin dashboard.");
-    }
-    return result;
-  }
-
-  loginForm.addEventListener("submit", async function(event) {
-    event.preventDefault();
-    showMessage(loginMessage, "", "");
-    loginButton.disabled = true;
-    loginButton.textContent = "Logging in...";
-    try {
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (!data.session) throw new Error("Login succeeded but no session was created.");
-      await verifyAdminAccess();
-      loginCard.classList.add("hidden");
-      adminPanel.classList.remove("hidden");
-    } catch (error) {
-      showMessage(loginMessage, error.message || "Login failed.", "error");
-    } finally {
-      loginButton.disabled = false;
-      loginButton.textContent = "Login";
-    }
-  });
-
-  function getCustomerBalance(customer) {
-    if (customer && customer.wallets && customer.wallets.length > 0) return Number(customer.wallets[0].balance || 0);
-    return 0;
-  }
-
-  async function searchCustomers() {
-    const search = customerSearch.value.trim();
-    customerList.innerHTML = "";
-    showMessage(searchMessage, "", "");
-    if (!search) {
-      showMessage(searchMessage, "Enter a customer name or phone number.", "error");
-      return;
-    }
-    searchButton.disabled = true;
-    searchButton.textContent = "Searching...";
-    try {
-      const result = await callAdminFunction({ action: "customer_search", search });
-      const customers = result.customers || [];
-      if (customers.length === 0) {
-        showMessage(searchMessage, "No customer found.", "info");
-        return;
-      }
-      customers.forEach(function(customer) {
-        const item = document.createElement("div");
-        item.className = "customer";
-        const name = document.createElement("div");
-        name.className = "customer-name";
-        name.textContent = customer.name || "Unnamed customer";
-        const phone = document.createElement("div");
-        phone.className = "customer-phone";
-        phone.textContent = customer.phone || "No phone number";
-        const role = document.createElement("span");
-        role.className = "customer-role";
-        role.textContent = customer.role || "customer";
-        const balance = document.createElement("div");
-        balance.className = "customer-balance";
-        balance.textContent = "Balance: ₦" + getCustomerBalance(customer).toLocaleString();
-        item.appendChild(name);
-        item.appendChild(phone);
-        item.appendChild(role);
-        item.appendChild(balance);
-        item.addEventListener("click", function() { selectCustomer(customer, item); });
-        customerList.appendChild(item);
-      });
-    } catch (error) {
-      showMessage(searchMessage, error.message || "Customer search failed.", "error");
-    } finally {
-      searchButton.disabled = false;
-      searchButton.textContent = "Search Customer";
-    }
-  }
-
-  searchButton.addEventListener("click", searchCustomers);
-  customerSearch.addEventListener("keydown", function(event) {
-    if (event.key === "Enter") { event.preventDefault(); searchCustomers(); }
-  });
-
-  function selectCustomer(customer, element) {
-    selectedCustomerData = customer;
-    document.querySelectorAll(".customer").forEach(function(item) { item.classList.remove("selected"); });
-    element.classList.add("selected");
-    const currentBalance = getCustomerBalance(customer);
-    selectedCustomerName.textContent = customer.name || "Unnamed customer";
-    selectedCustomerPhone.textContent = customer.phone || "No phone number";
-    selectedCustomerBalance.textContent = "Current balance: ₦" + currentBalance.toLocaleString();
-    selectedCustomer.classList.remove("hidden");
-    fundButton.disabled = false;
-    balanceResult.innerHTML = "";
-    showMessage(fundingMessage, "Customer selected. Enter the funding details below.", "info");
-    createFundingReference();
-    amount.focus();
-  }
-
-  fundButton.addEventListener("click", async function() {
-    showMessage(fundingMessage, "", "");
-    balanceResult.innerHTML = "";
-    if (!selectedCustomerData) {
-      showMessage(fundingMessage, "Select a customer first.", "error");
-      return;
-    }
-    const fundingAmount = Number(amount.value);
-    const fundingNote = note.value.trim();
-    if (!Number.isFinite(fundingAmount) || fundingAmount <= 0) {
-      showMessage(fundingMessage, "Enter a valid funding amount.", "error");
-      amount.focus();
-      return;
-    }
-    const fundingReference = currentFundingReference || createFundingReference();
-    const confirmed = window.confirm(
-      "Fund " + (selectedCustomerData.name || "this customer") +
-      "'s wallet with ₦" + fundingAmount.toLocaleString() +
-      "?\n\nReference: " + fundingReference
-    );
-    if (!confirmed) return;
-    fundButton.disabled = true;
-    fundButton.textContent = "Funding...";
-    try {
-      const result = await callAdminFunction({
-        action: "manual_fund",
-        customer_user_id: selectedCustomerData.id,
-        amount: fundingAmount,
-        reference: fundingReference,
-        note: fundingNote || null
-      });
-      const funding = result.funding;
-      showMessage(fundingMessage, "Wallet funded successfully.", "success");
-      if (funding) {
-        const newBalance = Number(funding.balance_after || 0);
-        if (selectedCustomerData.wallets && selectedCustomerData.wallets.length > 0) {
-          selectedCustomerData.wallets[0].balance = newBalance;
-        } else {
-          selectedCustomerData.wallets = [{ balance: newBalance }];
-        }
-        selectedCustomerBalance.textContent = "Current balance: ₦" + newBalance.toLocaleString();
-        document.querySelectorAll(".customer").forEach(function(item) {
-          const phoneElement = item.querySelector(".customer-phone");
-          if (phoneElement && phoneElement.textContent === (selectedCustomerData.phone || "No phone number")) {
-            const balanceElement = item.querySelector(".customer-balance");
-            if (balanceElement) balanceElement.textContent = "Balance: ₦" + newBalance.toLocaleString();
-          }
-        });
-        balanceResult.innerHTML = `
-          <div class="balance-result">
-            <div>Customer</div>
-            <strong>${escapeHtml(funding.customer_name || selectedCustomerData.name || "")}</strong>
-            <div style="margin-top:8px;">${escapeHtml(funding.customer_phone || selectedCustomerData.phone || "")}</div>
-            <div style="margin-top:14px;">New wallet balance</div>
-            <div class="balance-value">₦${newBalance.toLocaleString()}</div>
-            <div class="transaction-reference">
-              <strong>Transaction Reference</strong><br />
-              ${escapeHtml(funding.reference || fundingReference)}
-            </div>
-          </div>`;
-      }
-      amount.value = "";
-      note.value = "";
-      createFundingReference();
-    } catch (error) {
-      showMessage(fundingMessage, error.message || "Wallet funding failed.", "error");
-    } finally {
-      fundButton.disabled = !selectedCustomerData;
-      fundButton.textContent = "Fund Wallet";
-    }
-  });
-
-  resetPasswordButton.addEventListener("click", resetCustomerPassword);
-  confirmPassword.addEventListener("keydown", function(event) {
-    if (event.key === "Enter") { event.preventDefault(); resetCustomerPassword(); }
-  });
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-  logoutButton.addEventListener("click", async function() {
-    await supabaseClient.auth.signOut();
-    selectedCustomerData = null;
-    currentFundingReference = null;
-    adminPanel.classList.add("hidden");
-    loginCard.classList.remove("hidden");
-    customerList.innerHTML = "";
-    selectedCustomer.classList.add("hidden");
-    fundButton.disabled = true;
-    amount.value = "";
-    note.value = "";
-    generatedReference.textContent = "Will be generated automatically";
-    balanceResult.innerHTML = "";
-    resetEmail.value = "";
-    newPassword.value = "";
-    confirmPassword.value = "";
-    showMessage(resetPasswordMessage, "", "");
-    showMessage(loginMessage, "You have been logged out.", "info");
-  });
-
-  async function checkExistingSession() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-      try {
-        await verifyAdminAccess();
-        loginCard.classList.add("hidden");
-        adminPanel.classList.remove("hidden");
-      } catch (error) {
-        await supabaseClient.auth.signOut();
-        showMessage(loginMessage, error.message || "Admin access required.", "error");
-      }
-    }
-  }
-
-  checkExistingSession();
+$("refreshOverview").onclick=loadOverview;$("refreshAnalytics").onclick=loadAnalytics;$("analyticsDays").onchange=loadAnalytics;$("closeModal").onclick=()=>$("modal").classList.add("hidden");$("modal").addEventListener("click",e=>{if(e.target===$("modal"))$("modal").classList.add("hidden")});
+async function loadAll(){await Promise.all([loadOverview(),loadProviders(),loadProducts(),loadAnalytics()])}
+(async()=>{const {data:{session}}=await sb.auth.getSession();if(session){try{await admin({action:"dashboard_summary"});$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch{await sb.auth.signOut()}}})();
 </script>
 </body>
 </html>
