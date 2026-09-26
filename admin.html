@@ -21,6 +21,7 @@
 <button data-tab="overview" class="active">Overview</button>
 <button data-tab="providers">APIs & Providers</button>
 <button data-tab="products">Products & Plans</button>
+<button data-tab="transactions">Transactions</button>
 <button data-tab="analytics">Analytics</button>
 <button data-tab="operations">Operations</button>
 <button id="logout" class="danger">Logout</button>
@@ -52,6 +53,15 @@
 <div class="card"><div class="section-title"><h2>Provider Plan IDs</h2><button id="newMapping">+ Add Provider Plan ID</button></div><div id="mappingMsg"></div><div class="field"><label>Filter by internal product</label><select id="mappingProduct"></select></div><div class="table-wrap"><table><thead><tr><th>Internal Plan</th><th>Provider</th><th>Provider Plan ID</th><th>Provider Cost</th><th>Priority</th><th>Status</th><th>Active</th><th>Action</th></tr></thead><tbody id="mappingRows"></tbody></table></div><p class="muted">The internal Bindawasub product ID and the provider's own Plan ID are stored separately. One internal plan can have multiple provider mappings for routing and failover.</p></div>
 </section>
 
+
+<section id="transactions" class="panel">
+<div class="card">
+<div class="section-title"><h2>Transactions</h2><div class="actions"><select id="transactionStatus"><option value="">All statuses</option><option value="pending">Pending</option><option value="successful">Successful</option><option value="failed">Failed</option><option value="reversed">Reversed</option></select><input id="transactionSearch" style="width:220px" placeholder="Phone or provider ref"><button id="refreshTransactions" class="secondary">Refresh</button></div></div>
+<div id="transactionMsg"></div>
+<div class="table-wrap"><table><thead><tr><th>Time</th><th>Customer</th><th>Product</th><th>Phone</th><th>Amount</th><th>Cost</th><th>Profit</th><th>Provider</th><th>Status</th><th>Provider Ref</th><th>Action</th></tr></thead><tbody id="transactionRows"></tbody></table></div>
+<p class="muted">This first version is read-only for transaction safety. Requery/retry/refund controls will be added only after duplicate-purchase and wallet-reversal safeguards are in place.</p>
+</div>
+</section>
 
 <section id="analytics" class="panel">
 <div class="card"><div class="section-title"><h2>Business Analytics</h2><div class="actions"><select id="analyticsDays"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">365 days</option></select><button id="refreshAnalytics" class="secondary">Refresh</button></div></div><div id="analyticsMsg"></div><div class="grid2"><div><h3>Sales</h3><div id="salesChart" class="chart"></div><div class="legend">Daily successful sales</div></div><div><h3>Profit</h3><div id="profitChart" class="chart"></div><div class="legend">Daily successful profit</div></div></div></div>
@@ -160,6 +170,32 @@ async function openMapping(m){
 }
 
 
+async function loadTransactions(){
+  try{
+    const d=await admin({action:"list_transactions",status:$("transactionStatus").value,search:$("transactionSearch").value.trim(),limit:100});
+    const rows=d.transactions||[];
+    $("transactionRows").innerHTML=rows.map(t=>{
+      const product=t.products?.product_name||"—";
+      const customer=t.users?.name||t.users?.phone||"—";
+      const status=t.status||"pending";
+      return '<tr><td>'+escapeHtml(new Date(t.created_at).toLocaleString())+'</td><td>'+escapeHtml(customer)+'</td><td>'+escapeHtml(product)+'</td><td>'+escapeHtml(t.phone_number||"—")+'</td><td>'+money(t.amount)+'</td><td>'+money(t.cost)+'</td><td>'+money(t.profit)+'</td><td>'+escapeHtml(t.provider||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(t.provider_reference||"—")+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button></td></tr>';
+    }).join("")||'<tr><td colspan="11" class="muted">No transactions found.</td></tr>';
+    window._transactions=rows;
+    msg($("transactionMsg"),rows.length+" transaction(s) loaded.","success");
+  }catch(e){msg($("transactionMsg"),e.message,"error")}
+}
+window.viewTransaction=id=>{
+  const t=(window._transactions||[]).find(x=>x.id===id);
+  if(!t)return;
+  const p=t.products||{}, u=t.users||{};
+  $("modalTitle").textContent="Transaction Details";
+  $("modalBody").innerHTML='<div class="grid2"><div><p><strong>Transaction ID</strong><br><code>'+escapeHtml(t.id)+'</code></p><p><strong>Status</strong><br>'+escapeHtml(t.status)+'</p><p><strong>Customer</strong><br>'+escapeHtml(u.name||"—")+'<br>'+escapeHtml(u.email||"")+'</p><p><strong>Phone</strong><br>'+escapeHtml(t.phone_number||"—")+'</p></div><div><p><strong>Product</strong><br>'+escapeHtml(p.product_name||"—")+'</p><p><strong>Network / Service</strong><br>'+escapeHtml(p.network||"—")+' / '+escapeHtml(p.service_type||"—")+'</p><p><strong>Amount / Cost / Profit</strong><br>'+money(t.amount)+' / '+money(t.cost)+' / '+money(t.profit)+'</p><p><strong>Provider</strong><br>'+escapeHtml(t.provider||"—")+'<br>'+escapeHtml(t.provider_reference||"No provider reference")+'</p></div></div><div class="card" style="background:#f7faf8"><p><strong>Created:</strong> '+escapeHtml(new Date(t.created_at).toLocaleString())+'</p><p><strong>Completed:</strong> '+escapeHtml(t.completed_at?new Date(t.completed_at).toLocaleString():"Not completed")+'</p></div>';
+  $("modal").classList.remove("hidden");
+};
+$("transactionStatus").onchange=loadTransactions;
+$("refreshTransactions").onclick=loadTransactions;
+$("transactionSearch").addEventListener("keydown",e=>{if(e.key==="Enter")loadTransactions()});
+
 async function loadAnalytics(){try{const d=await admin({action:"analytics",days:$("analyticsDays").value});const rows=d.series||[];$("analyticsRows").innerHTML=rows.slice().reverse().map(x=>'<tr><td>'+escapeHtml(x.date)+'</td><td>'+money(x.sales)+'</td><td>'+money(x.profit)+'</td><td>'+x.transactions+'</td><td>'+x.successful+'</td><td>'+x.failed+'</td><td>'+money(x.funding)+'</td><td>'+x.new_customers+'</td></tr>').join("")||'<tr><td colspan="8" class="muted">No activity in this period.</td></tr>';drawChart("salesChart",rows.map(x=>x.sales));drawChart("profitChart",rows.map(x=>x.profit));msg($("analyticsMsg"),"Analytics refreshed.","success")}catch(e){msg($("analyticsMsg"),e.message,"error")}}
 function drawChart(id,values){const max=Math.max(...values,1);$(id).innerHTML=values.slice(-60).map((v,i)=>'<div class="bar" title="'+money(v)+'" style="height:'+Math.max(3,(Number(v)/max)*160)+'px"><span>'+((i+1)%5===0?i+1:"")+'</span></div>').join("")||'<span class="muted">No data</span>'}
 
@@ -170,7 +206,7 @@ $("fundWallet").onclick=async()=>{try{if(!selectedCustomer)throw Error("Select a
 $("resetBtn").onclick=async()=>{try{const email=$("resetEmail").value.trim(),password=$("resetPassword").value;if(password.length<8)throw Error("Password must be at least 8 characters.");if(!confirm("Reset this customer's password?"))return;const r=await fetch(RESET_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok||d.success===false)throw Error(d.error||"Reset failed.");msg($("resetMsg"),"Password reset successfully.","success");$("resetPassword").value=""}catch(e){msg($("resetMsg"),e.message,"error")}};
 
 $("refreshOverview").onclick=loadOverview;$("refreshAnalytics").onclick=loadAnalytics;$("analyticsDays").onchange=loadAnalytics;$("closeModal").onclick=()=>$("modal").classList.add("hidden");$("modal").addEventListener("click",e=>{if(e.target===$("modal"))$("modal").classList.add("hidden")});
-async function loadAll(){await loadOverview();await loadProviders();await loadProducts();await loadEndpoints();await loadMappings();await loadAnalytics()}
+async function loadAll(){await loadOverview();await loadProviders();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics()}
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session){try{await admin({action:"dashboard_summary"});$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch{await sb.auth.signOut()}}})();
 </script>
 </body>
