@@ -56,7 +56,7 @@
 async function loadEndpoints(){try{
   const pid=$("endpointProvider").value;
   const d=await admin({action:"list_endpoints",provider_id:pid||null});
-  const rows=d.endpoints||[];
+  const rows=d.endpoints||[]; window._endpoints=rows;
   $("endpointRows").innerHTML=rows.map(e=>'<tr><td>'+escapeHtml(e.service_type)+'</td><td>'+escapeHtml(e.operation)+'</td><td>'+escapeHtml(e.method)+'</td><td>'+escapeHtml(e.path)+'</td><td>'+e.timeout_ms+'ms</td><td>'+e.retry_count+'</td><td><span class="badge '+(e.active?"on":"off")+'">'+(e.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editEndpoint(\''+e.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No endpoints configured.</td></tr>';
 }catch(e){msg($("endpointMsg"),e.message,"error")}}
 function refreshEndpointProviderOptions(){
