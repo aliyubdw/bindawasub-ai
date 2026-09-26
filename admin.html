@@ -193,12 +193,27 @@ async function loadTransactions(){
       const product=t.products?.product_name||"—";
       const customer=t.users?.name||t.users?.phone||"—";
       const status=t.status||"pending";
-      return '<tr><td>'+escapeHtml(new Date(t.created_at).toLocaleString())+'</td><td>'+escapeHtml(customer)+'</td><td>'+escapeHtml(product)+'</td><td>'+escapeHtml(t.phone_number||"—")+'</td><td>'+money(t.amount)+'</td><td>'+money(t.cost)+'</td><td>'+money(t.profit)+'</td><td>'+escapeHtml(t.provider||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(t.provider_reference||"—")+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+'</td></tr>';
+      return '<tr><td>'+escapeHtml(new Date(t.created_at).toLocaleString())+'</td><td>'+escapeHtml(customer)+'</td><td>'+escapeHtml(product)+'</td><td>'+escapeHtml(t.phone_number||"—")+'</td><td>'+money(t.amount)+'</td><td>'+money(t.cost)+'</td><td>'+money(t.profit)+'</td><td>'+escapeHtml(t.provider||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(t.provider_reference||"—")+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' <button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button>':"")+'</td></tr>';
     }).join("")||'<tr><td colspan="12" class="muted">No transactions found.</td></tr>';
     window._transactions=rows;
     msg($("transactionMsg"),rows.length+" transaction(s) loaded.","success");
   }catch(e){msg($("transactionMsg"),e.message,"error")}
 }
+async function manualTransactionUpdate(id,action){
+  const labels={successful:"Success",failed:"Failed",refunded:"Refund"};
+  const label=labels[action]||action;
+  const defaultText=action==="refunded"?"Transaction manually refunded by admin.":action==="failed"?"Transaction manually marked failed by admin. Wallet refunded.":"Transaction manually marked successful by admin.";
+  const description=prompt("Transaction description:",defaultText);
+  if(description===null)return;
+  if(!confirm("Mark this pending transaction as "+label+"?"+(action==="failed"||action==="refunded"?"\\n\\nThe customer wallet will be refunded.":"")))return;
+  try{
+    const d=await admin({action:"manual_transaction_update",transaction_id:id,manual_action:action,description});
+    if(!d.success)throw Error(d.error||"Manual update failed.");
+    msg($("transactionMsg"),"Transaction updated: "+label+(d.refund_reference?" — "+d.refund_reference:""),"success");
+    await loadTransactions(); await loadOverview();
+  }catch(e){msg($("transactionMsg"),e.message,"error")}
+}
+window.manualTransactionUpdate=manualTransactionUpdate;
 window.viewTransaction=id=>{
   const t=(window._transactions||[]).find(x=>x.id===id);
   if(!t)return;
