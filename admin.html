@@ -59,7 +59,7 @@
 <div class="section-title"><h2>Transactions</h2><div class="actions"><select id="transactionStatus"><option value="">All statuses</option><option value="pending">Pending</option><option value="successful">Successful</option><option value="failed">Failed</option><option value="reversed">Reversed</option></select><input id="transactionSearch" style="width:220px" placeholder="Phone or provider ref"><button id="refreshTransactions" class="secondary">Refresh</button></div></div>
 <div id="transactionMsg"></div>
 <div class="table-wrap"><table><thead><tr><th>Time</th><th>Customer</th><th>Product</th><th>Phone</th><th>Amount</th><th>Cost</th><th>Profit</th><th>Provider</th><th>Status</th><th>Provider Ref</th><th>Action</th></tr></thead><tbody id="transactionRows"></tbody></table></div>
-<p class="muted">This first version is read-only for transaction safety. Requery/retry/refund controls will be added only after duplicate-purchase and wallet-reversal safeguards are in place.</p>
+<p class="muted">Pending transactions with a saved provider/customer reference can now be safely re-queried. Requery checks provider status only; it never sends a second purchase request. Transactions without a saved reference remain manual-review only.</p>
 </div>
 </section>
 
@@ -170,6 +170,21 @@ async function openMapping(m){
 }
 
 
+async function requeryTransaction(id){
+  if(!confirm("Re-query this pending transaction with the provider? No purchase/retry request will be sent."))return;
+  try{
+    const r=await fetch(EXECUTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({action:"requery_transaction",transaction_id:id})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false&&d.status!=="pending")throw Error(d.error||d.message||"Requery failed.");
+    msg($("transactionMsg"),d.status==="successful"?"Provider confirmed delivery and the transaction was finalized.":d.status==="failed"?"Provider reported failure and the transaction was finalized/refunded.":d.message||"Transaction remains pending.","success");
+    await loadTransactions();
+    await loadOverview();
+    if(d.status==="successful"||d.status==="failed"){
+      $("modal").classList.add("hidden");
+    }
+  }catch(e){msg($("transactionMsg"),e.message,"error")}
+}
+window.requeryTransaction=requeryTransaction;
 async function loadTransactions(){
   try{
     const d=await admin({action:"list_transactions",status:$("transactionStatus").value,search:$("transactionSearch").value.trim(),limit:100});
@@ -178,7 +193,7 @@ async function loadTransactions(){
       const product=t.products?.product_name||"—";
       const customer=t.users?.name||t.users?.phone||"—";
       const status=t.status||"pending";
-      return '<tr><td>'+escapeHtml(new Date(t.created_at).toLocaleString())+'</td><td>'+escapeHtml(customer)+'</td><td>'+escapeHtml(product)+'</td><td>'+escapeHtml(t.phone_number||"—")+'</td><td>'+money(t.amount)+'</td><td>'+money(t.cost)+'</td><td>'+money(t.profit)+'</td><td>'+escapeHtml(t.provider||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(t.provider_reference||"—")+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button></td></tr>';
+      return '<tr><td>'+escapeHtml(new Date(t.created_at).toLocaleString())+'</td><td>'+escapeHtml(customer)+'</td><td>'+escapeHtml(product)+'</td><td>'+escapeHtml(t.phone_number||"—")+'</td><td>'+money(t.amount)+'</td><td>'+money(t.cost)+'</td><td>'+money(t.profit)+'</td><td>'+escapeHtml(t.provider||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(t.provider_reference||"—")+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+'</td></tr>';
     }).join("")||'<tr><td colspan="11" class="muted">No transactions found.</td></tr>';
     window._transactions=rows;
     msg($("transactionMsg"),rows.length+" transaction(s) loaded.","success");
