@@ -19,7 +19,7 @@
 <div class="header"><h1>Bindawasub Admin</h1><p>Manage providers, plans, pricing, customers and business analytics.</p></div>
 <div class="nav">
 <button data-tab="overview" class="active">Overview</button>
-<button data-tab="providers">APIs & Providers</button>
+<button data-tab="providers">APIs & Providers</button><button data-tab="services">Services</button>
 <button data-tab="products">Products & Plans</button>
 <button data-tab="transactions">Transactions</button>
 <button data-tab="analytics">Analytics</button>
@@ -46,6 +46,11 @@
 <section id="providers" class="panel">
 <div class="card"><div class="section-title"><h2>API Providers</h2><button id="newProvider">+ Add API</button></div><div id="providerMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Code</th><th>Base URL</th><th>Status</th><th>Webhook</th><th>Secret reference</th><th>Action</th></tr></thead><tbody id="providerRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>API Endpoints</h2><button id="newEndpoint">+ Add Endpoint</button></div><div id="endpointMsg"></div><div class="field"><label>Provider</label><select id="endpointProvider"></select></div><div class="table-wrap"><table><thead><tr><th>Service</th><th>Operation</th><th>Method</th><th>Path</th><th>Timeout</th><th>Retries</th><th>Status</th><th>Action</th></tr></thead><tbody id="endpointRows"></tbody></table></div></div>
+</section>
+
+<section id="services" class="panel">
+<div class="card"><div class="section-title"><h2>Services</h2><button id="newService">+ Add Service</button></div><div id="serviceMsg"></div><div class="table-wrap"><table><thead><tr><th>Service</th><th>Code</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceRows"></tbody></table></div></div>
+<div class="card"><div class="section-title"><h2>Provider Service Routing</h2><button id="newProviderService">+ Add Provider Service</button></div><div id="providerServiceMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Service</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="providerServiceRows"></tbody></table></div><p class="muted">This controls which providers are allowed to serve each Bindawasub service. It does not expose API credentials.</p></div>
 </section>
 
 <section id="products" class="panel">
@@ -108,6 +113,35 @@ $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active")});
 
 async function loadOverview(){try{const d=await admin({action:"dashboard_summary"});const s=d.summary;$("mCustomers").textContent=s.customers;$("mProducts").textContent=s.products;$("mProviders").textContent=s.providers;$("mWallet").textContent=money(s.wallet_liability);$("mSales").textContent=money(s.sales);$("mProfit").textContent=money(s.profit);$("mSuccess").textContent=s.successful_transactions;$("mPending").textContent=s.pending_transactions;msg($("overviewMsg"),"Dashboard refreshed.","success")}catch(e){msg($("overviewMsg"),e.message,"error")}}
+
+let services=[], providerServices=[];
+async function loadServices(){
+  try{
+    const d=await admin({action:"list_services"}); services=d.services||[];
+    $("serviceRows").innerHTML=services.map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\''+s.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No services configured.</td></tr>';
+    await loadProviderServices();
+  }catch(e){msg($("serviceMsg"),e.message,"error")}
+}
+window.editService=id=>openService(services.find(s=>s.id===id)||null);
+$("newService").onclick=()=>openService(null);
+async function openService(s){
+  $("modalTitle").textContent=s?"Edit Service":"Add Service";
+  $("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Service name *</label><input id="sName"></div><div class="field"><label>Service code *</label><input id="sCode" placeholder="e.g. electricity"></div><div class="field"><label>Category</label><input id="sCategory" placeholder="telecom, utilities, education"></div><div class="field"><label><input id="sActive" type="checkbox" style="width:auto" checked> Active</label></div></div><div class="field"><label>Description</label><textarea id="sDescription"></textarea></div><div class="field"><label>Metadata (JSON)</label><textarea id="sMetadata">{}</textarea></div><button id="saveService">Save Service</button>';
+  $("sName").value=s?.name||"";$("sCode").value=s?.code||"";$("sCategory").value=s?.category||"";$("sDescription").value=s?.description||"";$("sActive").checked=s?.active!==false;$("sMetadata").value=JSON.stringify(s?.metadata||{},null,2);$("modal").classList.remove("hidden");
+  $("saveService").onclick=async()=>{try{let metadata={};try{metadata=JSON.parse($("sMetadata").value||"{}")}catch{throw Error("Invalid service metadata JSON.")}await admin({action:"save_service",id:s?.id,name:$("sName").value,code:$("sCode").value,category:$("sCategory").value,description:$("sDescription").value,active:$("sActive").checked,metadata});$("modal").classList.add("hidden");await loadServices()}catch(e){msg($("modalMsg"),e.message,"error")}};
+}
+async function loadProviderServices(){
+  const d=await admin({action:"list_provider_services"}); providerServices=d.provider_services||[];
+  $("providerServiceRows").innerHTML=providerServices.map(x=>'<tr><td>'+escapeHtml(x.api_providers?.name||x.api_providers?.code||"—")+'</td><td>'+escapeHtml(x.service_type)+'</td><td>'+escapeHtml(x.priority)+'</td><td><span class="badge '+(x.enabled?"on":"off")+'">'+(x.enabled?"Enabled":"Disabled")+'</span></td><td><button class="secondary" onclick="editProviderService(\''+x.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No provider-service mappings.</td></tr>';
+}
+window.editProviderService=id=>openProviderService(providerServices.find(x=>x.id===id)||null);
+$("newProviderService").onclick=()=>openProviderService(null);
+async function openProviderService(x){
+  $("modalTitle").textContent=x?"Edit Provider Service":"Add Provider Service";
+  $("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Provider</label><select id="psProvider">'+providers.map(p=>'<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>').join("")+'</select></div><div class="field"><label>Service</label><select id="psService">'+services.map(s=>'<option value="'+s.code+'">'+escapeHtml(s.name)+' ('+escapeHtml(s.code)+')</option>').join("")+'</select></div><div class="field"><label>Priority</label><input id="psPriority" type="number" min="0" value="100"></div><div class="field"><label><input id="psEnabled" type="checkbox" style="width:auto" checked> Enabled</label></div></div><div class="field"><label>Metadata (JSON)</label><textarea id="psMetadata">{}</textarea></div><button id="saveProviderService">Save Provider Service</button>';
+  $("psProvider").value=x?.provider_id||providers[0]?.id||"";$("psService").value=x?.service_type||services[0]?.code||"";$("psPriority").value=x?.priority??100;$("psEnabled").checked=x?.enabled!==false;$("psMetadata").value=JSON.stringify(x?.metadata||{},null,2);$("modal").classList.remove("hidden");
+  $("saveProviderService").onclick=async()=>{try{let metadata={};try{metadata=JSON.parse($("psMetadata").value||"{}")}catch{throw Error("Invalid routing metadata JSON.")}await admin({action:"save_provider_service",id:x?.id,provider_id:$("psProvider").value,service_type:$("psService").value,priority:$("psPriority").value,enabled:$("psEnabled").checked,metadata});$("modal").classList.add("hidden");await loadProviderServices()}catch(e){msg($("modalMsg"),e.message,"error")}};
+}
 async function loadProviders(){try{const d=await admin({action:"list_providers"});providers=d.providers||[];refreshEndpointProviderOptions();refreshMappingProductOptions();renderProviders();}catch(e){msg($("providerMsg"),e.message,"error")}}
 function renderProviders(){ $("providerRows").innerHTML=providers.map(p=>'<tr><td><strong>'+escapeHtml(p.name)+'</strong></td><td>'+escapeHtml(p.code)+'</td><td>'+escapeHtml(p.base_url||"—")+'</td><td><span class="badge '+(p.status==="active"?"on":"off")+'">'+escapeHtml(p.status)+'</span></td><td>'+ (p.supports_webhook?"Yes":"No") +'</td><td>'+escapeHtml(p.api_secret_name||"—")+'<br><span class="muted">'+(p.credential_configured?"Vault configured":"Not configured")+'</span></td><td><button class="secondary" onclick="editProvider(\''+p.id+'\')">Edit</button> <button class="secondary" onclick="testProvider(\''+p.id+'\')">Test</button></td></tr>').join("")||'<tr><td colspan="7" class="muted">No providers added yet.</td></tr>'}
 window.editProvider=id=>openProvider(providers.find(p=>p.id===id));
@@ -292,7 +326,7 @@ $("refreshOverview").onclick=loadOverview;$("refreshAnalytics").onclick=loadAnal
 async function loadAiManagement(){try{const s=await aiAdmin({action:"ai_summary"});const x=s.summary||{};$("aiConversations").textContent=x.conversations??0;$("aiMessages").textContent=x.messages??0;$("aiActivity").textContent=x.activity_events??0;$("aiSuccess").textContent=x.successful_purchases??0;$("aiFailed").textContent=x.failed_purchases??0;$("aiPending").textContent=x.pending_purchases??0;const d=await aiAdmin({action:"ai_settings_get"});const a=d.settings||{};$("aiEnabled").checked=!!a.enabled;$("aiGemini").checked=!!a.gemini_enabled;$("aiConfirm").checked=!!a.require_purchase_confirmation;$("aiMaxPurchase").value=a.max_purchase_amount??10000;$("aiLanguage").value=a.default_language||"english";$("aiChannels").value=Array.isArray(a.allowed_channels)?a.allowed_channels.join(", "):"";$("aiFallback").value=a.fallback_message||"";msg($("aiMsg"),"AI management refreshed.","success")}catch(e){msg($("aiMsg"),e.message,"error")}}
 $("refreshAi").onclick=loadAiManagement;
 $("saveAiSettings").onclick=async()=>{try{const channels=$("aiChannels").value.split(",").map(x=>x.trim()).filter(Boolean);const d=await aiAdmin({action:"ai_settings_save",settings:{enabled:$("aiEnabled").checked,gemini_enabled:$("aiGemini").checked,require_purchase_confirmation:$("aiConfirm").checked,max_purchase_amount:Number($("aiMaxPurchase").value),default_language:$("aiLanguage").value,allowed_channels:channels,fallback_message:$("aiFallback").value}});msg($("aiSettingsMsg"),d.success?"AI settings saved successfully.":"Save failed.",d.success?"success":"error")}catch(e){msg($("aiSettingsMsg"),e.message,"error")}};
-async function loadAll(){await loadOverview();await loadAiManagement();await loadProviders();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics()}
+async function loadAll(){await loadOverview();await loadAiManagement();await loadProviders();await loadServices();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics()}
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session){try{await admin({action:"dashboard_summary"});$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch{await sb.auth.signOut()}}})();
 </script>
 </body>
