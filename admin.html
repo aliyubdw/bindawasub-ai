@@ -287,7 +287,7 @@ window.viewAiCustomer=async function(i){
       sb.from("transactions").select("id,created_at,amount,status,source,description,provider,provider_reference,phone_number").eq("user_id",c.id).order("created_at",{ascending:false}).limit(10)
     ]);
     if(cv.error)throw cv.error; if(av.error)throw av.error; if(tv.error)throw tv.error;
-    const conversations=cv.data||[], activities=av.data||[], transactions=tv.data||[];
+    const conversations=cv.data||[], activities=av.data||[], transactions=tv.data||[]; window._aiCustomerConversationRows=conversations;
     const success=transactions.filter(x=>x.status==="successful").length;
     const failed=transactions.filter(x=>x.status==="failed").length;
     const pending=transactions.filter(x=>x.status==="pending").length;
@@ -306,14 +306,24 @@ window.viewAiCustomer=async function(i){
       (activities.map(x=>'<tr><td>'+escapeHtml(new Date(x.created_at).toLocaleString())+'</td><td>'+escapeHtml(x.channel||"—")+'</td><td>'+escapeHtml(x.event_type||"—")+'</td><td>'+escapeHtml(x.intent||"—")+'</td><td>'+escapeHtml(x.error_message?"Error":x.success===true?"Success":x.success===false?"Failed":"—")+'</td><td style="font-family:monospace">'+escapeHtml(x.transaction_id||"—")+'</td></tr>').join("")||'<tr><td colspan="6" class="muted">No AI activity recorded.</td></tr>')+
       '</tbody></table></div><h3>Recent purchases</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th>Source</th><th>Provider</th></tr></thead><tbody>'+
       (transactions.map(x=>'<tr><td>'+escapeHtml(new Date(x.created_at).toLocaleString())+'</td><td>'+escapeHtml(x.description||"—")+'</td><td>₦'+escapeHtml(Number(x.amount||0).toLocaleString())+'</td><td>'+escapeHtml(x.status||"—")+'</td><td>'+escapeHtml(x.source||"—")+'</td><td>'+escapeHtml(x.provider||"—")+'</td></tr>').join("")||'<tr><td colspan="6" class="muted">No purchases found.</td></tr>')+
-      '</tbody></table></div><h3>Conversations</h3><div class="table-wrap"><table><thead><tr><th>Channel</th><th>Language</th><th>Started</th><th>Last message</th><th>Pending</th></tr></thead><tbody>'+
-      (conversations.map(x=>'<tr><td>'+escapeHtml(x.channel||"—")+'</td><td>'+escapeHtml(x.language||"—")+'</td><td>'+escapeHtml(new Date(x.started_at).toLocaleString())+'</td><td>'+escapeHtml(new Date(x.last_message_at).toLocaleString())+'</td><td>'+escapeHtml(x.pending_product_id||x.pending_phone_number?"Yes":"No")+'</td></tr>').join("")||'<tr><td colspan="5" class="muted">No conversations found.</td></tr>')+
+      '</tbody></table></div><h3>Conversations</h3><div class="table-wrap"><table><thead><tr><th>Channel</th><th>Language</th><th>Started</th><th>Last message</th><th>Pending</th><th>Action</th></tr></thead><tbody>'+
+      (conversations.map((x,i)=>'<tr><td>'+escapeHtml(x.channel||"—")+'</td><td>'+escapeHtml(x.language||"—")+'</td><td>'+escapeHtml(new Date(x.started_at).toLocaleString())+'</td><td>'+escapeHtml(new Date(x.last_message_at).toLocaleString())+'</td><td>'+escapeHtml(x.pending_product_id||x.pending_phone_number?"Yes":"No")+'</td><td><button class="secondary" onclick="viewAiCustomerConversation('+i+')">Messages</button></td></tr>').join("")||'<tr><td colspan="6" class="muted">No conversations found.</td></tr>')+
       '</tbody></table></div>';
     $("aiCustomerViewer").classList.remove("hidden");
     $("aiCustomerViewer").scrollIntoView({behavior:"smooth",block:"start"});
   }catch(e){msg($("aiCustomerMsg"),e.message,"error")}
 };
 $("searchAiCustomer").onclick=searchAiCustomers;
+window.viewAiCustomerConversation=async function(i){
+  try{
+    const rows=window._aiCustomerConversationRows||[];
+    const c=rows[i]; if(!c)return;
+    const {data,error}=await sb.from("ai_messages").select("id,role,message,intent,tool_called,created_at").eq("conversation_id",c.id).order("created_at",{ascending:true});
+    if(error)throw error;
+    const html=(data||[]).map(m=>'<div class="event"><h4>'+escapeHtml(m.role||"message")+(m.intent?' • '+escapeHtml(m.intent):"")+'</h4><small>'+escapeHtml(new Date(m.created_at).toLocaleString())+(m.tool_called?' • '+escapeHtml(m.tool_called):"")+'</small><p style="white-space:pre-wrap">'+escapeHtml(m.message||"")+'</p></div>').join("")||'<p class="muted">No messages recorded for this conversation.</p>';
+    $("aiCustomerDetails").insertAdjacentHTML("beforeend",'<div class="card" style="margin-top:16px"><div class="section-title"><h3>Conversation messages</h3></div><div class="timeline">'+html+'</div></div>');
+  }catch(e){msg($("aiCustomerMsg"),e.message,"error")}
+};
 $("aiCustomerSearch").addEventListener("keydown",e=>{if(e.key==="Enter")searchAiCustomers()});
 $("refreshAiCustomers").onclick=()=>{$("aiCustomerSearch").value="";$("aiCustomerResults").innerHTML="";$("aiCustomerViewer").classList.add("hidden");$("aiCustomerMsg").innerHTML=""};
 $("closeAiCustomer").onclick=()=>$("aiCustomerViewer").classList.add("hidden");
