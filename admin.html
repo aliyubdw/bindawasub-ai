@@ -178,47 +178,13 @@ async function openMapping(m){
 
 async function executeTransaction(id){
   if(!confirm("Execute this pending transaction with the configured provider?\n\nThis will send the purchase request. It will NOT debit the wallet again."))return;
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),30000);
   try{
-    const accessToken=await token();
-    const r=await fetch(EXECUTION_URL,{
-      method:"POST",
-      mode:"cors",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization":"Bearer "+accessToken,
-        "apikey":KEY
-      },
-      body:JSON.stringify({action:"execute_purchase",transaction_id:id}),
-      signal:controller.signal
-    });
-    const raw=await r.text();
-    let d={};
-    try{d=raw?JSON.parse(raw):{}}catch{}
-    if(!r.ok){
-      const detail=d.error||d.message||raw||("HTTP "+r.status+" "+r.statusText);
-      throw Error("HTTP "+r.status+": "+detail);
-    }
-    if(d.success===false && d.status!=="pending"){
-      throw Error(d.error||d.message||"Execution failed.");
-    }
-    const text=d.status==="successful"
-      ?"Provider confirmed the purchase successfully."
-      :d.status==="failed"
-        ?"Provider reported failure. The transaction was finalized and the wallet was refunded."
-        :d.message||"Transaction remains pending; no duplicate purchase will be sent automatically.";
-    msg($("transactionMsg"),text,d.status==="failed"?"error":"success");
-    await loadTransactions();
-    await loadOverview();
-  }catch(e){
-    const detail=e?.name==="AbortError"
-      ?"Request timed out after 30 seconds."
-      :e?.message||String(e);
-    msg($("transactionMsg"),"Execute failed: "+detail+" — Open browser DevTools → Console/Network if more detail is needed.","error");
-  }finally{
-    clearTimeout(timeout);
-  }
+    const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({action:"execute_purchase",transaction_id:id})});
+    const raw=await r.text(); let d={}; try{d=raw?JSON.parse(raw):{}}catch{}
+    if(!r.ok||d.success===false&&d.status!=="pending")throw Error("HTTP "+r.status+": "+(d.error||d.message||raw||"Empty response"));
+    const text=d.status==="successful"?"Provider confirmed the purchase successfully.":d.status==="failed"?"Provider reported failure. The transaction was finalized and the wallet was refunded.":d.message||"Transaction remains pending; no duplicate purchase will be sent automatically.";
+    msg($("transactionMsg"),text,d.status==="failed"?"error":"success"); await loadTransactions(); await loadOverview();
+  }catch(e){msg($("transactionMsg"),"Execute failed: "+(e?.message||String(e)),"error")}
 }
 window.executeTransaction=executeTransaction;
 
