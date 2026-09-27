@@ -287,6 +287,9 @@ window.viewAiCustomer=async function(i){
       sb.from("transactions").select("id,created_at,amount,status,source,description,provider,provider_reference,phone_number").eq("user_id",c.id).order("created_at",{ascending:false}).limit(10)
     ]);
     if(cv.error)throw cv.error; if(av.error)throw av.error; if(tv.error)throw tv.error;
+    const walletResp=await aiAdmin({action:"ai_customer_wallet",user_id:c.id});
+    if(walletResp.error)throw Error(walletResp.error);
+    const walletData=walletResp.wallet||null, walletTransactions=walletResp.transactions||[];
     const conversations=cv.data||[], activities=av.data||[], transactions=tv.data||[]; window._aiCustomerConversationRows=conversations;
     const success=transactions.filter(x=>x.status==="successful").length;
     const failed=transactions.filter(x=>x.status==="failed").length;
@@ -302,7 +305,7 @@ window.viewAiCustomer=async function(i){
       '<div class="card metric"><div class="label">Successful</div><div class="value">'+success+'</div></div>'+
       '<div class="card metric"><div class="label">Failed</div><div class="value">'+failed+'</div></div>'+
       '<div class="card metric"><div class="label">Pending</div><div class="value">'+pending+'</div></div></div>'+
-      '<h3>Recent AI activity</h3><div class="table-wrap"><table><thead><tr><th>Time</th><th>Channel</th><th>Event</th><th>Intent</th><th>Result</th><th>Transaction</th></tr></thead><tbody>'+
+      '<h3>Wallet & funding history</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th><th>Balance Before</th><th>Balance After</th><th>Reference</th></tr></thead><tbody>'+(walletTransactions.map(x=>'<tr><td>'+escapeHtml(new Date(x.created_at).toLocaleString())+'</td><td>'+escapeHtml(x.type||"—")+'</td><td>₦'+escapeHtml(Number(x.amount||0).toLocaleString())+'</td><td>'+escapeHtml(x.status||"—")+'</td><td>₦'+escapeHtml(Number(x.balance_before||0).toLocaleString())+'</td><td>₦'+escapeHtml(Number(x.balance_after||0).toLocaleString())+'</td><td style="font-family:monospace">'+escapeHtml(x.reference||"—")+'</td></tr>').join("")||'<tr><td colspan="7" class="muted">No wallet transactions found.</td></tr>')+'</tbody></table></div><h3>Recent AI activity</h3><div class="table-wrap"><table><thead><tr><th>Time</th><th>Channel</th><th>Event</th><th>Intent</th><th>Result</th><th>Transaction</th></tr></thead><tbody>'+
       (activities.map(x=>'<tr><td>'+escapeHtml(new Date(x.created_at).toLocaleString())+'</td><td>'+escapeHtml(x.channel||"—")+'</td><td>'+escapeHtml(x.event_type||"—")+'</td><td>'+escapeHtml(x.intent||"—")+'</td><td>'+escapeHtml(x.error_message?"Error":x.success===true?"Success":x.success===false?"Failed":"—")+'</td><td style="font-family:monospace">'+escapeHtml(x.transaction_id||"—")+'</td></tr>').join("")||'<tr><td colspan="6" class="muted">No AI activity recorded.</td></tr>')+
       '</tbody></table></div><h3>Recent purchases</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th>Source</th><th>Provider</th></tr></thead><tbody>'+
       (transactions.map(x=>'<tr><td>'+escapeHtml(new Date(x.created_at).toLocaleString())+'</td><td>'+escapeHtml(x.description||"—")+'</td><td>₦'+escapeHtml(Number(x.amount||0).toLocaleString())+'</td><td>'+escapeHtml(x.status||"—")+'</td><td>'+escapeHtml(x.source||"—")+'</td><td>'+escapeHtml(x.provider||"—")+'</td></tr>').join("")||'<tr><td colspan="6" class="muted">No purchases found.</td></tr>')+
