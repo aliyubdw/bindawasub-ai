@@ -190,6 +190,20 @@ async function requeryTransaction(id){
     }
   }catch(e){msg($("transactionMsg"),e.message,"error")}
 }
+
+async function dryRunTransaction(id){
+  try{
+    const r=await fetch(EXECUTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({action:"dry_run_purchase",transaction_id:id})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false)throw Error(d.error||d.message||"Dry run failed.");
+    const req=d.request||{};
+    $("modalTitle").textContent="🧪 Provider Dry Run";
+    $("modalBody").innerHTML='<div class="msg info">DRY RUN ONLY — no provider request was sent and no transaction or wallet state was changed.</div>'+
+      '<div class="card" style="background:#f7faf8"><p><strong>Provider</strong><br>'+escapeHtml(d.provider||"—")+'</p><p><strong>Endpoint</strong><br>'+escapeHtml((req.method||"")+" "+(req.url||""))+'</p><p><strong>Headers</strong></p><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(req.headers||{},null,2))+'</pre><p><strong>Request body</strong></p><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(req.body||{},null,2))+'</pre></div>';
+    $("modal").classList.remove("hidden");
+  }catch(e){msg($("transactionMsg"),"Dry run failed: "+e.message,"error")}
+}
+window.dryRunTransaction=dryRunTransaction;
 window.requeryTransaction=requeryTransaction;
 async function loadTransactions(){
   try{
@@ -199,7 +213,7 @@ async function loadTransactions(){
       const product=t.products?.product_name||"—";
       const customer=t.users?.name||t.users?.phone||"—";
       const status=t.status||"pending";
-      return '<tr><td><code>'+escapeHtml(t.id)+'</code></td><td><span class="badge">'+escapeHtml(t.source||"web")+'</span></td><td><strong>'+escapeHtml(t.users?.name||"—")+'</strong><br><span class="muted">'+escapeHtml(t.users?.phone||t.phone_number||"—")+'</span></td><td>'+money(t.amount)+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+money(t.balance_before)+'</td><td>'+money(t.balance_after)+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' <button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button>':"")+'</td></tr>';
+      return '<tr><td><code>'+escapeHtml(t.id)+'</code></td><td><span class="badge">'+escapeHtml(t.source||"web")+'</span></td><td><strong>'+escapeHtml(t.users?.name||"—")+'</strong><br><span class="muted">'+escapeHtml(t.users?.phone||t.phone_number||"—")+'</span></td><td>'+money(t.amount)+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+money(t.balance_before)+'</td><td>'+money(t.balance_after)+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' <button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button><button class="secondary" onclick="dryRunTransaction(\''+t.id+'\')">🧪 Dry Run</button>':"")+'</td></tr>';
     }).join("")||'<tr><td colspan="9" class="muted">No transactions found.</td></tr>';
     window._transactions=rows;
     msg($("transactionMsg"),rows.length+" transaction(s) loaded.","success");
