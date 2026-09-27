@@ -23,7 +23,7 @@
 <button data-tab="products">Products & Plans</button>
 <button data-tab="transactions">Transactions</button>
 <button data-tab="analytics">Analytics</button>
-<button data-tab="operations">Operations</button>
+<button data-tab="operations">Operations</button><button data-tab="ai-management">AI Management</button>
 <button id="logout" class="danger">Logout</button>
 </div>
 
@@ -68,6 +68,12 @@
 <div class="card"><h2>Daily figures</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Sales</th><th>Profit</th><th>Transactions</th><th>Successful</th><th>Failed</th><th>Funding</th><th>New customers</th></tr></thead><tbody id="analyticsRows"></tbody></table></div></div>
 </section>
 
+
+<section id="ai-management" class="panel">
+<div class="card"><div class="section-title"><h2>Bindawasub AI Management</h2><div class="actions"><select id="aiPeriod"><option value="7">Last 7 days</option></select><button id="refreshAi" class="secondary">Refresh</button></div></div><div id="aiMsg"></div><div class="grid"><div class="card metric"><div class="label">AI Conversations</div><div id="aiConversations" class="value">—</div></div><div class="card metric"><div class="label">AI Messages</div><div id="aiMessages" class="value">—</div></div><div class="card metric"><div class="label">Activity Events</div><div id="aiActivity" class="value">—</div></div><div class="card metric"><div class="label">Successful Purchases</div><div id="aiSuccess" class="value">—</div></div><div class="card metric"><div class="label">Failed Purchases</div><div id="aiFailed" class="value">—</div></div><div class="card metric"><div class="label">Pending Purchases</div><div id="aiPending" class="value">—</div></div></div></div>
+<div class="card"><div class="section-title"><h2>AI Controls</h2><button id="saveAiSettings">Save AI Settings</button></div><div id="aiSettingsMsg"></div><div class="grid2"><div class="field"><label><input id="aiEnabled" type="checkbox" style="width:auto"> AI enabled</label></div><div class="field"><label><input id="aiGemini" type="checkbox" style="width:auto"> Gemini enabled</label></div><div class="field"><label><input id="aiConfirm" type="checkbox" style="width:auto"> Require purchase confirmation</label></div><div class="field"><label>Maximum purchase amount (₦)</label><input id="aiMaxPurchase" type="number" min="0"></div><div class="field"><label>Default language</label><select id="aiLanguage"><option value="english">English</option><option value="hausa">Hausa</option><option value="mixed">Mixed</option></select></div><div class="field"><label>Allowed channels</label><input id="aiChannels" placeholder="web, app, whatsapp"></div></div><div class="field"><label>Fallback message</label><textarea id="aiFallback"></textarea></div><p class="muted">These controls use the secure admin-only AI settings endpoint. API keys are never exposed here.</p></div>
+<div class="card"><h2>AI Management Roadmap</h2><div class="grid2"><div><strong>Live</strong><p class="muted">AI settings, 7-day summary, message/activity logging.</p></div><div><strong>Next backend module</strong><p class="muted">Conversation browser and message viewer. The deployment route for that module is currently being handled separately.</p></div></div></div>
+</section>
 <section id="operations" class="panel">
 <div class="grid2">
 <div class="card"><h2>Customer Search</h2><div id="searchMsg"></div><div class="field"><input id="customerSearch" placeholder="Name or phone"></div><button id="searchCustomer">Search</button><div id="customerRows"></div></div>
@@ -250,7 +256,11 @@ $("fundWallet").onclick=async()=>{try{if(!selectedCustomer)throw Error("Select a
 $("resetBtn").onclick=async()=>{try{const email=$("resetEmail").value.trim(),password=$("resetPassword").value;if(password.length<8)throw Error("Password must be at least 8 characters.");if(!confirm("Reset this customer's password?"))return;const r=await fetch(RESET_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok||d.success===false)throw Error(d.error||"Reset failed.");msg($("resetMsg"),"Password reset successfully.","success");$("resetPassword").value=""}catch(e){msg($("resetMsg"),e.message,"error")}};
 
 $("refreshOverview").onclick=loadOverview;$("refreshAnalytics").onclick=loadAnalytics;$("analyticsDays").onchange=loadAnalytics;$("closeModal").onclick=()=>$("modal").classList.add("hidden");$("modal").addEventListener("click",e=>{if(e.target===$("modal"))$("modal").classList.add("hidden")});
-async function loadAll(){await loadOverview();await loadProviders();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics()}
+
+async function loadAiManagement(){try{const s=await aiAdmin({action:"ai_summary"});const x=s.summary||{};$("aiConversations").textContent=x.conversations??0;$("aiMessages").textContent=x.messages??0;$("aiActivity").textContent=x.activity_events??0;$("aiSuccess").textContent=x.successful_purchases??0;$("aiFailed").textContent=x.failed_purchases??0;$("aiPending").textContent=x.pending_purchases??0;const d=await aiAdmin({action:"ai_settings_get"});const a=d.settings||{};$("aiEnabled").checked=!!a.enabled;$("aiGemini").checked=!!a.gemini_enabled;$("aiConfirm").checked=!!a.require_purchase_confirmation;$("aiMaxPurchase").value=a.max_purchase_amount??10000;$("aiLanguage").value=a.default_language||"english";$("aiChannels").value=Array.isArray(a.allowed_channels)?a.allowed_channels.join(", "):"";$("aiFallback").value=a.fallback_message||"";msg($("aiMsg"),"AI management refreshed.","success")}catch(e){msg($("aiMsg"),e.message,"error")}}
+$("refreshAi").onclick=loadAiManagement;
+$("saveAiSettings").onclick=async()=>{try{const channels=$("aiChannels").value.split(",").map(x=>x.trim()).filter(Boolean);const d=await aiAdmin({action:"ai_settings_save",settings:{enabled:$("aiEnabled").checked,gemini_enabled:$("aiGemini").checked,require_purchase_confirmation:$("aiConfirm").checked,max_purchase_amount:Number($("aiMaxPurchase").value),default_language:$("aiLanguage").value,allowed_channels:channels,fallback_message:$("aiFallback").value}});msg($("aiSettingsMsg"),d.success?"AI settings saved successfully.":"Save failed.",d.success?"success":"error")}catch(e){msg($("aiSettingsMsg"),e.message,"error")}};
+async function loadAll(){await loadOverview();await loadAiManagement();await loadProviders();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics()}
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session){try{await admin({action:"dashboard_summary"});$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch{await sb.auth.signOut()}}})();
 </script>
 </body>
