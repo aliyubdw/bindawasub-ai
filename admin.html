@@ -176,6 +176,24 @@ async function openMapping(m){
 }
 
 
+async function executeTransaction(id){
+  if(!confirm("Execute this pending transaction with the configured provider?\n\nThis will send the purchase request. It will NOT debit the wallet again."))return;
+  try{
+    const r=await fetch(EXECUTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({action:"execute_purchase",transaction_id:id})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false&&d.status!=="pending")throw Error(d.error||d.message||"Execution failed.");
+    const text=d.status==="successful"
+      ?"Provider confirmed the purchase successfully."
+      :d.status==="failed"
+        ?"Provider reported failure. The transaction was finalized and the wallet was refunded."
+        :d.message||"Transaction remains pending; no duplicate purchase will be sent automatically.";
+    msg($("transactionMsg"),text,d.status==="failed"?"error":"success");
+    await loadTransactions();
+    await loadOverview();
+  }catch(e){msg($("transactionMsg"),"Execute failed: "+e.message,"error")}
+}
+window.executeTransaction=executeTransaction;
+
 async function requeryTransaction(id){
   if(!confirm("Re-query this pending transaction with the provider? No purchase/retry request will be sent."))return;
   try{
@@ -219,7 +237,7 @@ async function loadTransactions(){
       const product=t.products?.product_name||"—";
       const customer=t.users?.name||t.users?.phone||"—";
       const status=t.status||"pending";
-      return '<tr><td><code>'+escapeHtml(t.id)+'</code></td><td><span class="badge">'+escapeHtml(t.source||"web")+'</span></td><td><strong>'+escapeHtml(t.users?.name||"—")+'</strong><br><span class="muted">'+escapeHtml(t.users?.phone||t.phone_number||"—")+'</span></td><td>'+money(t.amount)+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+money(t.balance_before)+'</td><td>'+money(t.balance_after)+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' <button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button><button class="secondary" onclick="dryRunTransaction(\''+t.id+'\')">🧪 Dry Run</button>':"")+'</td></tr>';
+      return '<tr><td><code>'+escapeHtml(t.id)+'</code></td><td><span class="badge">'+escapeHtml(t.source||"web")+'</span></td><td><strong>'+escapeHtml(t.users?.name||"—")+'</strong><br><span class="muted">'+escapeHtml(t.users?.phone||t.phone_number||"—")+'</span></td><td>'+money(t.amount)+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+money(t.balance_before)+'</td><td>'+money(t.balance_after)+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' '+(!t.provider_reference?'<button onclick="executeTransaction(\''+t.id+'\')">Execute</button>': '<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>')+'<button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button><button class="secondary" onclick="dryRunTransaction(\''+t.id+'\')">🧪 Dry Run</button>':"")+'</td></tr>';
     }).join("")||'<tr><td colspan="9" class="muted">No transactions found.</td></tr>';
     window._transactions=rows;
     msg($("transactionMsg"),rows.length+" transaction(s) loaded.","success");
