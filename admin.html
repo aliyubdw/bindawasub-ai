@@ -278,9 +278,10 @@ async function searchAiCustomers(){
     msg($("aiCustomerMsg"),rows.length+" customer result(s) found.","success");
   }catch(e){msg($("aiCustomerMsg"),e.message,"error")}
 }
+window.refreshSelectedAiCustomer=async function(){const c=window._aiSelectedCustomer;if(!c)return;const rows=window._aiCustomerResults||[];const i=rows.findIndex(x=>x.id===c.id);if(i>=0)await window.viewAiCustomer(i);};
 window.viewAiCustomer=async function(i){
   try{
-    const c=(window._aiCustomerResults||[])[i]; if(!c)return;
+    const c=(window._aiCustomerResults||[])[i]; if(!c)return; window._aiSelectedCustomer=c;
     const [cv,av,tv]=await Promise.all([
       sb.from("ai_conversations").select("id,channel,language,started_at,last_message_at,pending_product_id,pending_phone_number,pending_service_type,pending_at,pending_airtime_amount,pending_network").eq("user_id",c.id).order("last_message_at",{ascending:false}).limit(20),
       sb.from("ai_activity_log").select("id,conversation_id,transaction_id,channel,event_type,intent,user_message,ai_response,success,error_message,metadata,created_at").eq("user_id",c.id).order("created_at",{ascending:false}).limit(50),
@@ -302,7 +303,7 @@ window.viewAiCustomer=async function(i){
     const failed=transactions.filter(x=>x.status==="failed").length;
     const pending=transactions.filter(x=>x.status==="pending").length;
     $("aiCustomerTitle").textContent="AI Customer — "+(c.name||c.phone||"Customer");
-    $("aiCustomerDetails").innerHTML=
+    <div style="display:flex;justify-content:flex-end;margin:8px 0"><button class="secondary" onclick="refreshSelectedAiCustomer()">Refresh customer profile</button></div>$("aiCustomerDetails").innerHTML=
       '<div class="grid">'+
       '<div class="card metric"><div class="label">Customer</div><div class="value" style="font-size:18px">'+escapeHtml(c.name||"Unnamed")+'</div><span class="muted">'+escapeHtml(c.phone||"—")+'</span></div>'+
       '<div class="card metric"><div class="label">Wallet</div><div class="value">₦'+escapeHtml(Number(c.wallets?.[0]?.balance||0).toLocaleString())+'</div></div>'+
