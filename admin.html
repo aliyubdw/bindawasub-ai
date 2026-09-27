@@ -196,10 +196,16 @@ async function dryRunTransaction(id){
     const r=await fetch(EXECUTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({action:"dry_run_purchase",transaction_id:id})});
     const d=await r.json().catch(()=>({}));
     if(!r.ok||d.success===false)throw Error(d.error||d.message||"Dry run failed.");
-    const req=d.request||{};
+    const ep=d.endpoint||{};
     $("modalTitle").textContent="🧪 Provider Dry Run";
     $("modalBody").innerHTML='<div class="msg info">DRY RUN ONLY — no provider request was sent and no transaction or wallet state was changed.</div>'+
-      '<div class="card" style="background:#f7faf8"><p><strong>Provider</strong><br>'+escapeHtml(d.provider||"—")+'</p><p><strong>Endpoint</strong><br>'+escapeHtml((req.method||"")+" "+(req.url||""))+'</p><p><strong>Headers</strong></p><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(req.headers||{},null,2))+'</pre><p><strong>Request body</strong></p><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(req.body||{},null,2))+'</pre></div>';
+      '<div class="card" style="background:#f7faf8">'+
+      '<p><strong>Provider</strong><br>'+escapeHtml(d.provider||"—")+'</p>'+
+      '<p><strong>Endpoint</strong><br>'+escapeHtml((ep.method||"")+" "+(ep.url||""))+'</p>'+
+      '<p><strong>Headers</strong></p><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(ep.headers||{},null,2))+'</pre>'+
+      '<p><strong>Request body</strong></p><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(ep.request||{},null,2))+'</pre>'+
+      '<p><strong>Provider plan</strong><br>'+escapeHtml((d.mapping&&d.mapping.provider_plan_id)||"—")+'</p>'+
+      '</div>';
     $("modal").classList.remove("hidden");
   }catch(e){msg($("transactionMsg"),"Dry run failed: "+e.message,"error")}
 }
