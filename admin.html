@@ -200,6 +200,23 @@ async function requeryTransaction(id){
   }catch(e){msg($("transactionMsg"),e.message,"error")}
 }
 window.requeryTransaction=requeryTransaction;
+async function dryRunTransaction(id){
+  try{
+    msg($("transactionMsg"),"Running safe dry-run…");
+    const r=await fetch(EXECUTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify({action:"dry_run_purchase",transaction_id:id})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false)throw Error(d.error||"Dry run failed.");
+    $("modalTitle").textContent="🧪 Provider Dry Run";
+    $("modalBody").innerHTML='<div class="msg success">SAFE DRY RUN — no provider request was sent and no wallet or transaction state was changed.</div>'+
+      '<div class="card" style="background:#f7faf8"><p><strong>Provider</strong><br>'+escapeHtml(d.provider||"—")+' ('+escapeHtml(d.provider_code||"—")+')</p><p><strong>Transaction</strong><br><code>'+escapeHtml(d.transaction_id||id)+'</code></p><p><strong>Provider Plan</strong><br>'+escapeHtml(d.mapping?.provider_plan_id||"—")+' — '+escapeHtml(d.mapping?.provider_plan_name||"—")+'</p><p><strong>Provider Cost</strong><br>'+money(d.mapping?.provider_cost)+'</p></div>'+
+      '<div class="card" style="background:#f7faf8"><p><strong>Rendered Request</strong></p><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px">'+escapeHtml(JSON.stringify(d.endpoint||{},null,2))+'</pre></div>'+
+      '<p class="muted">'+escapeHtml(d.note||"")+'</p>';
+    $("modal").classList.remove("hidden");
+    msg($("transactionMsg"),"Dry run completed successfully.","success");
+  }catch(e){msg($("transactionMsg"),e.message,"error")}
+}
+window.dryRunTransaction=dryRunTransaction;
+
 async function loadTransactions(){
   try{
     const d=await admin({action:"list_transactions",status:$("transactionStatus").value,search:$("transactionSearch").value.trim(),limit:100});
@@ -208,7 +225,7 @@ async function loadTransactions(){
       const product=t.products?.product_name||"—";
       const customer=t.users?.name||t.users?.phone||"—";
       const status=t.status||"pending";
-      return '<tr><td><code>'+escapeHtml(t.id)+'</code></td><td><span class="badge">'+escapeHtml(t.source||"web")+'</span></td><td><strong>'+escapeHtml(t.users?.name||"—")+'</strong><br><span class="muted">'+escapeHtml(t.users?.phone||t.phone_number||"—")+'</span></td><td>'+money(t.amount)+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+money(t.balance_before)+'</td><td>'+money(t.balance_after)+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' <button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button>':"")+'</td></tr>';
+      return '<tr><td><code>'+escapeHtml(t.id)+'</code></td><td><span class="badge">'+escapeHtml(t.source||"web")+'</span></td><td><strong>'+escapeHtml(t.users?.name||"—")+'</strong><br><span class="muted">'+escapeHtml(t.users?.phone||t.phone_number||"—")+'</span></td><td>'+money(t.amount)+'</td><td title="'+escapeHtml(t.description||"")+'">'+escapeHtml(t.description||"—")+'</td><td><span class="badge '+(status==="successful"?"on":status==="failed"||status==="reversed"?"off":"")+'">'+escapeHtml(status)+'</span></td><td>'+money(t.balance_before)+'</td><td>'+money(t.balance_after)+'</td><td><button class="secondary" onclick="viewTransaction(\''+t.id+'\')">View</button> '+(status==="pending"&&t.provider_reference?'<button onclick="requeryTransaction(\''+t.id+'\')">Requery</button>':"")+(status==="pending"?' <button class="secondary" onclick="dryRunTransaction(\''+t.id+'\')">🧪 Dry Run</button><button onclick="manualTransactionUpdate(\''+t.id+'\',\'successful\')">Success</button><button class="danger" onclick="manualTransactionUpdate(\''+t.id+'\',\'failed\')">Failed</button><button class="secondary" onclick="manualTransactionUpdate(\''+t.id+'\',\'refunded\')">Refund</button>':"")+'</td></tr>';
     }).join("")||'<tr><td colspan="9" class="muted">No transactions found.</td></tr>';
     window._transactions=rows;
     msg($("transactionMsg"),rows.length+" transaction(s) loaded.","success");
