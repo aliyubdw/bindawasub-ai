@@ -52,6 +52,14 @@
 <div class="card"><div class="section-title"><h2>Services</h2><button id="newService">+ Add Service</button></div><div id="serviceMsg"></div><div class="table-wrap"><table><thead><tr><th>Service</th><th>Code</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>Provider Service Routing</h2><button id="newProviderService">+ Add Provider Service</button></div><div id="providerServiceMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Service</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="providerServiceRows"></tbody></table></div><p class="muted">This controls which providers are allowed to serve each Bindawasub service. It does not expose API credentials.</p></div>
 <div class="card"><div class="section-title"><h2>Service Fields</h2><button id="newServiceField">+ Add Field</button></div><div class="grid2"><div class="field"><label>Service</label><select id="serviceFieldService"></select></div><div><span class="muted">Define the customer inputs required by each service. Examples: meter number, decoder number, amount, exam type.</span></div></div><div id="serviceFieldMsg"></div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Label</th><th>Type</th><th>Required</th><th>Sensitive</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceFieldRows"></tbody></table></div></div>
+
+<div class="card"><div class="section-title"><h2>Networks</h2><button id="newNetwork">+ Add Network</button></div>
+<div class="grid2"><div class="field"><label>Filter by Service</label><select id="networkService"></select></div><div><span class="muted">Networks belong to a service. Example: Data → MTN, Airtel, Glo, 9mobile.</span></div></div>
+<div id="networkMsg"></div><div class="table-wrap"><table><thead><tr><th>Network</th><th>Code</th><th>Service</th><th>Status</th><th>Action</th></tr></thead><tbody id="networkRows"></tbody></table></div></div>
+<div class="card"><div class="section-title"><h2>Service Variants / Channels</h2><button id="newVariant">+ Add Variant</button></div>
+<div class="grid2"><div class="field"><label>Service</label><select id="variantService"></select></div><div class="field"><label>Network</label><select id="variantNetwork"></select></div></div>
+<div id="variantMsg"></div><div class="table-wrap"><table><thead><tr><th>Variant</th><th>Code</th><th>Network</th><th>Service</th><th>Status</th><th>Action</th></tr></thead><tbody id="variantRows"></tbody></table></div>
+<p class="muted">Examples: SME, Gifting, CG, Promo. Variants remain configurable so new provider-specific channels do not require a schema redesign.</p></div>
 </section>
 
 <section id="products" class="panel">
@@ -99,7 +107,7 @@ const AI_URL=SUPABASE_URL+"/functions/v1/bindawasub-ai";
 const RESET_URL=SUPABASE_URL+"/functions/v1/admin-reset-password";
 const EXECUTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/provider-execution";
 const sb=window.supabase.createClient(SUPABASE_URL,KEY);
-let selectedCustomer=null, providers=[], products=[];
+let selectedCustomer=null, providers=[], products=[], networks=[], variants=[];
 
 const $=id=>document.getElementById(id);
 const money=n=>"₦"+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
@@ -123,6 +131,7 @@ async function loadServices(){
     refreshServiceFieldServiceOptions();
     await loadProviderServices();
     await loadServiceFields();
+    await loadCatalogDimensions();
   }catch(e){msg($("serviceMsg"),e.message,"error")}
 }
 window.editService=id=>openService(services.find(s=>s.id===id)||null);
@@ -185,9 +194,79 @@ $("newProvider").onclick=()=>openProvider(null);
 function openProvider(p){$("modalTitle").textContent=p?"Edit API Provider":"Add API Provider";$("modalBody").innerHTML='<div class="field"><label>Name</label><input id="pName" value="'+escapeHtml(p?.name||"")+'"></div><div class="grid2"><div class="field"><label>Code</label><input id="pCode" value="'+escapeHtml(p?.code||"")+'"></div><div class="field"><label>Status</label><select id="pStatus"><option>active</option><option>inactive</option><option>maintenance</option></select></div></div><div class="field"><label>Base URL</label><input id="pUrl" value="'+escapeHtml(p?.base_url||"")+'"></div><div class="grid2"><div class="field"><label>Credential name</label><input id="pSecret" value="'+escapeHtml(p?.api_secret_name||"provider_api_credentials")+'" placeholder="e.g. api_key"></div><div class="field"><label>Webhook secret name</label><input id="pWebhookSecret" value="'+escapeHtml(p?.webhook_secret_name||"")+'"></div></div><div class="field"><label>API key</label><div style="display:flex;gap:8px"><input id="pCredential" type="text" autocomplete="off" value="'+escapeHtml(p?.credential_mask||"")+'" placeholder="Paste provider API key"><button type="button" id="toggleCredential" class="secondary">Show</button></div><p class="muted">For an existing provider, this box shows a safe partial preview of the saved key. Leave it unchanged to keep the current Vault key, or paste a new key to replace it. It is stored encrypted in Supabase Vault. You do not need to enter JSON.</p></div><div class="field"><label><input id="pWebhook" type="checkbox" style="width:auto" '+(p?.supports_webhook?"checked":"")+'> Supports webhook</label></div><div class="field"><label>Notes</label><textarea id="pNotes">'+escapeHtml(p?.notes||"")+'</textarea></div><p class="muted">Credentials are stored encrypted in Supabase Vault. They are never returned to the dashboard after saving. Leave the credentials box empty when editing if you do not want to replace them.</p><button id="saveProvider">Save Provider</button>';$("pStatus").value=p?.status||"inactive";$("modal").classList.remove("hidden");$("toggleCredential").onclick=()=>{const i=$("pCredential");i.type=i.type==="password"?"text":"password";$("toggleCredential").textContent=i.type==="password"?"Show":"Hide"};$("saveProvider").onclick=async()=>{try{const enteredCredential=$("pCredential").value.trim();const savedMask=p?.credential_mask||"";const apiKey=(p?.id&&savedMask&&enteredCredential===savedMask)?"":enteredCredential;await admin({action:"save_provider",id:p?.id,name:$("pName").value,code:$("pCode").value,base_url:$("pUrl").value,status:$("pStatus").value,api_secret_name:$("pSecret").value,webhook_secret_name:$("pWebhookSecret").value,supports_webhook:$("pWebhook").checked,notes:$("pNotes").value,secret_value:apiKey||null});$("modal").classList.add("hidden");await loadProviders();await loadOverview()}catch(e){msg($("modalMsg"),e.message,"error")}}}
 
 async function loadProducts(){try{const d=await admin({action:"list_products"});products=d.products||[];refreshMappingProductOptions();renderProducts()}catch(e){msg($("productMsg"),e.message,"error")}}
-function renderProducts(){$("productRows").innerHTML=products.map(p=>'<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(p.service_type)+'</td><td>'+escapeHtml(p.network||"—")+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td>'+escapeHtml(p.api_providers?.name||p.provider||"—")+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No products/plans.</td></tr>'}
+function renderProducts(){$("productRows").innerHTML=products.map(p=>'<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(p.service_type)+'</td><td>'+escapeHtml(p.network||"—")+(p.service_variants?.name?' / '+escapeHtml(p.service_variants.name):"")+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td>'+escapeHtml(p.api_providers?.name||p.provider||"—")+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No products/plans.</td></tr>'}
 window.editProduct=id=>openProduct(products.find(p=>p.id===id));$("newProduct").onclick=()=>openProduct(null);
-function openProduct(p){const opts=providers.map(x=>'<option value="'+x.id+'" '+(p?.provider_id===x.id?"selected":"")+'>'+escapeHtml(x.name)+'</option>').join("");$("modalTitle").textContent=p?"Edit Product / Plan":"Add Product / Plan";$("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Product name</label><input id="xName" value="'+escapeHtml(p?.product_name||"")+'"></div><div class="field"><label>SKU</label><input id="xSku" value="'+escapeHtml(p?.sku||"")+'"></div></div><div class="grid2"><div class="field"><label>Service type</label><select id="xService"><option value="data">Data</option><option value="airtime">Airtime</option><option value="electricity">Electricity</option><option value="tv">TV</option><option value="exam_pin">Exam PIN</option><option value="other">Other</option></select></div><div class="field"><label>Network</label><input id="xNetwork" value="'+escapeHtml(p?.network||"")+'" placeholder="MTN / AIRTEL / GLO / 9MOBILE"></div></div><div class="grid2"><div class="field"><label>Volume / amount</label><input id="xVolume" value="'+escapeHtml(p?.volume||"")+'"></div><div class="field"><label>Duration</label><input id="xDuration" value="'+escapeHtml(p?.duration||"")+'"></div></div><div class="grid2"><div class="field"><label>Selling price (₦)</label><input id="xSell" type="number" min="0" step=".01" value="'+(p?.selling_price??"")+'"></div><div class="field"><label>Cost price (₦)</label><input id="xCost" type="number" min="0" step=".01" value="'+(p?.cost_price??"")+'"></div></div><div class="grid2"><div class="field"><label>Provider</label><select id="xProvider"><option value="">— none —</option>'+opts+'</select></div><div class="field"><label>Provider product ID</label><input id="xProviderProduct" value="'+escapeHtml(p?.provider_product_id||"")+'"></div></div><div class="grid2"><div class="field"><label>Display order</label><input id="xOrder" type="number" value="'+(p?.display_order??100)+'"></div><div class="field"><label><input id="xActive" type="checkbox" style="width:auto" '+(p?.active!==false?"checked":"")+'> Active</label></div></div><button id="saveProduct">Save Product / Plan</button>';$("xService").value=p?.service_type||"data";$("modal").classList.remove("hidden");$("saveProduct").onclick=async()=>{try{await admin({action:"save_product",id:p?.id,product_name:$("xName").value,sku:$("xSku").value,service_type:$("xService").value,network:$("xNetwork").value,volume:$("xVolume").value,duration:$("xDuration").value,selling_price:$("xSell").value,cost_price:$("xCost").value,provider_id:$("xProvider").value||null,provider_product_id:$("xProviderProduct").value,display_order:$("xOrder").value,active:$("xActive").checked});$("modal").classList.add("hidden");await loadProducts();await loadOverview()}catch(e){msg($("modalMsg"),e.message,"error")}}}
+async function openProduct(p){
+  const opts=providers.map(x=>'<option value="'+x.id+'" '+(p?.provider_id===x.id?"selected":"")+'>'+escapeHtml(x.name)+'</option>').join("");
+  $("modalTitle").textContent=p?"Edit Product / Plan":"Add Product / Plan";
+  $("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Product name</label><input id="xName"></div><div class="field"><label>SKU</label><input id="xSku"></div></div><div class="grid2"><div class="field"><label>Service type</label><select id="xService"><option value="data">Data</option><option value="airtime">Airtime</option><option value="electricity">Electricity</option><option value="tv">TV</option><option value="exam_pin">Exam PIN</option><option value="other">Other</option></select></div><div class="field"><label>Network</label><select id="xNetwork"><option value="">— none —</option></select></div></div><div class="grid2"><div class="field"><label>Variant / channel</label><select id="xVariant"><option value="">— none —</option></select></div><div class="field"><label>Volume / amount</label><input id="xVolume"></div></div><div class="grid2"><div class="field"><label>Duration</label><input id="xDuration"></div><div class="field"><label>Display order</label><input id="xOrder" type="number"></div></div><div class="grid2"><div class="field"><label>Selling price (₦)</label><input id="xSell" type="number" min="0" step=".01"></div><div class="field"><label>Cost price (₦)</label><input id="xCost" type="number" min="0" step=".01"></div></div><div class="grid2"><div class="field"><label>Provider</label><select id="xProvider"><option value="">— none —</option>'+opts+'</select></div><div class="field"><label>Provider product ID</label><input id="xProviderProduct"></div></div><div class="field"><label><input id="xActive" type="checkbox" style="width:auto"> Active</label></div><button id="saveProduct">Save Product / Plan</button>';
+  $("xName").value=p?.product_name||"";$("xSku").value=p?.sku||"";$("xService").value=p?.service_type||"data";$("xVolume").value=p?.volume||"";$("xDuration").value=p?.duration||"";$("xSell").value=p?.selling_price??"";$("xCost").value=p?.cost_price??"";$("xProvider").value=p?.provider_id||"";$("xProviderProduct").value=p?.provider_product_id||"";$("xOrder").value=p?.display_order??100;$("xActive").checked=p?.active!==false;
+  await populateProductDimensions(p?.network_id||"",p?.variant_id||"");
+  $("xService").onchange=()=>populateProductDimensions("","");
+  $("xNetwork").onchange=()=>populateProductVariants($("xService").value,$("xNetwork").value,"");
+  $("modal").classList.remove("hidden");
+  $("saveProduct").onclick=async()=>{try{await admin({action:"save_product",id:p?.id,product_name:$("xName").value,sku:$("xSku").value,service_type:$("xService").value,network:$("xNetwork").selectedOptions[0]?.textContent||"",network_id:$("xNetwork").value||null,variant_id:$("xVariant").value||null,volume:$("xVolume").value,duration:$("xDuration").value,selling_price:$("xSell").value,cost_price:$("xCost").value,provider_id:$("xProvider").value||null,provider_product_id:$("xProviderProduct").value,display_order:$("xOrder").value,active:$("xActive").checked});$("modal").classList.add("hidden");await loadProducts()}catch(e){msg($("modalMsg"),e.message,"error")}};
+}
+async function populateProductDimensions(networkId="",variantId=""){
+  const sid=$("xService").value;
+  const ns=networks.filter(n=>n.service_id===sid);
+  $("xNetwork").innerHTML='<option value="">— none —</option>'+ns.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");
+  $("xNetwork").value=networkId||"";
+  await populateProductVariants(sid,$("xNetwork").value,variantId);
+}
+async function populateProductVariants(serviceId,networkId="",variantId=""){
+  const vs=variants.filter(v=>v.service_id===serviceId && (!networkId||v.network_id===networkId));
+  $("xVariant").innerHTML='<option value="">— none —</option>'+vs.map(v=>'<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>').join("");
+  $("xVariant").value=variantId||"";
+}
+
+async function loadCatalogDimensions(){
+  try{
+    const n=await admin({action:"list_service_networks"}); networks=n.networks||[];
+    const v=await admin({action:"list_service_variants"}); variants=v.variants||[];
+    refreshCatalogServiceOptions();
+    renderNetworks();
+    renderVariants();
+  }catch(e){msg($("networkMsg"),e.message,"error");msg($("variantMsg"),e.message,"error")}
+}
+function refreshCatalogServiceOptions(){
+  const opts='<option value="">All services</option>'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("");
+  $("networkService").innerHTML=opts;
+  $("variantService").innerHTML='<option value="">Select service</option>'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("");
+  $("variantNetwork").innerHTML='<option value="">All networks</option>';
+}
+function renderNetworks(){
+  const sid=$("networkService").value;
+  const rows=networks.filter(n=>!sid||n.service_id===sid);
+  $("networkRows").innerHTML=rows.map(n=>'<tr><td><strong>'+escapeHtml(n.name)+'</strong></td><td>'+escapeHtml(n.code)+'</td><td>'+escapeHtml(n.service_definitions?.name||"—")+'</td><td><span class="badge '+(n.active?"on":"off")+'">'+(n.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editNetwork(\''+n.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No networks configured.</td></tr>';
+}
+function renderVariants(){
+  const sid=$("variantService").value, nid=$("variantNetwork").value;
+  const rows=variants.filter(v=>(!sid||v.service_id===sid)&&(!nid||v.network_id===nid));
+  $("variantRows").innerHTML=rows.map(v=>'<tr><td><strong>'+escapeHtml(v.name)+'</strong></td><td>'+escapeHtml(v.code)+'</td><td>'+escapeHtml(v.service_networks?.name||"All networks")+'</td><td>'+escapeHtml(v.service_definitions?.name||"—")+'</td><td><span class="badge '+(v.active?"on":"off")+'">'+(v.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editVariant(\''+v.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="6" class="muted">No variants configured.</td></tr>';
+}
+$("networkService").onchange=renderNetworks;
+$("variantService").onchange=async()=>{const sid=$("variantService").value;$("variantNetwork").innerHTML='<option value="">All networks</option>'+networks.filter(n=>!sid||n.service_id===sid).map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");renderVariants()};
+$("variantNetwork").onchange=renderVariants;
+$("newNetwork").onclick=()=>openNetwork(null);
+$("newVariant").onclick=()=>openVariant(null);
+window.editNetwork=id=>openNetwork(networks.find(n=>n.id===id)||null);
+window.editVariant=id=>openVariant(variants.find(v=>v.id===id)||null);
+async function openNetwork(n){
+  $("modalTitle").textContent=n?"Edit Network":"Add Network";
+  $("modalBody").innerHTML='<div class="field"><label>Service *</label><select id="nService">'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("")+'</select></div><div class="grid2"><div class="field"><label>Network name *</label><input id="nName" placeholder="MTN"></div><div class="field"><label>Code *</label><input id="nCode" placeholder="mtn"></div></div><div class="field"><label><input id="nActive" type="checkbox" style="width:auto"> Active</label></div><button id="saveNetwork">Save Network</button>';
+  $("nService").value=n?.service_id||services[0]?.id||"";$("nName").value=n?.name||"";$("nCode").value=n?.code||"";$("nActive").checked=n?.active!==false;$("modal").classList.remove("hidden");
+  $("saveNetwork").onclick=async()=>{try{await admin({action:"save_service_network",id:n?.id,service_id:$("nService").value,name:$("nName").value,code:$("nCode").value,active:$("nActive").checked});$("modal").classList.add("hidden");await loadCatalogDimensions()}catch(e){msg($("modalMsg"),e.message,"error")}};
+}
+async function openVariant(v){
+  $("modalTitle").textContent=v?"Edit Variant / Channel":"Add Variant / Channel";
+  $("modalBody").innerHTML='<div class="field"><label>Service *</label><select id="vService">'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("")+'</select></div><div class="field"><label>Network</label><select id="vNetwork"><option value="">All networks for this service</option></select></div><div class="grid2"><div class="field"><label>Variant name *</label><input id="vName" placeholder="SME"></div><div class="field"><label>Code *</label><input id="vCode" placeholder="sme"></div></div><div class="field"><label>Description</label><textarea id="vDescription"></textarea></div><div class="field"><label><input id="vActive" type="checkbox" style="width:auto"> Active</label></div><button id="saveVariant">Save Variant</button>';
+  $("vService").value=v?.service_id||services[0]?.id||"";
+  const fill=()=>{$("vNetwork").innerHTML='<option value="">All networks for this service</option>'+networks.filter(n=>n.service_id===$("vService").value).map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");$("vNetwork").value=v?.network_id||""};
+  fill();$("vService").onchange=fill;
+  $("vName").value=v?.name||"";$("vCode").value=v?.code||"";$("vDescription").value=v?.description||"";$("vActive").checked=v?.active!==false;$("modal").classList.remove("hidden");
+  $("saveVariant").onclick=async()=>{try{await admin({action:"save_service_variant",id:v?.id,service_id:$("vService").value,network_id:$("vNetwork").value||null,name:$("vName").value,code:$("vCode").value,description:$("vDescription").value,active:$("vActive").checked});$("modal").classList.add("hidden");await loadCatalogDimensions()}catch(e){msg($("modalMsg"),e.message,"error")}};
+}
 
 async function loadEndpoints(){try{
   const pid=$("endpointProvider").value;
