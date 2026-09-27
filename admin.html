@@ -51,6 +51,7 @@
 <section id="services" class="panel">
 <div class="card"><div class="section-title"><h2>Services</h2><button id="newService">+ Add Service</button></div><div id="serviceMsg"></div><div class="table-wrap"><table><thead><tr><th>Service</th><th>Code</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>Provider Service Routing</h2><button id="newProviderService">+ Add Provider Service</button></div><div id="providerServiceMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Service</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="providerServiceRows"></tbody></table></div><p class="muted">This controls which providers are allowed to serve each Bindawasub service. It does not expose API credentials.</p></div>
+<div class="card"><div class="section-title"><h2>Service Fields</h2><button id="newServiceField">+ Add Field</button></div><div class="grid2"><div class="field"><label>Service</label><select id="serviceFieldService"></select></div><div><span class="muted">Define the customer inputs required by each service. Examples: meter number, decoder number, amount, exam type.</span></div></div><div id="serviceFieldMsg"></div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Label</th><th>Type</th><th>Required</th><th>Sensitive</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceFieldRows"></tbody></table></div></div>
 </section>
 
 <section id="products" class="panel">
@@ -119,7 +120,9 @@ async function loadServices(){
   try{
     const d=await admin({action:"list_services"}); services=d.services||[];
     $("serviceRows").innerHTML=services.map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\''+s.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No services configured.</td></tr>';
+    refreshServiceFieldServiceOptions();
     await loadProviderServices();
+    await loadServiceFields();
   }catch(e){msg($("serviceMsg"),e.message,"error")}
 }
 window.editService=id=>openService(services.find(s=>s.id===id)||null);
@@ -141,6 +144,38 @@ async function openProviderService(x){
   $("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Provider</label><select id="psProvider">'+providers.map(p=>'<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>').join("")+'</select></div><div class="field"><label>Service</label><select id="psService">'+services.map(s=>'<option value="'+s.code+'">'+escapeHtml(s.name)+' ('+escapeHtml(s.code)+')</option>').join("")+'</select></div><div class="field"><label>Priority</label><input id="psPriority" type="number" min="0" value="100"></div><div class="field"><label><input id="psEnabled" type="checkbox" style="width:auto" checked> Enabled</label></div></div><div class="field"><label>Metadata (JSON)</label><textarea id="psMetadata">{}</textarea></div><button id="saveProviderService">Save Provider Service</button>';
   $("psProvider").value=x?.provider_id||providers[0]?.id||"";$("psService").value=x?.service_type||services[0]?.code||"";$("psPriority").value=x?.priority??100;$("psEnabled").checked=x?.enabled!==false;$("psMetadata").value=JSON.stringify(x?.metadata||{},null,2);$("modal").classList.remove("hidden");
   $("saveProviderService").onclick=async()=>{try{let metadata={};try{metadata=JSON.parse($("psMetadata").value||"{}")}catch{throw Error("Invalid routing metadata JSON.")}await admin({action:"save_provider_service",id:x?.id,provider_id:$("psProvider").value,service_type:$("psService").value,priority:$("psPriority").value,enabled:$("psEnabled").checked,metadata});$("modal").classList.add("hidden");await loadProviderServices()}catch(e){msg($("modalMsg"),e.message,"error")}};
+}
+async function loadServiceFields(){
+  const serviceId=$("serviceFieldService").value;
+  if(!serviceId){
+    $("serviceFieldRows").innerHTML='<tr><td colspan="7" class="muted">Select a service first.</td></tr>';
+    return;
+  }
+  try{
+    const d=await admin({action:"list_service_fields",service_id:serviceId});
+    serviceFields=d.fields||[];
+    $("serviceFieldRows").innerHTML=serviceFields.map(f=>'<tr><td><code>'+escapeHtml(f.field_key)+'</code></td><td>'+escapeHtml(f.label)+'</td><td>'+escapeHtml(f.data_type)+'</td><td>'+(f.required?"Yes":"No")+'</td><td>'+(f.sensitive?"Yes":"No")+'</td><td><span class="badge '+(f.active?"on":"off")+'">'+(f.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editServiceField(\''+f.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="7" class="muted">No fields configured for this service.</td></tr>';
+    msg($("serviceFieldMsg"),serviceFields.length+" field(s) loaded.","success");
+  }catch(e){msg($("serviceFieldMsg"),e.message,"error")}
+}
+function refreshServiceFieldServiceOptions(){
+  $("serviceFieldService").innerHTML='<option value="">Select service...</option>'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+' ('+escapeHtml(s.code)+')</option>').join("");
+}
+$("serviceFieldService").onchange=loadServiceFields;
+$("newServiceField").onclick=()=>openServiceField(null);
+window.editServiceField=id=>openServiceField(serviceFields.find(f=>f.id===id)||null);
+async function openServiceField(f){
+  $("modalTitle").textContent=f?"Edit Service Field":"Add Service Field";
+  $("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Service *</label><select id="sfService"></select></div><div class="field"><label>Field key *</label><input id="sfKey" placeholder="e.g. meter_number"></div><div class="field"><label>Label *</label><input id="sfLabel" placeholder="e.g. Meter Number"></div><div class="field"><label>Type</label><select id="sfType"><option>text</option><option>number</option><option>phone</option><option>select</option><option>boolean</option><option>date</option></select></div><div class="field"><label>Display order</label><input id="sfOrder" type="number" min="0" value="100"></div><div class="field"><label><input id="sfRequired" type="checkbox" style="width:auto" checked> Required</label></div><div class="field"><label><input id="sfSensitive" type="checkbox" style="width:auto"> Sensitive</label></div><div class="field"><label><input id="sfActive" type="checkbox" style="width:auto" checked> Active</label></div></div><div class="field"><label>Validation (JSON)</label><textarea id="sfValidation">{}</textarea></div><div class="field"><label>Metadata / options (JSON)</label><textarea id="sfMetadata">{}</textarea></div><button id="saveServiceField">Save Service Field</button>';
+  refreshServiceFieldServiceOptions();
+  $("sfService").value=f?.service_id||$("serviceFieldService").value||"";
+  $("sfKey").value=f?.field_key||"";$("sfLabel").value=f?.label||"";$("sfType").value=f?.data_type||"text";$("sfOrder").value=f?.display_order??100;$("sfRequired").checked=f?.required!==false;$("sfSensitive").checked=f?.sensitive===true;$("sfActive").checked=f?.active!==false;$("sfValidation").value=JSON.stringify(f?.validation||{},null,2);$("sfMetadata").value=JSON.stringify(f?.metadata||{},null,2);
+  $("modal").classList.remove("hidden");
+  $("saveServiceField").onclick=async()=>{try{
+    let validation={},metadata={};try{validation=JSON.parse($("sfValidation").value||"{}");metadata=JSON.parse($("sfMetadata").value||"{}")}catch{throw Error("Invalid field JSON.")}
+    await admin({action:"save_service_field",id:f?.id,service_id:$("sfService").value,field_key:$("sfKey").value,label:$("sfLabel").value,data_type:$("sfType").value,display_order:$("sfOrder").value,required:$("sfRequired").checked,sensitive:$("sfSensitive").checked,active:$("sfActive").checked,validation,metadata});
+    $("modal").classList.add("hidden");refreshServiceFieldServiceOptions();await loadServiceFields();
+  }catch(e){msg($("modalMsg"),e.message,"error")}};
 }
 async function loadProviders(){try{const d=await admin({action:"list_providers"});providers=d.providers||[];refreshEndpointProviderOptions();refreshMappingProductOptions();renderProviders();}catch(e){msg($("providerMsg"),e.message,"error")}}
 function renderProviders(){ $("providerRows").innerHTML=providers.map(p=>'<tr><td><strong>'+escapeHtml(p.name)+'</strong></td><td>'+escapeHtml(p.code)+'</td><td>'+escapeHtml(p.base_url||"—")+'</td><td><span class="badge '+(p.status==="active"?"on":"off")+'">'+escapeHtml(p.status)+'</span></td><td>'+ (p.supports_webhook?"Yes":"No") +'</td><td>'+escapeHtml(p.api_secret_name||"—")+'<br><span class="muted">'+(p.credential_configured?"Vault configured":"Not configured")+'</span></td><td><button class="secondary" onclick="editProvider(\''+p.id+'\')">Edit</button> <button class="secondary" onclick="testProvider(\''+p.id+'\')">Test</button></td></tr>').join("")||'<tr><td colspan="7" class="muted">No providers added yet.</td></tr>'}
