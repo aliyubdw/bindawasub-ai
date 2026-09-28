@@ -9,6 +9,9 @@ const SUPABASE_PUBLISHABLE_KEY =
 const EDGE_FUNCTION_URL =
   SUPABASE_URL + "/functions/v1/bindawasub-ai";
 
+const PROFILE_FUNCTION_URL =
+  SUPABASE_URL + "/functions/v1/bindawasub-profile";
+
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY,
@@ -76,4 +79,41 @@ async function callEdgeFunction(payload) {
   }
 
   return response;
+}
+
+
+async function callProfileFunction(payload) {
+  let token = await getAccessToken(false);
+  let response = await fetch(PROFILE_FUNCTION_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_PUBLISHABLE_KEY,
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify(payload || {})
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    token = await getAccessToken(true);
+    response = await fetch(PROFILE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_PUBLISHABLE_KEY,
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify(payload || {})
+    });
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) {
+    throw new Error(data.error || "Profile request failed.");
+  }
+  return data;
+}
+
+async function getProfileStatus() {
+  return callProfileFunction({ action: "status" });
 }
