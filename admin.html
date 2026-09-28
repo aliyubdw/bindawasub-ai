@@ -12,7 +12,7 @@
 <body>
 <div id="loginView" class="login card">
 <h2>Bindawasub Admin</h2><p class="muted">Secure administration dashboard</p><div id="loginMsg"></div>
-<form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Password</label><input id="password" type="password" required></div><button id="loginBtn">Login</button></form>
+<form id="loginForm" autocomplete="on" onsubmit="return handleAdminLogin(event)"><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Password</label><input id="password" type="password" required></div><button id="loginBtn">Login</button></form>
 </div>
 
 <div id="app" class="shell hidden">
@@ -144,24 +144,35 @@ async function token(){const {data:{session}}=await sb.auth.getSession();if(!ses
 async function admin(payload){const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||"Admin request failed.");return d}
 async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||d.message||"Request failed.");return d}
 
-$("loginForm").addEventListener("submit",async e=>{
-  e.preventDefault();
-  e.stopPropagation();
+async function handleAdminLogin(e){
+  if(e){
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  const form=$("loginForm");
   const btn=$("loginBtn");
   const emailInput=$("email");
   const passwordInput=$("password");
-  const email=emailInput.value.trim();
-  const password=passwordInput.value;
-  if(!email||!password){msg($("loginMsg"),"Email and password are required.","error");return false;}
+  const email=(emailInput?.value||"").trim();
+  const password=passwordInput?.value||"";
+
+  if(!email||!password){
+    msg($("loginMsg"),"Email and password are required.","error");
+    return false;
+  }
+
   btn.disabled=true;
   btn.textContent="Signing in…";
   msg($("loginMsg"),"Signing in…","info");
+
   try{
-    // Keep the form in place until both Supabase authentication and admin verification succeed.
     const {data,error}=await sb.auth.signInWithPassword({email,password});
     if(error) throw error;
+
     const accessToken=data?.session?.access_token;
     if(!accessToken) throw Error("Login succeeded, but no session was returned. Please try again.");
+
     const response=await fetch(ADMIN_URL,{
       method:"POST",
       headers:{
@@ -170,28 +181,42 @@ $("loginForm").addEventListener("submit",async e=>{
       },
       body:JSON.stringify({action:"list_products"})
     });
+
     const raw=await response.text();
     let result={};
     try{result=raw?JSON.parse(raw):{};}catch{result={error:raw||"Invalid response from admin service."};}
+
     if(!response.ok||result.success===false){
       await sb.auth.signOut();
       throw Error(result.error||"Admin access required.");
     }
+
+    // Switch views only after authentication and admin verification succeed.
     $("loginView").classList.add("hidden");
     $("app").classList.remove("hidden");
     msg($("loginMsg"),"","info");
-    await loadAll();
+
+    // A dashboard-data failure must not make a successful login look like a failed login.
+    try{
+      await loadAll();
+    }catch(loadError){
+      console.error("Bindawasub admin dashboard load error:",loadError);
+      msg($("overviewMsg"),loadError?.message||"Some dashboard data could not be loaded.","error");
+    }
   }catch(e){
     console.error("Bindawasub admin login error:",e);
-    msg($("loginMsg"),e?.message||"Login failed. Please try again.","error");
-    // Restore the button but deliberately keep the entered credentials visible.
+    // Never clear the user's entered credentials on an authentication error.
     emailInput.value=email;
     passwordInput.value=password;
+    msg($("loginMsg"),e?.message||"Login failed. Please try again.","error");
   }finally{
     btn.disabled=false;
     btn.textContent="Login";
   }
+
   return false;
+}
+
 });
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active")});
