@@ -162,7 +162,7 @@ async function registerUser() {
       showLoginForm();
       document.getElementById("loginEmail").value = email;
       messageBox.textContent =
-        "Account created. Check your email to confirm your account, then log in.";
+        "Account created. Log in with your email and password to continue.";
     }
   } catch (error) {
     console.error("Registration failed:", error);
