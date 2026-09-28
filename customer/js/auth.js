@@ -205,12 +205,7 @@ async function initAuth() {
       return;
     }
 
-    if (
-      event === "INITIAL_SESSION" ||
-      event === "SIGNED_IN" ||
-      event === "TOKEN_REFRESHED" ||
-      event === "USER_UPDATED"
-    ) {
+    if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
       setTimeout(() => {
         applyAuthenticatedSession(session);
       }, 0);
