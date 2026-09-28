@@ -5,6 +5,10 @@ document
   .addEventListener("click", loginUser);
 
 document
+  .getElementById("emailLinkButton")
+  .addEventListener("click", sendEmailLink);
+
+document
   .getElementById("registerButton")
   .addEventListener("click", registerUser);
 
