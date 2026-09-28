@@ -802,6 +802,21 @@ async function loadAll(){await loadOverview();await loadAiManagement();await loa
     if(login) login.classList.add("hidden");
     if(app) app.classList.remove("hidden");
   }
+  window.addEventListener("error",function(e){console.error("ADMIN_RUNTIME_ERROR",e.error||e.message);});
+  window.addEventListener("unhandledrejection",function(e){console.error("ADMIN_UNHANDLED_REJECTION",e.reason);});
+  function bindEmergencyLogout(){
+    const btn=document.getElementById("logout");
+    if(!btn||btn.dataset.emergencyLogoutBound)return;
+    btn.dataset.emergencyLogoutBound="1";
+    btn.addEventListener("click",async function(e){
+      e.preventDefault(); e.stopImmediatePropagation();
+      try{
+        const client=window.supabase.createClient("https://fuktxjweuanatmurlzpg.supabase.co","sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2");
+        await client.auth.signOut();
+      }catch(err){console.error("Emergency logout failed:",err);}
+      window.location.reload();
+    },true);
+  }
   function bindNavigation(){
     document.querySelectorAll(".nav button[data-tab]").forEach(function(btn){
       if(btn.dataset.failsafeBound) return;
@@ -817,6 +832,7 @@ async function loadAll(){await loadOverview();await loadAiManagement();await loa
   }
   async function fallbackLoad(){
     showApp();
+    bindEmergencyLogout();
     bindNavigation();
     try{
       const {data:{session},error}=await window.supabase.createClient(
