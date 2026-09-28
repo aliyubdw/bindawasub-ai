@@ -24,6 +24,7 @@ async function verifyAdminMode() {
       document.getElementById("adminPanel").style.display = "block";
       document.getElementById("headerSubtitle").textContent =
         "Admin mode — customer tools are available below.";
+      startEmbeddedFundingPolling();
       document.getElementById("adminStatus").textContent =
         "Logged in as " + (data.user?.name || "Admin");
       loadManualFundingSettings();
@@ -187,6 +188,17 @@ async function fundAdminCustomer() {
   }
 }
 
+let embeddedFundingPollTimer=null;
+
+function startEmbeddedFundingPolling(){
+  if(embeddedFundingPollTimer)clearInterval(embeddedFundingPollTimer);
+  embeddedFundingPollTimer=setInterval(()=>{
+    if(isAdminUser && !document.hidden){
+      loadManualFundingRequests().catch(error=>console.error("Embedded funding polling failed:",error));
+    }
+  },15000);
+}
+
 async function loadManualFundingSettings() {
   try {
     const data = await adminCall({ action: "manual_funding_settings_get" });
@@ -226,7 +238,7 @@ async function loadManualFundingRequests() {
   const box = document.getElementById("manualFundingRequests");
   box.textContent = "Loading...";
   try {
-    const data = await adminCall({ action: "manual_funding_requests", status: "submitted" });
+    const data = await adminCall({ action: "manual_funding_requests", status: "all" });
     const requests = data.requests || [];
 
     if (!requests.length) {
