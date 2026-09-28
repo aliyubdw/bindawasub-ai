@@ -4,13 +4,13 @@ async function startNewConversation() {
   const button = document.getElementById("newChatButton");
   if (button) button.disabled = true;
   try {
-    const response = await callEdgeFunction({ action: "new_conversation", channel: "web" });
+    const response = await callEdgeFunction({ action: "new_conversation", channel: getCustomerChannel() });
     const data = await response.json();
     if (!response.ok || data.success !== true) throw new Error(data.error || "Failed to start a new conversation.");
-    selectedProduct = null;
-    recipientPhone = null;
-    waitingForPhone = false;
-    waitingForConfirmation = false;
+    BindawasubCustomerState.selectedProduct = null;
+    BindawasubCustomerState.recipientPhone = null;
+    BindawasubCustomerState.waitingForPhone = false;
+    BindawasubCustomerState.waitingForConfirmation = false;
     const messages = document.getElementById("messages");
     messages.innerHTML = "";
     addMessage("Sannu! Sabuwar hira ta fara. Ta yaya zan taimaka maka?", "bot");
@@ -35,7 +35,7 @@ async function loadConversationHistory() {
   try {
     const response = await callEdgeFunction({
       action: "conversation_history",
-      channel: "web"
+      channel: getCustomerChannel()
     });
 
     const data = await response.json();
@@ -127,7 +127,7 @@ async function sendMessage(customMessage = null, customAction = null) {
   ========================================= */
 
   if (
-    waitingForPhone &&
+    BindawasubCustomerState.waitingForPhone &&
     !customMessage
   ) {
 
@@ -163,11 +163,11 @@ Misali: 08012345678`,
     }
 
 
-    recipientPhone =
+    BindawasubCustomerState.recipientPhone =
       phone;
 
 
-    waitingForPhone =
+    BindawasubCustomerState.waitingForPhone =
       false;
 
 
@@ -236,7 +236,7 @@ Misali: 08012345678`,
     let requestAction = customAction;
     let requestAmount = null;
 
-    if (!requestAction && waitingForFundingAmount) {
+    if (!requestAction && BindawasubCustomerState.waitingForFundingAmount) {
       const amountText = String(message || "").trim();
       const amountMatch = amountText.match(
         /^(?:₦\s*|NGN\s*|naira\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*$/i
@@ -352,7 +352,7 @@ Misali: 08012345678`,
     }
 
     if (data?.intent === "fund_wallet" && data?.requires_amount) {
-      waitingForFundingAmount = true;
+      BindawasubCustomerState.waitingForFundingAmount = true;
     }
 
     if (data?.intent === "fund_wallet" && data?.requires_payment && data?.request) {
