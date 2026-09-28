@@ -50,6 +50,34 @@ async function authorize(req:Request, internalOnly=false) {
   if(!user || user.role!=="admin") throw new Error("Admin access required.");
   return {internal:false,user};
 }
+async function getServiceOperationRoutes(serviceType:string, operation:string, providerId?:string) {
+  const q= db.from("provider_services")
+    .select("id,provider_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)")
+    .eq("service_type",serviceType)
+    .eq("enabled",true)
+    .eq("api_providers.status","active")
+    .order("priority",{ascending:true});
+  if(providerId) q.eq("provider_id",providerId);
+  const {data:services,error}=await q;
+  if(error) throw new Error("Provider service lookup failed: "+error.message);
+  const routes:any[]=[];
+  for(const service of (services||[])){
+    const {data:ops,error:oError}=await db.from("provider_service_operations")
+      .select("id,operation,endpoint_id,active,priority,metadata,api_endpoints!inner(id,provider_id,service_type,operation,method,path,headers_template,request_template,response_mapping,timeout_ms,active)")
+      .eq("provider_service_id",service.id)
+      .eq("operation",operation)
+      .eq("active",true)
+      .eq("api_endpoints.active",true)
+      .eq("api_endpoints.provider_id",service.provider_id)
+      .eq("api_endpoints.service_type",serviceType)
+      .eq("api_endpoints.operation",operation)
+      .order("priority",{ascending:true});
+    if(oError) throw new Error("Provider service operation lookup failed: "+oError.message);
+    for(const op of (ops||[])) routes.push({service,operation:op,provider:service.api_providers,endpoint:op.api_endpoints});
+  }
+  return routes;
+}
+
 async function getCredentials(providerId:string) {
   const {data:credential,error:credentialError}=await db
     .from("provider_credentials")
@@ -93,14 +121,18 @@ async function dryRunPurchase(req:Request, body:any) {
     if(mError) throw new Error("Provider mapping lookup failed: "+mError.message);
     mapping=(mappings||[]).find((m:any)=>m.provider_status==="active"); if(!mapping) throw new Error("No active provider plan mapping is available for this product."); provider=mapping.api_providers;
   } else {
-    const {data:services,error:sError}=await db.from("provider_services").select("id,provider_id,endpoint_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)").eq("service_type",serviceType).eq("enabled",true).eq("api_providers.status","active").order("priority",{ascending:true});
-    if(sError) throw new Error("Provider service lookup failed: "+sError.message);
-    const service=(services||[])[0]; if(!service) throw new Error("No active provider is configured for "+serviceType+"."); provider=service.api_providers;
+    const routes=await getServiceOperationRoutes(serviceType,"purchase");
+    const route=routes[0]; if(!route) throw new Error("No active provider purchase capability is configured for "+serviceType+".");
+    provider=route.provider;
   }
   let endpoint:any=null; let eError:any=null;
-  if(mapping?.endpoint_id){ const r=await db.from("api_endpoints").select("*").eq("id",mapping.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle(); endpoint=r.data; eError=r.error; }
-  else if(service?.endpoint_id){ const r=await db.from("api_endpoints").select("*").eq("id",service.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle(); endpoint=r.data; eError=r.error; }
-  else { const r=await db.from("api_endpoints").select("*").eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).order("id",{ascending:true}).limit(1).maybeSingle(); endpoint=r.data; eError=r.error; }
+  if(mapping?.endpoint_id){
+    const r=await db.from("api_endpoints").select("*").eq("id",mapping.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
+    endpoint=r.data; eError=r.error;
+  } else {
+    const route=await getServiceOperationRoutes(serviceType,"purchase",provider.id);
+    endpoint=route[0]?.endpoint||null;
+  }
   if(eError || !endpoint) throw new Error("No active purchase endpoint is configured for "+provider.name+".");
   const credentials=await getCredentials(provider.id);
   const reference="BW-"+tx.id;
@@ -143,11 +175,8 @@ async function executePurchase(req:Request, body:any) {
     if(error) throw new Error("Provider mapping lookup failed: "+error.message);
     candidates=(data||[]).filter((m:any)=>m.provider_status==="active").map((m:any)=>({mapping:m,service:null,provider:m.api_providers}));
   } else {
-    const {data,error}=await db.from("provider_services")
-      .select("id,provider_id,endpoint_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)")
-      .eq("service_type",serviceType).eq("enabled",true).eq("api_providers.status","active").order("priority",{ascending:true});
-    if(error) throw new Error("Provider service lookup failed: "+error.message);
-    candidates=(data||[]).map((s:any)=>({mapping:null,service:s,provider:s.api_providers}));
+    const routes=await getServiceOperationRoutes(serviceType,"purchase");
+    candidates=routes.map((r:any)=>({mapping:null,service:r.service,operation:r.operation,provider:r.provider,endpoint:r.endpoint}));
   }
   if(!candidates.length){
     await db.from("transactions").update({processing_at:null}).eq("id",tx.id);
@@ -157,15 +186,9 @@ async function executePurchase(req:Request, body:any) {
   let lastFailure:any=null;
   for(let i=0;i<candidates.length;i++){
     const {mapping,service,provider}=candidates[i];
-    let endpoint:any=null;
+    let endpoint:any=service?.endpoint ? service.endpoint : null;
     if(mapping?.endpoint_id){
       const r=await db.from("api_endpoints").select("*").eq("id",mapping.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
-      if(r.error) throw new Error("Purchase endpoint lookup failed: "+r.error.message);
-      endpoint=r.data;
-    } else if(service?.endpoint_id){
-      const r=await db.from("api_endpoints").select("*").eq("id",service.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
-    } else {
-      const r=await db.from("api_endpoints").select("*").eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).order("id",{ascending:true}).limit(1).maybeSingle();
       if(r.error) throw new Error("Purchase endpoint lookup failed: "+r.error.message);
       endpoint=r.data;
     }
@@ -272,9 +295,11 @@ async function requeryTransaction(req:Request, body:any) {
   if(!attempt) return {success:false,status:"pending",transaction_id:tx.id,requires_manual_review:true,message:"No ambiguous provider attempt is recorded for this transaction."};
 
   const provider=attempt.api_providers;
-  const endpoint=attempt.api_endpoints;
   if(!provider || provider.status!=="active") throw new Error("The provider used by the pending attempt is not active.");
-  if(!endpoint || endpoint.operation!=="status" && endpoint.operation!=="purchase") throw new Error("No valid status/requery endpoint is attached to the pending attempt.");
+  const {data:txService}=await db.from("transactions").select("service_type").eq("id",tx.id).single();
+  const statusRoutes=await getServiceOperationRoutes(String(txService?.service_type||""),"status",provider.id);
+  const endpoint=statusRoutes[0]?.endpoint||null;
+  if(!endpoint) throw new Error("No active status capability is configured for the provider used by this transaction.");
   const reference=String(attempt.provider_reference||tx.provider_reference||"");
   if(!reference) return {success:false,status:"pending",transaction_id:tx.id,requires_manual_review:true,message:"The ambiguous provider attempt has no reference to re-query."};
 
@@ -333,7 +358,18 @@ async function testProvider(req:Request, body:any) {
   await authorize(req,false);
   const providerId=String(body.provider_id||"");if(!providerId)throw new Error("provider_id is required.");
   const {data:provider,error}=await db.from("api_providers").select("*").eq("id",providerId).single();if(error||!provider)throw new Error("Provider not found.");
-  const {data:endpoint,error:eError}=await db.from("api_endpoints").select("*").eq("provider_id",providerId).eq("operation",body.operation||"balance").eq("active",true).maybeSingle();if(eError||!endpoint)throw new Error("No active test endpoint configured for this operation.");
+  const operation=String(body.operation||"balance");
+  const requestedServiceType=body.service_type?String(body.service_type):null;
+  let routes:any[]=[];
+  if(requestedServiceType) routes=await getServiceOperationRoutes(requestedServiceType,operation,providerId);
+  else {
+    const {data:services,error:sError}=await db.from("provider_services").select("service_type").eq("provider_id",providerId).eq("enabled",true);
+    if(sError) throw new Error("Provider service lookup failed: "+sError.message);
+    for(const s of (services||[])) routes.push(...await getServiceOperationRoutes(String(s.service_type),operation,providerId));
+  }
+  const route=routes[0];
+  const endpoint=route?.endpoint||null;
+  if(!endpoint)throw new Error("No active configured endpoint for provider operation "+operation+".");
   const credentials=await getCredentials(providerId);const ctx={credential:credentials,credentials,reference:"TEST-"+crypto.randomUUID(),amount:0,phone:body.phone||"08000000000",network:body.network||"MTN"};
   const headers=deepRender(endpoint.headers_template||{},ctx);if(!headers["Content-Type"]&&!headers["content-type"])headers["Content-Type"]="application/json";
   const path=deepRender(endpoint.path,ctx);const url=new URL(path,provider.base_url).toString();const method=endpoint.method.toUpperCase();const request=deepRender(endpoint.request_template||{},ctx);
