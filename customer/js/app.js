@@ -21,6 +21,14 @@ document
   .addEventListener("click", showLoginForm);
 
 document
+  .getElementById("completeProfileButton")
+  .addEventListener("click", completeProfile);
+
+document
+  .getElementById("profileBackButton")
+  .addEventListener("click", showLoginForm);
+
+document
   .getElementById("logoutButton")
   .addEventListener("click", logoutUser);
 
