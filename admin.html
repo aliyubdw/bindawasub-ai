@@ -329,7 +329,7 @@ async function loadEndpoints(){try{
   const pid=$("endpointProvider").value;
   const d=await admin({action:"list_endpoints",provider_id:pid||null});
   const rows=d.endpoints||[]; window._endpoints=rows;
-  $("endpointRows").innerHTML=rows.map(e=>'<tr><td>'+escapeHtml(e.service_type)+'</td><td>'+escapeHtml(e.operation)+'</td><td>'+escapeHtml(e.method)+'</td><td>'+escapeHtml(e.path)+'</td><td>'+e.timeout_ms+'ms</td><td>'+e.retry_count+'</td><td><span class="badge '+(e.active?"on":"off")+'">'+(e.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editEndpoint(\''+e.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No endpoints configured.</td></tr>';
+  $("endpointRows").innerHTML=rows.map(e=>'<tr><td>'+escapeHtml(e.service_type)+'</td><td>'+escapeHtml(e.operation)+'</td><td>'+escapeHtml(e.method)+'</td><td>'+escapeHtml(e.path)+'</td><td>'+e.timeout_ms+'ms</td><td>'+e.retry_count+'</td><td><span class="badge '+(e.active?"on":"off")+'">'+(e.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editEndpoint(\''+e.id+'\')">Edit</button><button class="secondary" onclick="previewEndpointAdmin(\''+e.id+'\')">Preview</button><button class="secondary" '+(e.operation==="purchase"||e.operation==="webhook"?"disabled":"")+' onclick="testEndpointAdmin(\''+e.id+'\')">Test</button><button class="secondary" onclick="validateMappingAdmin(\''+e.id+'\')">Validate</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No endpoints configured.</td></tr>';
 }catch(e){msg($("endpointMsg"),e.message,"error")}}
 function refreshEndpointProviderOptions(){
   $("endpointProvider").innerHTML='<option value="">All providers</option>'+providers.map(p=>'<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>').join("");
@@ -355,6 +355,30 @@ async function openEndpoint(e){
     $("modal").classList.add("hidden"); await loadEndpoints();
   }catch(err){msg($("modalMsg"),err.message,"error")}};
 }
+
+
+async function endpointToolCall(action,id){
+  try{
+    const d=await admin({action,endpoint_id:id});
+    $("modalTitle").textContent=action==="preview_endpoint"?"Endpoint Preview":action==="test_endpoint"?"Endpoint Test":"Response Mapping Validation";
+    const pretty=v=>escapeHtml(JSON.stringify(v??{},null,2));
+    let html="";
+    if(action==="validate_response_mapping"){
+      html='<div class="msg '+(d.valid?"success":"error")+'">'+(d.valid?"Mapping is valid.":"Mapping needs attention.")+'</div>';
+      if((d.errors||[]).length) html+='<p><strong>Errors</strong></p><ul>'+d.errors.map(x=>'<li>'+escapeHtml(x)+'</li>').join("")+'</ul>';
+      if((d.warnings||[]).length) html+='<p><strong>Warnings</strong></p><ul>'+d.warnings.map(x=>'<li>'+escapeHtml(x)+'</li>').join("")+'</ul>';
+    }else if(action==="preview_endpoint"){
+      html='<div class="msg info">PREVIEW ONLY — no provider request was sent.</div><p><strong>Provider:</strong> '+escapeHtml(d.provider?.name||"—")+'</p><p><strong>Endpoint:</strong> '+escapeHtml((d.endpoint?.method||"")+" "+(d.endpoint?.url||""))+'</p><p><strong>Headers</strong></p><pre>'+pretty(d.headers)+'</pre><p><strong>Request</strong></p><pre>'+pretty(d.request)+'</pre><p><strong>Response mapping</strong></p><pre>'+pretty(d.response_mapping)+'</pre>';
+    }else{
+      html='<div class="msg success">LIVE NON-PURCHASE TEST — no purchase request was sent.</div><p><strong>Provider:</strong> '+escapeHtml(d.provider?.name||"—")+'</p><p><strong>Operation:</strong> '+escapeHtml(d.operation||"—")+'</p><p><strong>HTTP:</strong> '+escapeHtml(String(d.http?.status??"—"))+' · '+escapeHtml(String(d.http?.response_time_ms??"—"))+' ms</p><p><strong>Auth:</strong> '+escapeHtml(d.auth?.masked||"not present")+'</p><p><strong>Response</strong></p><pre>'+pretty(d.response)+'</pre><p><strong>Response mapping</strong></p><pre>'+pretty(d.response_mapping)+'</pre>';
+    }
+    $("modalBody").innerHTML=html;
+    $("modal").classList.remove("hidden");
+  }catch(e){msg($("endpointMsg"),e.message,"error")}
+}
+window.previewEndpointAdmin=id=>endpointToolCall("preview_endpoint",id);
+window.testEndpointAdmin=id=>endpointToolCall("test_endpoint",id);
+window.validateMappingAdmin=id=>endpointToolCall("validate_response_mapping",id);
 
 async function loadMappings(){try{
   const pid=$("mappingProduct").value;
