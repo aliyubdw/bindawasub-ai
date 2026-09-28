@@ -608,10 +608,57 @@ async function logoutUser() {
   hideAdminMode();
 }
 
-function showChatScreen() {
+async function loadConversationHistory() {
+  if (isAdminUser) return;
+
+  const messages = document.getElementById("messages");
+  if (!messages) return;
+
+  try {
+    const response = await callEdgeFunction({
+      action: "conversation_history",
+      channel: "web"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(data.error || "Failed to load conversation history.");
+    }
+
+    messages.innerHTML = "";
+
+    if (Array.isArray(data.messages) && data.messages.length > 0) {
+      data.messages.forEach(item => {
+        const role = item.role === "user" ? "user" : "bot";
+        addMessage(item.message || "", role);
+      });
+    } else {
+      addMessage(
+        "Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?",
+        "bot"
+      );
+    }
+
+    messages.scrollTop = messages.scrollHeight;
+  } catch (error) {
+    console.error("Conversation history load failed:", error);
+
+    if (!messages.children.length) {
+      addMessage(
+        "Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?",
+        "bot"
+      );
+    }
+  }
+}
+
+async function showChatScreen() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("chatScreen").style.display = "flex";
+
   if (!isAdminUser) {
+    await loadConversationHistory();
     document.getElementById("messageInput").focus();
   }
 }
