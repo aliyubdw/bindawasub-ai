@@ -205,7 +205,7 @@ async function openProduct(p){
   $("xService").onchange=()=>populateProductDimensions("","");
   $("xNetwork").onchange=()=>populateProductVariants($("xService").value,$("xNetwork").value,"");
   $("modal").classList.remove("hidden");
-  $("saveProduct").onclick=async()=>{try{await admin({action:"save_product",id:p?.id,product_name:$("xName").value,sku:$("xSku").value,service_type:$("xService").value,network:$("xNetwork").selectedOptions[0]?.textContent||"",network_id:$("xNetwork").value||null,variant_id:$("xVariant").value||null,volume:$("xVolume").value,duration:$("xDuration").value,validity_type:$("xValidityType").value,validity_value:$("xValidityValue").value,validity_unit:$("xValidityUnit").value,selling_price:$("xSell").value,cost_price:$("xCost").value,provider_id:$("xProvider").value||null,provider_product_id:$("xProviderProduct").value,display_order:$("xOrder").value,active:$("xActive").checked});$("modal").classList.add("hidden");await loadProducts()}catch(e){msg($("modalMsg"),e.message,"error")}};
+  $("saveProduct").onclick=async()=>{try{await admin({action:"save_product",id:p?.id,product_name:$("xName").value,sku:$("xSku").value,service_type:$("xService").value,network_id:$("xNetwork").value||null,variant_id:$("xVariant").value||null,volume:$("xVolume").value,validity_type:$("xValidityType").value,validity_value:$("xValidityValue").value,validity_unit:$("xValidityUnit").value,selling_price:$("xSell").value,cost_price:$("xCost").value,display_order:$("xOrder").value,active:$("xActive").checked});$("modal").classList.add("hidden");await loadProducts()}catch(e){msg($("modalMsg"),e.message,"error")}};
 }
 async function populateProductDimensions(networkId="",variantId=""){
   const sid=$("xService").value;
