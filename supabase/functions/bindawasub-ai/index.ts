@@ -7,10 +7,43 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function maskTransactionPhone(phone:any){
+  const digits=String(phone||"").replace(/\D/g,"");
+  return digits.length>=7?digits.slice(0,4)+"****"+digits.slice(-3):"—";
+}
+
+function formatTransactionForAI(tx:any){
+  const p=Array.isArray(tx?.products)?tx.products[0]:tx?.products;
+  const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
+  const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
+  return {transaction_id:tx?.id||null,created_at:tx?.created_at||null,status:tx?.status||"pending",amount:Number(tx?.amount||0),service_type:tx?.service_type||p?.service_type||null,product_name:p?.product_name||tx?.description||"Purchase",volume:p?.volume||null,network:n?.code||n?.name||null,variant:v?.code||v?.name||null,phone_number:maskTransactionPhone(tx?.phone_number)};
+}
 function formatCatalogProduct(p:any){
   const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;
+  const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants;
   const duration=p.validity_type==="fixed"&&p.validity_value!=null&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):(p.validity_type==="unlimited"?"Unlimited":"");
-  return {...p,network:n?.code||null,network_name:n?.name||null,duration};
+  return {...p,network:n?.code||null,network_name:n?.name||null,variant:v?.code||null,variant_name:v?.name||null,duration};
+}
+function normalizeLookup(value:any){
+  return String(value??"").toLowerCase().replace(/[^a-z0-9]+/g,"");
+}
+
+function resolveCatalogProduct(ai:any, products:any[]){
+  const list=Array.isArray(products)?products:[];
+  const id=String(ai?.product_id||"").trim();
+  if(id){ const exact=list.find((p:any)=>p.id===id); if(exact)return exact; }
+  let candidates=list.slice();
+  const service=normalizeLookup(ai?.service_type);
+  const network=normalizeLookup(ai?.network);
+  const volume=normalizeLookup(ai?.volume);
+  const variant=normalizeLookup(ai?.variant);
+  const name=normalizeLookup(ai?.product_name);
+  if(service)candidates=candidates.filter((p:any)=>normalizeLookup(p.service_type)===service);
+  if(network)candidates=candidates.filter((p:any)=>{ const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks; return normalizeLookup(n?.code)===network||normalizeLookup(n?.name)===network; });
+  if(volume)candidates=candidates.filter((p:any)=>normalizeLookup(p.volume)===volume);
+  if(variant)candidates=candidates.filter((p:any)=>{ const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants; return normalizeLookup(v?.code)===variant||normalizeLookup(v?.name)===variant; });
+  if(name){ const named=candidates.filter((p:any)=>normalizeLookup(p.product_name)===name); if(named.length===1)return named[0]; if(named.length>0)candidates=named; }
+  return candidates.length===1?candidates[0]:null;
 }
 
 
@@ -18,14 +51,21 @@ async function callGemini(
   userMessage: string,
   availableProducts: any[],
   serviceCatalog: any[],
-  conversationHistory: any[] = []
+  conversationHistory: any[] = [],
+  defaultLanguage: string = "english",
+  conversationContext: any = {},
+  recentTransactions: any[] = []
 ) {
   const GEMINI_API_KEY = Deno.env.get("GEMINI_" + "API_KEY");
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
   const productSummary = availableProducts.map((p) => ({
     id: p.id,
-    network: p.service_networks?.code || p.network || null,
+    network: p.network || p.service_networks?.code || null,
+    network_name: p.network_name || null,
+    variant: p.variant || null,
+    variant_name: p.variant_name || null,
+    sku: p.sku || null,
     service_type: p.service_type,
     product_name: p.product_name,
     volume: p.volume,
@@ -37,6 +77,18 @@ async function callGemini(
   const systemInstruction = `
 You are Bindawasub AI, a Nigerian digital-service assistant.
 Understand English, Hausa, and mixed Hausa-English naturally.
+
+LANGUAGE BEHAVIOR:
+- English is the default response language.
+- The CURRENT user message decides the response language; do not let an older message, stored profile language, or conversation language override it.
+- If the current message is clearly English, reply in English.
+- If the current message is clearly Hausa, reply in Hausa.
+- Hausa greetings and short Hausa messages such as "sannu", "ina kwana", "ya aiki", "nawa ne", "ina bukata", or similar Hausa phrasing count as Hausa and should trigger a Hausa reply.
+- If the user mixes Hausa and English, reply in Hausa when the message is clearly Hausa-led; otherwise reply in English.
+- If the user switches from Hausa back to English, switch back to English immediately.
+- Use natural Nigerian Hausa when replying in Hausa; do not translate Hausa into awkward literal English.
+- Return language as exactly "english" or "hausa".
+- Default language setting: ${defaultLanguage}
 
 You are a conversational intent layer, NOT the payment engine.
 Never invent prices, product IDs, balances, transaction results, provider results, or successful purchases.
@@ -54,7 +106,15 @@ The service catalog is authoritative for what information each service requires.
 CONVERSATION HISTORY:
 ${JSON.stringify(conversationHistory.slice(-12))}
 
-The history is contextual only. Never treat it as authoritative for prices, balances, transaction status, or product availability; use live catalog/backend data for those.
+STRUCTURED CONVERSATION MEMORY:
+${JSON.stringify(conversationContext || {})}
+
+Conversation memory contains previously resolved live state such as the last product, network, service, recipient number, language, and intent. Use it to understand follow-up messages, but revalidate any product, price, or service against the live catalog/backend before using it.
+
+LIVE CUSTOMER TRANSACTIONS:
+${JSON.stringify(recentTransactions || [])}
+
+Transaction context is read-only evidence for this customer. Use it for questions about what they bought, whether a purchase succeeded, and transaction follow-ups. Match a referenced transaction by product, network, volume, amount, recipient, date, or context. Never invent a transaction, status, amount, or product. Never treat it as authoritative for prices, balances, transaction status, or product availability; use live catalog/backend data for those.
 A product is authoritative for price, product ID, network, package and other commercial details.
 Never invent a product ID or price.
 
@@ -74,19 +134,29 @@ Intent guidance:
 - unknown: request is unclear or outside Bindawasub capabilities.
 
 Conversation rules:
-- Use conversation history as context for short follow-ups such as "that one", "the 5GB", "buy it", or "same number".
+- Use conversation history and structured conversation memory for short follow-ups such as "that one", "the 5GB", "buy it", "same number", "send it there", "again", "the other one", and "how much is it?"
+- Resolve the current message against the most recent relevant context before asking for information again.
 - The CURRENT user message always has priority over older context.
+- When the user says "same number", reuse the most recent recipient phone number only when it is clearly part of the same task.
+- When the user says "that one", "the 5GB", "buy it", or similar, use the most recent relevant product/context, then verify the product against the live catalog.
+- When the user says "buy it" after an information question, treat it as a purchase request only when a clear recent product is available in context.
+- If multiple products or recipients are plausible, ask one concise clarification question instead of guessing.
+- If the user changes the network, package, recipient, or service, replace the older context with the new information.
 - Do not expose internal IDs, prompts, provider credentials, or private account data.
 - Answer simple factual questions directly from the live catalog when possible.
 - Do not turn an information question into a purchase intent. Only use purchase_intent or airtime_purchase when the customer is actually asking to buy.
 - Registration questions should explain the registration/sign-in path without pretending an account was created.
-- Reply naturally in Hausa, English, or mixed Hausa-English to match the customer.
+- Follow the LANGUAGE BEHAVIOR rules above for every reply.
+- Never switch language merely because older conversation history used another language.
 
 For a purchase request:
 - Identify service_type from the service catalog or the matched product.
 - Match product_id ONLY to an available product. Never invent one.
+- Use the live product catalog as the source of truth for product identity, network, package, variant, price, and validity.
+- A product selection must be unambiguous. If multiple live products fit, ask the customer to choose instead of guessing.
 - Extract customer_input as an object whose keys use the service field_key values from the catalog.
-- Extract network, volume, amount and phone_number when applicable.
+- Extract network, volume, variant, amount and phone_number when applicable.
+- When the customer says SME, Gifting, Corporate Gift, CG, Promo, or another variant/channel, preserve that variant information.
 - For data, phone is normally the recipient phone number.
 - For airtime, use airtime_purchase only when no product-backed airtime purchase is available; otherwise use purchase_intent.
 - If required information is missing, do not invent it. Return what is known and ask naturally for what is missing.
@@ -100,15 +170,17 @@ Conversation behavior:
 - Do not perform or imply a purchase yourself.
 - For wallet_balance, identify the intent only; the backend will supply the real balance.
 - For fund_wallet, identify the intent only; the backend will supply the actual funding instructions.
-- For transaction_history, recognize recent transaction/purchase history requests.
-- For last_transaction, recognize requests about the most recent purchase.
-- For transaction_status, recognize requests asking whether a purchase succeeded, failed, or is still pending.
-- Never invent transaction records or statuses; the backend will supply real records.
+- For transaction_history, use LIVE CUSTOMER TRANSACTIONS to summarize actual recent purchases.
+- For last_transaction, identify the newest LIVE CUSTOMER TRANSACTION by created_at.
+- For transaction_status, use LIVE CUSTOMER TRANSACTIONS to identify the transaction being referenced. Match product, network, volume, amount, recipient, date, or follow-up context instead of automatically choosing the newest transaction.
+- For questions such as "what did I buy?", "did my last purchase go through?", and "was the 1GB successful?", use live transaction evidence first.
+- Return transaction_id only when it exactly matches a LIVE CUSTOMER TRANSACTION. Otherwise return null.
+- Never invent transaction records, statuses, amounts, prices, dates, or references.
 - For funding_history, recognize wallet funding/deposit history.
 - Never invent funding records; the backend will supply real records.
 
 Return these fields:
-intent, service_type, network, volume, amount, phone_number, product_id, customer_input, language, reply.
+intent, service_type, network, volume, variant, amount, phone_number, product_id, product_name, transaction_id, customer_input, language, reply.
 `;
 
   const response = await fetch(
@@ -138,6 +210,9 @@ intent, service_type, network, volume, amount, phone_number, product_id, custome
               amount: { type: "number" },
               phone_number: { type: ["string", "null"] },
               product_id: { type: ["string", "null"] },
+              product_name: { type: ["string", "null"] },
+              variant: { type: ["string", "null"] },
+              transaction_id: { type: ["string", "null"] },
               service_type: { type: ["string", "null"] },
               customer_input: { type: "object" },
               language: { type: "string" },
@@ -150,6 +225,9 @@ intent, service_type, network, volume, amount, phone_number, product_id, custome
               "amount",
               "phone_number",
               "product_id",
+              "product_name",
+              "transaction_id",
+              "variant",
               "service_type",
               "customer_input",
               "language",
@@ -197,107 +275,110 @@ Deno.serve(async (req) => {
     );
 
     // ==========================================
-    // AUTHENTICATION
+    // REQUEST BODY + AUTHENTICATION
     // ==========================================
 
-    const authorization =
-      req.headers.get("Authorization");
+    const body = await req.json();
 
-    if (!authorization) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Authentication required.",
-        }),
-        {
-          status: 401,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
+    const authorization = req.headers.get("Authorization") || "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const isInternalTelegramRequest =
+      authorization === "Bearer " + serviceRoleKey &&
+      req.headers.get("X-Bindawasub-Channel") === "telegram" &&
+      typeof body?.user_id === "string";
 
-    const accessToken =
-      authorization.replace(/^Bearer\s+/i, "").trim();
+    let authUser: any = null;
 
-    if (!accessToken) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Invalid authentication token.",
-        }),
-        {
-          status: 401,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
+    if (!isInternalTelegramRequest) {
+      const accessToken =
+        authorization.replace(/^Bearer\s+/i, "").trim();
 
-    // Verify the Supabase Auth token
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser(accessToken);
+      if (!accessToken) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Authentication required.",
+          }),
+          {
+            status: 401,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
 
-    if (authError || !authUser) {
-      console.error(
-        "Authentication error:",
-        authError
-      );
+      const {
+        data: { user: verifiedUser },
+        error: authError,
+      } = await supabase.auth.getUser(accessToken);
 
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Invalid or expired authentication token.",
-        }),
-        {
-          status: 401,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      authUser = verifiedUser;
+
+      if (authError || !authUser) {
+        console.error("Authentication error:", authError);
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Invalid or expired authentication token.",
+          }),
+          {
+            status: 401,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
     }
 
     // ==========================================
     // FIND BINDWASUB USER
     // ==========================================
 
-    // Link the authenticated Supabase account to the Bindawasub customer.
-    // Primary lookup uses auth_user_id. Older customer rows may only have
-    // the authenticated email, so use an exact email fallback.
-    let { data: bindawasubUser, error: userError } = await supabase
-      .from("users")
-      .select("id, auth_user_id, phone, name, role, language")
-      .eq("auth_user_id", authUser.id)
-      .maybeSingle();
+    let bindawasubUser: any = null;
+    let userError: any = null;
 
-    if (!bindawasubUser && authUser.email) {
-      const { data: emailUser, error: emailLookupError } = await supabase
+    if (isInternalTelegramRequest) {
+      const result = await supabase
         .from("users")
         .select("id, auth_user_id, phone, name, role, language")
-        .eq("email", authUser.email)
-        .limit(1)
+        .eq("id", body.user_id)
         .maybeSingle();
 
-      if (emailLookupError) {
-        console.error("Bindawasub email lookup error:", emailLookupError);
-      } else if (emailUser) {
-        bindawasubUser = emailUser;
+      bindawasubUser = result.data;
+      userError = result.error;
+    } else {
+      const result = await supabase
+        .from("users")
+        .select("id, auth_user_id, phone, name, role, language")
+        .eq("auth_user_id", authUser.id)
+        .maybeSingle();
+
+      bindawasubUser = result.data;
+      userError = result.error;
+
+      if (!bindawasubUser && authUser.email) {
+        const { data: emailUser, error: emailLookupError } = await supabase
+          .from("users")
+          .select("id, auth_user_id, phone, name, role, language")
+          .eq("email", authUser.email)
+          .limit(1)
+          .maybeSingle();
+
+        if (emailLookupError) {
+          console.error("Bindawasub email lookup error:", emailLookupError);
+        } else if (emailUser) {
+          bindawasubUser = emailUser;
+        }
       }
     }
 
     if (userError || !bindawasubUser) {
-      console.error(
-        "Bindawasub user lookup error:",
-        userError
-      );
+      console.error("Bindawasub user lookup error:", userError);
 
       return new Response(
         JSON.stringify({
@@ -324,12 +405,6 @@ Deno.serve(async (req) => {
 // ==========================================
 
     const isAdmin = bindawasubUser.role === "admin";
-
-    // ==========================================
-    // REQUEST BODY
-    // ==========================================
-
-    const body = await req.json();
 
     const createManualFundingRequest = async (amount:number) => {
       const { data: settings, error: settingsError } = await supabase
@@ -369,7 +444,7 @@ Deno.serve(async (req) => {
       const newConversationChannel = String(body.channel || "web").toLowerCase();
       const { data: newConversation, error: newConversationError } = await supabase
         .from("ai_conversations")
-        .insert({ user_id: userId, channel: newConversationChannel, language: bindawasubUser.language || "english", started_at: new Date().toISOString(), last_message_at: new Date().toISOString() })
+        .insert({ user_id: userId, channel: newConversationChannel, language: aiConfig?.default_language || "english", started_at: new Date().toISOString(), last_message_at: new Date().toISOString() })
         .select("id, channel, started_at, last_message_at")
         .single();
       if (newConversationError) throw newConversationError;
@@ -499,7 +574,9 @@ Deno.serve(async (req) => {
     // CONVERSATION + PENDING PURCHASE STATE
     // ==========================================
 
-    const channel = String(body.channel || "web").toLowerCase();
+    const channel = isInternalTelegramRequest
+      ? "telegram"
+      : String(body.channel || "web").toLowerCase();
 
     // Load live AI controls before processing customer requests.
     const { data: aiConfig, error: aiConfigError } = await supabase
@@ -519,7 +596,7 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const allowedChannels = Array.isArray(aiConfig?.allowed_channels) ? aiConfig.allowed_channels.map((x:any)=>String(x).toLowerCase()) : ["web","app","whatsapp"];
+    const allowedChannels = Array.isArray(aiConfig?.allowed_channels) ? aiConfig.allowed_channels.map((x:any)=>String(x).toLowerCase()) : ["web","app","whatsapp","telegram"];
     if (!allowedChannels.includes(channel)) {
       return new Response(JSON.stringify({
         success: false,
@@ -528,12 +605,13 @@ Deno.serve(async (req) => {
     }
 
     let conversationId: string | null = null;
+    let conversationContext: any = {};
 
     {
       const { data: existingConversation, error: conversationLookupError } =
         await supabase
           .from("ai_conversations")
-          .select("id, pending_product_id, pending_phone_number, pending_at, pending_service_type, pending_airtime_amount, pending_network, pending_customer_input")
+          .select("id, conversation_context, pending_product_id, pending_phone_number, pending_at, pending_service_type, pending_airtime_amount, pending_network, pending_customer_input")
           .eq("user_id", userId)
           .eq("channel", channel)
           .order("last_message_at", { ascending: false })
@@ -546,6 +624,9 @@ Deno.serve(async (req) => {
 
       if (existingConversation) {
         conversationId = existingConversation.id;
+        conversationContext = existingConversation.conversation_context && typeof existingConversation.conversation_context === "object"
+          ? existingConversation.conversation_context
+          : {};
       } else {
         const { data: newConversation, error: conversationCreateError } =
           await supabase
@@ -553,7 +634,7 @@ Deno.serve(async (req) => {
             .insert({
               user_id: userId,
               channel,
-              language: bindawasubUser.language || "english",
+              language: aiConfig?.default_language || "english",
               started_at: new Date().toISOString(),
               last_message_at: new Date().toISOString(),
             })
@@ -714,6 +795,39 @@ Deno.serve(async (req) => {
         throw new Error(result?.error || "Provider execution failed.");
       }
       return result;
+    }
+
+    async function loadCustomerTransaction(transactionId: string) {
+      const { data, error } = await supabase.from("transactions").select(`
+        id, created_at, phone_number, amount, status, provider, provider_reference,
+        description, service_type, product_id,
+        products (product_name, volume, validity_type, validity_value, validity_unit,
+          service_networks(code,name), service_variants(code,name))
+      `).eq("id", transactionId).eq("user_id", userId).maybeSingle();
+      if (error) { console.error("Customer transaction readback error:", error); return null; }
+      return data || null;
+    }
+
+    function buildPurchaseConfirmation(tx: any, fallbackPurchase: any, execution: any) {
+      const product=Array.isArray(tx?.products)?tx.products[0]:tx?.products;
+      const networkInfo=Array.isArray(product?.service_networks)?product.service_networks[0]:product?.service_networks;
+      const variantInfo=Array.isArray(product?.service_variants)?product.service_variants[0]:product?.service_variants;
+      const reference=tx?.provider_reference||execution?.provider_reference||fallbackPurchase?.provider_reference||null;
+      const description=tx?.description||fallbackPurchase?.description||product?.product_name||"Purchase";
+      const productName=product?.product_name||fallbackPurchase?.product_name||description;
+      const phoneNumber=tx?.phone_number||fallbackPurchase?.phone_number||fallbackPurchase?.customer_input?.phone||null;
+      const amount=Number(tx?.amount??fallbackPurchase?.amount??0);
+      const status=tx?.status||execution?.status||fallbackPurchase?.status||"pending";
+      const provider=tx?.provider||execution?.provider||fallbackPurchase?.provider||null;
+      return {
+        transaction_id:tx?.id||fallbackPurchase?.id||fallbackPurchase?.transaction_id||execution?.transaction_id||null,
+        date:tx?.created_at||fallbackPurchase?.created_at||null, description, product_name:productName,
+        service_type:tx?.service_type||fallbackPurchase?.service_type||null,
+        network:networkInfo?.code||networkInfo?.name||fallbackPurchase?.network||null,
+        variant:variantInfo?.code||variantInfo?.name||fallbackPurchase?.variant||null,
+        volume:product?.volume||fallbackPurchase?.volume||null, phone_number:phoneNumber, amount, status, provider,
+        reference, provider_reference:reference, provider_message:execution?.message||null
+      };
     }
 
 // ==========================================
@@ -1465,11 +1579,13 @@ if (body.action === "manual_fund") {
 
       const pendingIsProductPurchase=!!pendingConversation?.pending_product_id && Object.keys(pendingInput).length>0;
 
+      const hasPendingPurchase = pendingIsProductPurchase || pendingIsAirtime;
       const pendingIsFresh=!!pendingConversation?.pending_at &&
         Date.now()-new Date(pendingConversation.pending_at).getTime()<=15*60*1000 &&
-        (pendingIsProductPurchase || pendingIsAirtime);
+        hasPendingPurchase;
 
-      const clearPending=async()=>{await supabase.from("ai_conversations").update({
+      if (hasPendingPurchase) {
+        const clearPending=async()=>{await supabase.from("ai_conversations").update({
         pending_product_id:null,pending_phone_number:null,pending_at:null,pending_service_type:null,
         pending_airtime_amount:null,pending_network:null,pending_idempotency_key:null,pending_customer_input:{}
       }).eq("id",conversationId);};
@@ -1507,6 +1623,7 @@ if (body.action === "manual_fund") {
           success:true,intent:"purchase_confirmation_expired",
           answer:"That purchase confirmation has expired. Please start the purchase again."
         }),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }
       }
     }
 
@@ -1603,28 +1720,38 @@ if (body.action === "manual_fund") {
         .eq("provider_reference", reference);
 
       try {
-        const execution = await executeViaProviderExecution(airtimePurchase.transaction_id);
+                const execution = await executeViaProviderExecution(airtimePurchase.transaction_id);
         const executionStatus = execution?.status || "pending";
+        const finalizedTransaction = await loadCustomerTransaction(airtimePurchase.transaction_id);
+        const confirmation = buildPurchaseConfirmation(finalizedTransaction, airtimePurchase, execution);
         const customerAnswer =
-          executionStatus === "successful"
-            ? "✅ Your airtime purchase was successful."
-            : executionStatus === "failed"
-              ? "The airtime purchase failed. Your wallet has been refunded automatically."
-              : "⏳ Your airtime purchase is being processed. No second purchase will be sent while the provider result is being checked.";
+          confirmation.status === "successful"
+            ? "✅ Airtime purchase successful!\\n\\n" +
+              confirmation.description +
+              (confirmation.phone_number ? "\\nRecipient: " + confirmation.phone_number : "") +
+              "\\nAmount: ₦" + Number(confirmation.amount || 0).toLocaleString("en-NG") +
+              "\\nStatus: Successful" +
+              (confirmation.reference ? "\\nReference: " + confirmation.reference : "\\nReference: Pending")
+            : confirmation.status === "failed"
+              ? "❌ The airtime purchase failed. Your wallet has been refunded automatically." +
+                (confirmation.reference ? "\\nReference: " + confirmation.reference : "")
+              : "⏳ Your airtime purchase is still being processed. No second purchase will be sent while the provider result is being checked." +
+                (confirmation.reference ? "\\nReference: " + confirmation.reference : "");
 
         return new Response(JSON.stringify({
           success: true,
           intent: "airtime_purchase",
           answer: customerAnswer,
+          transaction_id: confirmation.transaction_id,
+          description: confirmation.description,
+          reference: confirmation.reference,
           purchase: {
             ...airtimePurchase,
+            ...confirmation,
             status: executionStatus,
-            provider_reference: execution?.provider_reference || null,
-            provider_message: execution?.message || null,
           },
           provider_execution: execution,
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      } catch (executionError) {
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });      } catch (executionError) {
         await logAiActivity(
           "provider_execution_error",
           "airtime_purchase",
@@ -1818,28 +1945,38 @@ if (body.action === "manual_fund") {
         .eq("provider_reference", reference);
 
       try {
-        const execution = await executeViaProviderExecution(purchaseResult.transaction_id);
+                const execution = await executeViaProviderExecution(purchaseResult.transaction_id);
         const executionStatus = execution?.status || "pending";
+        const finalizedTransaction = await loadCustomerTransaction(purchaseResult.transaction_id);
+        const confirmation = buildPurchaseConfirmation(finalizedTransaction, purchase, execution);
         const customerAnswer =
-          executionStatus === "successful"
-            ? "✅ Your " + String(purchase?.service_type || "service") + " purchase was successful."
-            : executionStatus === "failed"
-              ? "The purchase failed. Your wallet has been refunded automatically."
-              : "⏳ Your " + String(purchase?.service_type || "service") + " purchase is being processed. No second purchase will be sent while the provider result is being checked.";
+          confirmation.status === "successful"
+            ? "✅ Purchase successful!\\n\\n" +
+              confirmation.description +
+              (confirmation.phone_number ? "\\nRecipient: " + confirmation.phone_number : "") +
+              "\\nAmount: ₦" + Number(confirmation.amount || 0).toLocaleString("en-NG") +
+              "\\nStatus: Successful" +
+              (confirmation.reference ? "\\nReference: " + confirmation.reference : "\\nReference: Pending")
+            : confirmation.status === "failed"
+              ? "❌ The purchase failed. Your wallet has been refunded automatically." +
+                (confirmation.reference ? "\\nReference: " + confirmation.reference : "")
+              : "⏳ Your purchase is still being processed. No second purchase will be sent while the provider result is being checked." +
+                (confirmation.reference ? "\\nReference: " + confirmation.reference : "");
 
         return new Response(JSON.stringify({
           success: true,
           intent: "purchase",
           answer: customerAnswer,
+          transaction_id: confirmation.transaction_id,
+          description: confirmation.description,
+          reference: confirmation.reference,
           purchase: {
             ...purchase,
+            ...confirmation,
             status: executionStatus,
-            provider_reference: execution?.provider_reference || null,
-            provider_message: execution?.message || null,
           },
           provider_execution: execution,
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      } catch (executionError) {
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });      } catch (executionError) {
         await logAiActivity(
           "provider_execution_error",
           "purchase",
@@ -2206,11 +2343,18 @@ if (body.action === "manual_fund") {
         .select("role,message,intent,created_at")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
-        .limit(12);
+        .limit(13);
       if (historyError) {
         console.error("Conversation history lookup error:", historyError);
       } else {
         conversationHistory = (historyRows || []).reverse();
+        const lastHistoryMessage = conversationHistory[conversationHistory.length - 1];
+        if (
+          lastHistoryMessage?.role === "user" &&
+          String(lastHistoryMessage?.message || "") === String(originalMessage || "")
+        ) {
+          conversationHistory.pop();
+        }
       }
     }
 
@@ -2252,7 +2396,7 @@ if (body.action === "manual_fund") {
         await supabase
           .from("products")
           .select(
-            "id, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, service_networks(code,name)"
+            "id, sku, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, display_order, metadata, service_networks(code,name), service_variants(code,name)"
           )
           .eq("active", true)
           .order("selling_price", { ascending: true });
@@ -2260,9 +2404,65 @@ if (body.action === "manual_fund") {
       if (aiProductsError) throw aiProductsError;
 
       const aiProductsForAI = (aiProducts || []).map(formatCatalogProduct);
-      const ai = await callGemini(originalMessage, aiProductsForAI, serviceCatalog, conversationHistory);
+
+      const { data: recentTransactionRows, error: recentTransactionError } = await supabase
+        .from("transactions")
+        .select("id, created_at, phone_number, amount, status, service_type, description, products(product_name, service_type, volume, validity_type, validity_value, validity_unit, service_networks(code,name), service_variants(code,name))")
+        .eq("user_id", userId)
+        .order("created_at", { ascending:false })
+        .limit(12);
+
+      if (recentTransactionError) console.error("Recent transaction context lookup error:", recentTransactionError);
+
+      const recentTransactionsForAI = (recentTransactionRows || []).map(formatTransactionForAI);
+
+      const ai = await callGemini(
+        originalMessage,
+        aiProductsForAI,
+        serviceCatalog,
+        conversationHistory,
+        String(aiConfig?.default_language || "english").toLowerCase() === "hausa" ? "hausa" : "english",
+        conversationContext,
+        recentTransactionsForAI
+      );
 
       ai.intent = String(ai.intent || "unknown").trim().toLowerCase();
+      ai.language = String(ai.language || "english").trim().toLowerCase();
+      if (!["english", "hausa"].includes(ai.language)) ai.language = "english";
+      if (conversationId) {
+        await supabase
+          .from("ai_conversations")
+          .update({ language: ai.language, last_message_at: new Date().toISOString() })
+          .eq("id", conversationId);
+      }
+      if (conversationId) {
+        const nextContext = {
+          ...(conversationContext || {}),
+          last_intent: ai.intent,
+          language: ai.language,
+          service_type: ai.service_type || conversationContext?.service_type || null,
+          network: ai.network || conversationContext?.network || null,
+          volume: ai.volume || conversationContext?.volume || null,
+          phone_number: ai.phone_number || conversationContext?.phone_number || null,
+          product_id: ai.product_id || conversationContext?.product_id || null,
+          transaction_id: ai.transaction_id || conversationContext?.transaction_id || null,
+          last_transaction_id: ai.transaction_id || conversationContext?.last_transaction_id || null,
+          last_user_message: String(originalMessage || "").slice(0, 1000),
+          updated_at: new Date().toISOString()
+        };
+
+        conversationContext = nextContext;
+
+        await supabase
+          .from("ai_conversations")
+          .update({
+            language: ai.language,
+            conversation_context: nextContext,
+            last_message_at: new Date().toISOString()
+          })
+          .eq("id", conversationId);
+      }
+
       const supportedIntents = new Set([
         "greeting","help","product_enquiry","product_price","service_enquiry",
         "network_enquiry","purchase_intent","airtime_purchase","wallet_balance",
@@ -2289,9 +2489,7 @@ if (body.action === "manual_fund") {
       );
 
       if (ai.intent === "product_price") {
-        const matchedProduct = ai.product_id
-          ? (aiProducts || []).find((p:any) => p.id === ai.product_id)
-          : null;
+        const matchedProduct = resolveCatalogProduct(ai, aiProducts || []);
         if (matchedProduct) {
           const price = Number(matchedProduct.selling_price || 0);
           return new Response(JSON.stringify({
@@ -2328,9 +2526,7 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "purchase_intent") {
-        const matchedProduct = ai.product_id
-          ? (aiProducts || []).find((p) => p.id === ai.product_id)
-          : null;
+        const matchedProduct = resolveCatalogProduct(ai, aiProducts || []);
 
         const serviceType = String(ai.service_type || matchedProduct?.service_type || "").trim().toLowerCase();
         const catalogService = serviceCatalog.find((s:any) => s.code === serviceType);
@@ -2381,6 +2577,18 @@ if (body.action === "manual_fund") {
         }
 
         if (conversationId) {
+          conversationContext = {
+            ...(conversationContext || {}),
+            last_intent: "purchase_intent",
+            service_type: serviceType || matchedProduct.service_type || null,
+            product_id: matchedProduct.id,
+            phone_number: ai.phone_number || customerInput.phone || conversationContext?.phone_number || null,
+            network: ai.network || customerInput.network || conversationContext?.network || null,
+            volume: ai.volume || matchedProduct.volume || conversationContext?.volume || null,
+            language: ai.language || conversationContext?.language || "english",
+            updated_at: new Date().toISOString()
+          };
+
           const newPendingIdempotencyKey=`AI-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
           await supabase.from("ai_conversations").update({
             pending_product_id:matchedProduct.id,
@@ -2391,7 +2599,9 @@ if (body.action === "manual_fund") {
             pending_airtime_amount:null,
             pending_network:ai.network || customerInput.network || null,
             pending_idempotency_key:newPendingIdempotencyKey,
-            pending_customer_input:customerInput
+            pending_customer_input:customerInput,
+            conversation_context:conversationContext,
+            language:ai.language || conversationContext.language || "english"
           }).eq("id",conversationId);
         }
 
@@ -2494,30 +2704,30 @@ if (body.action === "manual_fund") {
       ) {
         const accountAction = ai.intent;
 
-        const { data: recentTransactions, error: transactionError } =
-          await supabase
-            .from("transactions")
-            .select(`
-              id,
-              created_at,
-              phone_number,
-              amount,
-              status,
-              provider,
-              provider_reference,
-              product_id,
-              products (
-                product_name,
-                volume,
-                validity_value,
-                validity_unit,
-                validity_type,
-                service_networks(code,name)
-              )
-            `)
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(accountAction === "transaction_history" ? 5 : 1);
+        let recentTransactions:any[] = [];
+        let transactionError:any = null;
+        const txSelect=`
+          id, created_at, phone_number, amount, status, provider, provider_reference, product_id, description, service_type,
+          products (
+            product_name, service_type, volume, validity_value, validity_unit, validity_type,
+            service_networks(code,name), service_variants(code,name)
+          )
+        `;
+
+        if (ai.transaction_id) {
+          const exactTx=await supabase.from("transactions")
+            .select(txSelect).eq("user_id",userId).eq("id",String(ai.transaction_id)).maybeSingle();
+          if (exactTx.error) transactionError=exactTx.error;
+          else if (exactTx.data) recentTransactions=[exactTx.data];
+        }
+
+        if (!recentTransactions.length) {
+          const fallbackQuery=await supabase.from("transactions")
+            .select(txSelect).eq("user_id",userId).order("created_at",{ascending:false})
+            .limit(accountAction === "transaction_history" ? 5 : 3);
+          recentTransactions=fallbackQuery.data||[];
+          transactionError=fallbackQuery.error;
+        }
 
         if (transactionError) throw transactionError;
 
@@ -2589,6 +2799,23 @@ if (body.action === "manual_fund") {
         }
 
         const latest = formatted[0];
+
+        if (conversationId) {
+          const txContext = {
+            ...(conversationContext || {}),
+            last_transaction_id: latest.id,
+            last_transaction_status: latest.status,
+            last_transaction_product: latest.product_name,
+            last_transaction_amount: latest.amount,
+            last_transaction_network: latest.network,
+            updated_at: new Date().toISOString()
+          };
+          conversationContext = txContext;
+          await supabase.from("ai_conversations")
+            .update({ conversation_context: txContext, last_message_at: new Date().toISOString() })
+            .eq("id", conversationId);
+        }
+
         let answer =
           `Your latest purchase is ${latest.product_name} for ₦${latest.amount.toLocaleString()} to ${latest.phone_number}. Status: ${latest.status}.`;
 
