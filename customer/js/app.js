@@ -3,11 +3,6 @@
 document
   .getElementById("loginButton")
   .addEventListener("click", loginUser);
-
-document
-  .getElementById("emailLinkButton")
-  .addEventListener("click", sendEmailLink);
-
 document
   .getElementById("googleButton")
   .addEventListener("click", loginWithGoogle);
