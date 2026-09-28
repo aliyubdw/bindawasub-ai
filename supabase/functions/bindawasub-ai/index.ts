@@ -329,6 +329,8 @@ Deno.serve(async (req) => {
     // REQUEST BODY
     // ==========================================
 
+    const body = await req.json();
+
     // Customer-only conversation history endpoint
     // Returns only the authenticated customer's latest conversation for the requested channel.
     if (body.action === "new_conversation") {
@@ -383,10 +385,6 @@ Deno.serve(async (req) => {
         messages: historyMessages || []
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
-
-
-    const body = await req.json();
 
     // AI MANAGEMENT: admin-only dashboard summary
     if (body.action === "ai_summary") {
