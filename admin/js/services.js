@@ -1,7 +1,5 @@
 // Bindawasub Admin — services
 
-let services=[];
-let providerServiceOperations=[];
 async function loadServices(){
   try{
     const d=await admin({action:"list_services"}); services=d.services||[];
