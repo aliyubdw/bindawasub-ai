@@ -73,4 +73,5 @@ document
     }
   });
 
+resetCustomerOrderState();
 initAuth();
