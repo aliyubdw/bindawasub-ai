@@ -1,11 +1,5 @@
 // Bindawasub AI — wallet and manual funding
 
-let waitingForFundingAmount = false;
-let activeFundingRequestId = null;
-
-const fundingStatusState = new Map();
-let fundingStatusTimer = null;
-
 function showManualFunding(data) {
   const messages = document.getElementById("messages");
   if (!messages) return;
@@ -15,8 +9,8 @@ function showManualFunding(data) {
   card.style.whiteSpace = "normal";
 
   const request = data?.request || {};
-  activeFundingRequestId = request.id || null;
-  waitingForFundingAmount = false;
+  BindawasubCustomerState.activeFundingRequestId = request.id || null;
+  BindawasubCustomerState.waitingForFundingAmount = false;
 
   const bank = data?.bank_account;
 
@@ -47,7 +41,7 @@ function showManualFunding(data) {
   submitBtn?.addEventListener("click", async () => {
     const paymentReference = String(refInput?.value || "").trim();
 
-    if (!activeFundingRequestId) {
+    if (!BindawasubCustomerState.activeFundingRequestId) {
       addMessage("No active funding request was found.", "bot");
       return;
     }
@@ -63,7 +57,7 @@ function showManualFunding(data) {
     try {
       const response = await callEdgeFunction({
         action: "manual_funding_submit",
-        request_id: activeFundingRequestId,
+        request_id: BindawasubCustomerState.activeFundingRequestId,
         payment_reference: paymentReference
       });
 
@@ -73,7 +67,7 @@ function showManualFunding(data) {
         throw new Error(result?.error || "Unable to submit the payment reference.");
       }
 
-      activeFundingRequestId = null;
+      BindawasubCustomerState.activeFundingRequestId = null;
       addMessage(result.answer || "Payment reference submitted. Waiting for admin verification.", "bot");
     } catch (error) {
       addMessage(error?.message || "Unable to submit the payment reference.", "bot");
@@ -103,7 +97,7 @@ async function syncManualFundingStatus(initial = false) {
 
       if (!id) continue;
 
-      const previousStatus = fundingStatusState.get(id);
+      const previousStatus = BindawasubCustomerState.fundingStatusState.get(id);
 
       if (
         !initial &&
@@ -139,12 +133,12 @@ If you believe this was a mistake, please contact Bindawasub support.`,
           );
         }
 
-        if (activeFundingRequestId === id) {
-          activeFundingRequestId = null;
+        if (BindawasubCustomerState.activeFundingRequestId === id) {
+          BindawasubCustomerState.activeFundingRequestId = null;
         }
       }
 
-      fundingStatusState.set(id, status);
+      BindawasubCustomerState.fundingStatusState.set(id, status);
     }
   } catch (error) {
     console.debug("Funding status check skipped:", error);
@@ -152,20 +146,20 @@ If you believe this was a mistake, please contact Bindawasub support.`,
 }
 
 function startFundingStatusNotifications() {
-  if (fundingStatusTimer) {
-    clearInterval(fundingStatusTimer);
+  if (BindawasubCustomerState.fundingStatusTimer) {
+    clearInterval(BindawasubCustomerState.fundingStatusTimer);
   }
 
   syncManualFundingStatus(true);
 
-  fundingStatusTimer = setInterval(() => {
+  BindawasubCustomerState.fundingStatusTimer = setInterval(() => {
     syncManualFundingStatus(false);
   }, 5000);
 }
 
 function stopFundingStatusNotifications() {
-  if (fundingStatusTimer) {
-    clearInterval(fundingStatusTimer);
-    fundingStatusTimer = null;
+  if (BindawasubCustomerState.fundingStatusTimer) {
+    clearInterval(BindawasubCustomerState.fundingStatusTimer);
+    BindawasubCustomerState.fundingStatusTimer = null;
   }
 }
