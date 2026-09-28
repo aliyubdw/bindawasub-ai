@@ -703,7 +703,7 @@
   </div>
 
   <div id="customerInterface">
-    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" type="button" data-action-message="Check my wallet balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?">Fund Wallet</button></div>
+    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button></div>
     <div id="messages">
 
       <div class="welcome-card" id="welcomeCard">
@@ -712,9 +712,9 @@
         <p>Buy data, check your wallet, view transactions, or ask me anything about your Bindawasub account.</p>
         <div class="suggestion-row">
           <button class="suggestion" type="button" data-action-message="I want to buy data">Buy data</button>
-          <button class="suggestion" type="button" data-action-message="Check my wallet balance">Check wallet</button>
-          <button class="suggestion" type="button" data-action-message="Show my recent transactions">Recent transactions</button>
-          <button class="suggestion" type="button" data-action-message="How can I fund my wallet?">Fund wallet</button>
+          <button class="suggestion" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Check wallet</button>
+          <button class="suggestion" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history">Recent transactions</button>
+          <button class="suggestion" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund wallet</button>
         </div>
       </div>
 
@@ -1893,7 +1893,7 @@ function showFundingHistory(funding) {
    SEND MESSAGE
 ========================================= */
 
-async function sendMessage(customMessage = null) {
+async function sendMessage(customMessage = null, customAction = null) {
 
   const input =
     document.getElementById("messageInput");
