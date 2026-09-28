@@ -23,7 +23,7 @@
 <button data-tab="products">Products & Plans</button>
 <button data-tab="transactions">Transactions</button>
 <button data-tab="analytics">Analytics</button>
-<button data-tab="operations">Operations</button><button data-tab="ai-management">AI Management</button>
+<button data-tab="operations">Operations</button><button data-tab="reliability">Reliability Tests</button><button data-tab="ai-management">AI Management</button>
 <button id="logout" class="danger">Logout</button>
 </div>
 
@@ -84,6 +84,13 @@
 </section>
 
 
+<section id="reliability" class="panel">
+<div class="card">
+<div class="section-title"><h2>Reliability Tests</h2><button id="runReliabilityTest">Run Test</button></div>
+<div id="reliabilityMsg"></div>
+<div id="reliabilityResult" class="muted">Synthetic database-only tests. No provider request or wallet debit is performed.</div>
+</div>
+</section>
 <section id="ai-management" class="panel">
 <div class="card"><div class="section-title"><h2>Bindawasub AI Management</h2><div class="actions"><select id="aiPeriod"><option value="7">Last 7 days</option></select><button id="refreshAi" class="secondary">Refresh</button></div></div><div id="aiMsg"></div><div class="grid"><div class="card metric"><div class="label">AI Conversations</div><div id="aiConversations" class="value">—</div></div><div class="card metric"><div class="label">AI Messages</div><div id="aiMessages" class="value">—</div></div><div class="card metric"><div class="label">Activity Events</div><div id="aiActivity" class="value">—</div></div><div class="card metric"><div class="label">Successful Purchases</div><div id="aiSuccess" class="value">—</div></div><div class="card metric"><div class="label">Failed Purchases</div><div id="aiFailed" class="value">—</div></div><div class="card metric"><div class="label">Pending Purchases</div><div id="aiPending" class="value">—</div></div></div></div>
 <div class="card"><div class="section-title"><h2>AI Controls</h2><button id="saveAiSettings">Save AI Settings</button></div><div id="aiSettingsMsg"></div><div class="grid2"><div class="field"><label><input id="aiEnabled" type="checkbox" style="width:auto"> AI enabled</label></div><div class="field"><label><input id="aiGemini" type="checkbox" style="width:auto"> Gemini enabled</label></div><div class="field"><label><input id="aiConfirm" type="checkbox" style="width:auto"> Require purchase confirmation</label></div><div class="field"><label>Maximum purchase amount (₦)</label><input id="aiMaxPurchase" type="number" min="0"></div><div class="field"><label>Default language</label><select id="aiLanguage"><option value="english">English</option><option value="hausa">Hausa</option><option value="mixed">Mixed</option></select></div><div class="field"><label>Allowed channels</label><input id="aiChannels" placeholder="web, app, whatsapp"></div></div><div class="field"><label>Fallback message</label><textarea id="aiFallback"></textarea></div><p class="muted">These controls use the secure admin-only AI settings endpoint. API keys are never exposed here.</p></div>
@@ -107,6 +114,7 @@ const ADMIN_URL=SUPABASE_URL+"/functions/v1/bindawasub-admin";
 const AI_URL=SUPABASE_URL+"/functions/v1/bindawasub-ai";
 const RESET_URL=SUPABASE_URL+"/functions/v1/admin-reset-password";
 const EXECUTION_URL = "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/provider-execution";
+const RELIABILITY_TEST_URL = SUPABASE_URL+"/functions/v1/provider-execution-test";
 const sb=window.supabase.createClient(SUPABASE_URL,KEY);
 let selectedCustomer=null, providers=[], products=[], networks=[], variants=[];
 
@@ -455,6 +463,46 @@ async function dryRunTransaction(id){
   }catch(e){msg($("transactionMsg"),"Dry run failed: "+e.message,"error")}
 }
 window.dryRunTransaction=dryRunTransaction;
+
+async function runReliabilityTest(){
+  const btn=$("runReliabilityTest");
+  try{
+    btn.disabled=true;
+    btn.textContent="Running…";
+    msg($("reliabilityMsg"),"Running synthetic database concurrency tests…","info");
+    const r=await fetch(RELIABILITY_TEST_URL,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+await token()
+      },
+      body:JSON.stringify({})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false) throw Error(d.error||d.message||("HTTP "+r.status));
+    const tests=d.tests||{};
+    const claim=tests.claim||tests.concurrent_claim||{};
+    const idem=tests.idempotency||tests.duplicate_idempotency||{};
+    const passed=d.success===true;
+    $("reliabilityResult").innerHTML=
+      '<div class="msg '+(passed?"success":"error")+'"><strong>'+(passed?"ALL REPORTED TESTS PASSED":"TESTS NEED ATTENTION")+'</strong></div>'+
+      '<div class="grid2">'+
+      '<div class="card" style="background:#f7faf8"><strong>Concurrent claim</strong><p class="muted">'+escapeHtml(JSON.stringify(claim,null,2))+'</p></div>'+
+      '<div class="card" style="background:#f7faf8"><strong>Idempotency</strong><p class="muted">'+escapeHtml(JSON.stringify(idem,null,2))+'</p></div>'+
+      '</div>'+
+      '<div class="card" style="background:#f7faf8"><strong>Safety checks</strong><p>Provider requests sent: <strong>'+escapeHtml(String(d.provider_requests_sent??0))+'</strong><br>Wallet debits: <strong>'+escapeHtml(String(d.wallet_debits??0))+'</strong><br>Real customer transactions changed: <strong>'+escapeHtml(String(d.real_customer_transactions_changed??0))+'</strong></p></div>'+
+      '<details><summary>Full test result</summary><pre style="white-space:pre-wrap;word-break:break-word">'+escapeHtml(JSON.stringify(d,null,2))+'</pre></details>';
+    msg($("reliabilityMsg"),"Reliability test completed. Review the results below.","success");
+  }catch(e){
+    $("reliabilityResult").innerHTML='<div class="msg error">'+escapeHtml(e.message)+'</div>';
+    msg($("reliabilityMsg"),"Reliability test failed to run.","error");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="Run Test";
+  }
+}
+$("runReliabilityTest").onclick=runReliabilityTest;
+
 window.requeryTransaction=requeryTransaction;
 async function loadTransactions(){
   try{
