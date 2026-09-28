@@ -94,3 +94,50 @@ function showFundingHistory(funding) {
   messages.appendChild(box);
   messages.scrollTop = messages.scrollHeight;
 }
+
+
+function showPurchaseConfirmation(purchase) {
+  const messages = document.getElementById("messages");
+  if (!messages || !purchase) return;
+
+  const box = document.createElement("div");
+  box.className = "message bot purchase-confirmation";
+  box.setAttribute("role", "status");
+
+  const status = String(purchase.status || "pending").toLowerCase();
+  const title = document.createElement("div");
+  title.className = "purchase-confirmation-title";
+  title.textContent =
+    status === "successful" ? "✅ Purchase confirmed" :
+    status === "failed" ? "❌ Purchase failed" :
+    "⏳ Purchase status";
+  box.appendChild(title);
+
+  const addRow = (label, value, extraClass = "") => {
+    if (value === null || value === undefined || String(value).trim() === "") return;
+    const row = document.createElement("div");
+    row.className = "purchase-confirmation-row " + extraClass;
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "purchase-confirmation-label";
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement("span");
+    valueEl.className = "purchase-confirmation-value";
+    valueEl.textContent = String(value);
+
+    row.appendChild(labelEl);
+    row.appendChild(valueEl);
+    box.appendChild(row);
+  };
+
+  addRow("Description", purchase.description || purchase.product_name || "Purchase");
+  addRow("Recipient", purchase.phone_number || "—");
+  addRow("Amount", "₦" + Number(purchase.amount || 0).toLocaleString("en-NG"));
+  addRow("Status", status === "successful" ? "Successful" : status);
+  addRow("Reference", purchase.reference || purchase.provider_reference || "Pending");
+  addRow("Provider", purchase.provider || "");
+
+  messages.appendChild(box);
+  messages.scrollTop = messages.scrollHeight;
+}
