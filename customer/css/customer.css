@@ -958,3 +958,5 @@ body{
     text-align: left;
   }
 }
+
+.login-success{color:#087f5b;font-size:13px;line-height:1.45;margin-top:12px}
