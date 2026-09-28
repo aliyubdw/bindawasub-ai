@@ -21,6 +21,71 @@ function showLoginForm() {
   document.getElementById("registerMessage").textContent = "";
 }
 
+function showProfileCompletionForm(email = "") {
+  document.getElementById("loginForm").style.display = "none";
+  document.getElementById("registerForm").style.display = "none";
+  document.getElementById("profileCompletionForm").style.display = "block";
+  document.getElementById("authSubtitle").textContent =
+    "Complete your Bindawasub profile to continue.";
+  document.getElementById("loginError").textContent = "";
+  document.getElementById("registerMessage").textContent = "";
+  document.getElementById("profileEmail").value = email || "";
+  document.getElementById("profileName").focus();
+}
+
+function hideProfileCompletionForm() {
+  document.getElementById("profileCompletionForm").style.display = "none";
+}
+
+async function completeProfile() {
+  const name = document.getElementById("profileName").value.trim();
+  const phone = normalizeRegistrationPhone(
+    document.getElementById("profilePhone").value.trim()
+  );
+  const button = document.getElementById("completeProfileButton");
+  const errorBox = document.getElementById("loginError");
+
+  errorBox.textContent = "";
+
+  if (!name) {
+    errorBox.textContent = "Enter your full name.";
+    return;
+  }
+
+  if (!phone) {
+    errorBox.textContent = "Enter a valid Nigerian phone number.";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Creating account...";
+
+  try {
+    const data = await callProfileFunction({
+      action: "complete_profile",
+      name,
+      phone
+    });
+
+    const isAdmin = data.user?.role === "admin" || await verifyAdminMode();
+
+    if (isAdmin) {
+      window.location.replace("./admin/");
+      return;
+    }
+
+    hideProfileCompletionForm();
+    await showChatScreen();
+    document.getElementById("customerInterface").classList.remove("admin-hidden");
+  } catch (error) {
+    console.error("Profile completion failed:", error);
+    errorBox.textContent = error?.message || "Unable to complete your account.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Continue";
+  }
+}
+
 function showRegisterForm() {
   document.getElementById("loginForm").style.display = "none";
   document.getElementById("registerForm").style.display = "block";
@@ -77,7 +142,13 @@ async function registerUser() {
     if (error) throw error;
 
     if (data.session) {
-      const isAdmin = await verifyAdminMode();
+      const profile = await callProfileFunction({
+        action: "complete_profile",
+        name,
+        phone
+      });
+
+      const isAdmin = profile.user?.role === "admin" || await verifyAdminMode();
 
       if (isAdmin) {
         window.location.replace("./admin/");
@@ -122,7 +193,7 @@ async function sendEmailLink() {
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
       options: {
-        shouldCreateUser: false,
+        shouldCreateUser: true,
         emailRedirectTo: window.location.origin + window.location.pathname
       }
     });
@@ -210,7 +281,14 @@ async function applyAuthenticatedSession(session) {
   authTransitionRunning = true;
 
   try {
-    const isAdmin = await verifyAdminMode();
+    const profile = await getProfileStatus();
+
+    if (!profile.profile_complete) {
+      showProfileCompletionForm(session?.user?.email || profile.email || "");
+      return;
+    }
+
+    const isAdmin = profile.user?.role === "admin" || await verifyAdminMode();
 
     if (isAdmin) {
       window.location.replace("./admin/");
