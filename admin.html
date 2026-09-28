@@ -144,7 +144,10 @@ async function token(){const {data:{session}}=await sb.auth.getSession();if(!ses
 async function admin(payload){const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||"Admin request failed.");return d}
 async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||d.message||"Request failed.");return d}
 
-$("loginBtn").addEventListener("click",handleAdminLogin);\n$("loginForm").addEventListener("submit",handleAdminLogin);\n\nasync function handleAdminLogin(e){
+$("loginBtn").addEventListener("click",handleAdminLogin);
+$("loginForm").addEventListener("submit",handleAdminLogin);
+
+async function handleAdminLogin(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
 
   const btn=$("loginBtn"), emailInput=$("email"), passwordInput=$("password");
