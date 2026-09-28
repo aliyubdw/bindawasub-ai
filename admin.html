@@ -126,7 +126,41 @@ async function token(){const {data:{session}}=await sb.auth.getSession();if(!ses
 async function admin(payload){const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||"Admin request failed.");return d}
 async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||d.message||"Request failed.");return d}
 
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginBtn").disabled=true;msg($("loginMsg"),"");try{const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)throw error;const d=await admin({action:"dashboard_summary"});if(!d.success)throw Error("Admin access required.");$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch(e){msg($("loginMsg"),e.message,"error")}finally{$("loginBtn").disabled=false}});
+$("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const btn=$("loginBtn");
+  btn.disabled=true;
+  btn.textContent="Signing in…";
+  msg($("loginMsg"),"Signing in…","info");
+  try{
+    const email=$("email").value.trim();
+    const password=$("password").value;
+    if(!email||!password) throw Error("Email and password are required.");
+    const {data,error}=await sb.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    const accessToken=data?.session?.access_token;
+    if(!accessToken) throw Error("Login succeeded, but no session was returned. Please try again.");
+    const r=await fetch(ADMIN_URL,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+accessToken
+      },
+      body:JSON.stringify({action:"dashboard_summary"})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false) throw Error(d.error||"Admin access required.");
+    $("loginView").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    await loadAll();
+  }catch(e){
+    console.error("Bindawasub admin login error:",e);
+    msg($("loginMsg"),e?.message||"Login failed. Check the browser console for details.","error");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="Login";
+  }
+});
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active")});
 
