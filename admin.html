@@ -23,7 +23,7 @@
 <button data-tab="products">Products & Plans</button>
 <button data-tab="transactions">Transactions</button>
 <button data-tab="analytics">Analytics</button>
-<button data-tab="operations">Operations</button><button data-tab="reliability">Reliability Tests</button><button data-tab="ai-management">AI Management</button>
+<button data-tab="operations">Operations</button><button data-tab="funding">Manual Funding</button><button data-tab="reliability">Reliability Tests</button><button data-tab="ai-management">AI Management</button>
 <button id="logout" class="danger">Logout</button>
 </div>
 
@@ -83,6 +83,24 @@
 <div class="card"><h2>Daily figures</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Sales</th><th>Profit</th><th>Transactions</th><th>Successful</th><th>Failed</th><th>Funding</th><th>New customers</th></tr></thead><tbody id="analyticsRows"></tbody></table></div></div>
 </section>
 
+
+<section id="funding" class="panel">
+<div class="card">
+<div class="section-title"><h2>Manual Funding</h2><button id="refreshManualFunding" class="secondary">Refresh Requests</button></div>
+<div id="manualFundingMsg"></div>
+<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Amount</th><th>Reference</th><th>Payment Reference</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody id="manualFundingRows"></tbody></table></div>
+</div>
+<div class="card">
+<div class="section-title"><h2>Funding Account Details</h2><button id="saveManualFunding" >Save Details</button></div>
+<div class="grid2">
+<div class="field"><label>Bank name</label><input id="mfBankName"></div>
+<div class="field"><label>Account name</label><input id="mfAccountName"></div>
+<div class="field"><label>Account number</label><input id="mfAccountNumber"></div>
+<div class="field"><label>Active</label><select id="mfActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+</div>
+<div class="field"><label>Customer instructions</label><textarea id="mfInstructions"></textarea></div>
+</div>
+</section>
 
 <section id="reliability" class="panel">
 <div class="card">
@@ -607,7 +625,53 @@ $("refreshOverview").onclick=loadOverview;$("refreshAnalytics").onclick=loadAnal
 async function loadAiManagement(){try{const s=await aiAdmin({action:"ai_summary"});const x=s.summary||{};$("aiConversations").textContent=x.conversations??0;$("aiMessages").textContent=x.messages??0;$("aiActivity").textContent=x.activity_events??0;$("aiSuccess").textContent=x.successful_purchases??0;$("aiFailed").textContent=x.failed_purchases??0;$("aiPending").textContent=x.pending_purchases??0;const d=await aiAdmin({action:"ai_settings_get"});const a=d.settings||{};$("aiEnabled").checked=!!a.enabled;$("aiGemini").checked=!!a.gemini_enabled;$("aiConfirm").checked=!!a.require_purchase_confirmation;$("aiMaxPurchase").value=a.max_purchase_amount??10000;$("aiLanguage").value=a.default_language||"english";$("aiChannels").value=Array.isArray(a.allowed_channels)?a.allowed_channels.join(", "):"";$("aiFallback").value=a.fallback_message||"";msg($("aiMsg"),"AI management refreshed.","success")}catch(e){msg($("aiMsg"),e.message,"error")}}
 $("refreshAi").onclick=loadAiManagement;
 $("saveAiSettings").onclick=async()=>{try{const channels=$("aiChannels").value.split(",").map(x=>x.trim()).filter(Boolean);const d=await aiAdmin({action:"ai_settings_save",settings:{enabled:$("aiEnabled").checked,gemini_enabled:$("aiGemini").checked,require_purchase_confirmation:$("aiConfirm").checked,max_purchase_amount:Number($("aiMaxPurchase").value),default_language:$("aiLanguage").value,allowed_channels:channels,fallback_message:$("aiFallback").value}});msg($("aiSettingsMsg"),d.success?"AI settings saved successfully.":"Save failed.",d.success?"success":"error")}catch(e){msg($("aiSettingsMsg"),e.message,"error")}};
-async function loadAll(){await loadOverview();await loadAiManagement();await loadProviders();await loadServices();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics()}
+async function loadManualFundingSettings(){
+  const d=await aiAdmin({action:"manual_funding_settings_get"});
+  const s=d.settings||{};
+  $("mfBankName").value=s.bank_name||"";
+  $("mfAccountName").value=s.account_name||"";
+  $("mfAccountNumber").value=s.account_number||"";
+  $("mfInstructions").value=s.instructions||"";
+  $("mfActive").value=s.active===false?"false":"true";
+}
+async function loadManualFundingRequests(){
+  try{
+    const d=await aiAdmin({action:"manual_funding_requests",status:"submitted"});
+    const rows=d.requests||[];
+    $("manualFundingRows").innerHTML=rows.map(r=>{
+      const u=r.users||r.user||{};
+      const customer=u.name||u.phone||r.user_id||"—";
+      const submitted=r.submitted_at?r.submitted_at.replace("T"," ").replace("Z",""):"—";
+      return '<tr><td><strong>'+escapeHtml(customer)+'</strong><br><span class="muted">'+escapeHtml(u.phone||u.email||"")+'</span></td><td>'+money(r.amount)+'</td><td><code>'+escapeHtml(r.reference||"—")+'</code></td><td><code>'+escapeHtml(r.payment_reference||"—")+'</code></td><td>'+escapeHtml(submitted)+'</td><td><span class="badge">'+escapeHtml(r.status||"submitted")+'</span></td><td><button onclick="approveManualFunding(\''+r.id+'\')">Approve</button> <button class="danger" onclick="rejectManualFunding(\''+r.id+'\')">Reject</button></td></tr>';
+    }).join("")||'<tr><td colspan="7" class="muted">No submitted funding requests.</td></tr>';
+    msg($("manualFundingMsg"),rows.length+" submitted request(s) loaded.","success");
+  }catch(e){msg($("manualFundingMsg"),e.message,"error")}
+}
+async function approveManualFunding(id){
+  if(!confirm("Approve this funding request and credit the customer's wallet?"))return;
+  try{
+    const d=await aiAdmin({action:"manual_funding_approve",request_id:id});
+    msg($("manualFundingMsg"),d.answer||"Funding approved and wallet credited.","success");
+    await loadManualFundingRequests(); await loadOverview();
+  }catch(e){msg($("manualFundingMsg"),e.message,"error")}
+}
+async function rejectManualFunding(id){
+  const note=prompt("Reason for rejection:","");
+  if(note===null)return;
+  try{
+    const d=await aiAdmin({action:"manual_funding_reject",request_id:id,note});
+    msg($("manualFundingMsg"),d.answer||"Funding request rejected.","success");
+    await loadManualFundingRequests();
+  }catch(e){msg($("manualFundingMsg"),e.message,"error")}
+}
+$("refreshManualFunding").onclick=async()=>{await loadManualFundingRequests()};
+$("saveManualFunding").onclick=async()=>{
+  try{
+    const d=await aiAdmin({action:"manual_funding_settings_save",settings:{active:$("mfActive").value==="true",bank_name:$("mfBankName").value.trim(),account_name:$("mfAccountName").value.trim(),account_number:$("mfAccountNumber").value.trim(),instructions:$("mfInstructions").value.trim()}});
+    msg($("manualFundingMsg"),d.answer||"Funding details saved.","success");
+  }catch(e){msg($("manualFundingMsg"),e.message,"error")}
+};
+async function loadAll(){await loadOverview();await loadAiManagement();await loadProviders();await loadServices();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics();await loadManualFundingSettings();await loadManualFundingRequests()}
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session){try{await admin({action:"dashboard_summary"});$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch{await sb.auth.signOut()}}})();
 </script>
 </body>
