@@ -2022,7 +2022,8 @@ Misali: 08012345678`,
     ========================================= */
 
     const response = await callEdgeFunction({
-      message: message
+      message: message,
+      ...(customAction ? { action: customAction } : {})
     });
 
     /* Read the raw response first so we never
@@ -2246,9 +2247,10 @@ initAuth();
 document.querySelectorAll("[data-action-message]").forEach(function(button) {
   button.addEventListener("click", function() {
     const message = button.getAttribute("data-action-message");
+    const action = button.getAttribute("data-action-action");
     const welcome = document.getElementById("welcomeCard");
     if (welcome) welcome.remove();
-    sendMessage(message);
+    sendMessage(message, action);
   });
 });
 
