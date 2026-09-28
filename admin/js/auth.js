@@ -57,7 +57,7 @@
     const btn=document.getElementById("logout");
     if(btn){btn.disabled=true;btn.textContent="Logging out…";}
     try{await sb.auth.signOut({scope:"local"});}catch(err){console.error("Admin logout failed:",err);}
-    showLogin();
+    window.location.replace("../");
   }
   let restoring=false;
   async function restore(){
