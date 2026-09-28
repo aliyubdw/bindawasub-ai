@@ -13,7 +13,7 @@ async function startNewConversation() {
     BindawasubCustomerState.waitingForConfirmation = false;
     const messages = document.getElementById("messages");
     messages.innerHTML = "";
-    addMessage("Sannu! Sabuwar hira ta fara. Ta yaya zan taimaka maka?", "bot");
+    addMessage("Hello! A new conversation has started. How can I help you today?", "bot");
     const input = document.getElementById("messageInput");
     input.value = "";
     input.placeholder = "Rubuta saƙonka...";
@@ -53,7 +53,7 @@ async function loadConversationHistory() {
       });
     } else {
       addMessage(
-        "Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?",
+        "Hello! Welcome to Bindawasub. How can I help you today?",
         "bot"
       );
     }
