@@ -11,17 +11,19 @@ async function loadManualFundingSettings(){
 }
 
 async function loadManualFundingRequests(){
+  const box=document.getElementById("manualFundingRows");
   try{
-    // Load the complete manual-funding history for admin, not only submitted requests.
-    const statuses=["pending","submitted","approved","rejected"];
-    const results=await Promise.all(statuses.map(status=>admin({action:"manual_funding_requests",status})));
-    const byId=new Map();
-    results.forEach(d=>(d.requests||[]).forEach(r=>byId.set(r.id,r)));
-    const rows=Array.from(byId.values()).sort((a,b)=>{
-      const da=new Date(a.created_at||a.submitted_at||0).getTime();
-      const db=new Date(b.created_at||b.submitted_at||0).getTime();
+    if(box) box.innerHTML='<tr><td colspan="9" class="muted">Checking for funding requests…</td></tr>';
+
+    // One authenticated admin request is enough. "all" prevents a request from
+    // disappearing because it moved from pending -> submitted or another state.
+    const d=await admin({action:"manual_funding_requests",status:"all"});
+    const rows=(d.requests||[]).slice().sort((a,b)=>{
+      const da=new Date(a.submitted_at||a.created_at||0).getTime();
+      const db=new Date(b.submitted_at||b.created_at||0).getTime();
       return db-da;
     });
+
     $("manualFundingRows").innerHTML=rows.map(r=>{
       const u=r.users||r.user||{};
       const customer=u.name||u.phone||r.user_id||"—";
@@ -31,12 +33,18 @@ async function loadManualFundingRequests(){
       const reason=r.note||r.rejection_reason||"—";
       const reviewed=r.reviewed_at?r.reviewed_at.replace("T"," ").replace("Z",""):"—";
       const action=(status==="pending"||status==="submitted")
-        ? '<button onclick="approveManualFunding(\''+r.id+'\')">Approve</button> <button class="danger" onclick="rejectManualFunding(\''+r.id+'\')">Reject</button>'
+        ? '<button onclick="approveManualFunding(\\''+r.id+'\\')">Approve</button> <button class="danger" onclick="rejectManualFunding(\\''+r.id+'\\')">Reject</button>'
         : '<span class="muted">Reviewed</span>';
       return '<tr><td><strong>'+escapeHtml(customer)+'</strong><br><span class="muted">'+escapeHtml(u.phone||u.email||"")+'</span></td><td>'+money(r.amount)+'</td><td><code>'+escapeHtml(r.reference||"—")+'</code></td><td><code>'+escapeHtml(r.payment_reference||"—")+'</code></td><td>'+escapeHtml(submitted)+'</td><td><span class="badge '+statusClass+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(reason)+'</td><td>'+escapeHtml(reviewed)+'</td><td>'+action+'</td></tr>';
     }).join("")||'<tr><td colspan="9" class="muted">No funding history found.</td></tr>';
-    msg($("manualFundingMsg"),rows.length+" funding request(s) in history.","success");
-  }catch(e){msg($("manualFundingMsg"),e.message,"error")}
+
+    const submittedCount=rows.filter(r=>r.status==="submitted"||r.status==="pending").length;
+    msg($("manualFundingMsg"),submittedCount+" funding request(s) awaiting admin review.",submittedCount?"info":"success");
+  }catch(e){
+    console.error("Manual funding load failed:",e);
+    msg($("manualFundingMsg"),e.message||"Unable to load funding requests.","error");
+    $("manualFundingRows").innerHTML='<tr><td colspan="9" class="muted">Unable to load funding requests. Use Refresh Requests.</td></tr>';
+  }
 }
 
 async function approveManualFunding(id){
