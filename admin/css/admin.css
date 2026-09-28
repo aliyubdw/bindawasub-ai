@@ -93,3 +93,8 @@ button{min-height:44px}
 .sidebar{overflow:hidden}
 .sidebar-nav{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:3px;overscroll-behavior-y:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.24) transparent}
 .sidebar-nav::-webkit-scrollbar{width:5px}.sidebar-nav::-webkit-scrollbar-track{background:transparent}.sidebar-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.24);border-radius:999px}
+
+.funding-table th:last-child,.funding-table td:last-child{position:sticky;right:0;background:#fff;z-index:2;box-shadow:-6px 0 10px rgba(0,0,0,.05)}
+.funding-table th:last-child{z-index:3}
+.funding-actions{min-width:170px;display:flex;gap:6px;flex-wrap:nowrap}
+.funding-actions button{white-space:nowrap;padding:9px 11px}
