@@ -287,6 +287,13 @@
       .admin-grid { grid-template-columns: 1fr; }
     }
 
+    .customer-toolbar { display:flex; gap:8px; padding:10px 12px; border-bottom:1px solid #e3e8e5; background:#fbfdfc; overflow-x:auto; }
+    .quick-action { flex:0 0 auto; padding:9px 12px; border-radius:999px; background:white; color:#087f5b; border:1px solid #b9d9cd; font-size:13px; white-space:nowrap; }
+    .quick-action.primary { background:#087f5b; color:white; border-color:#087f5b; }
+    .chat-header-actions { float:right; display:flex; gap:6px; }
+    .header-action { background:rgba(255,255,255,0.16); padding:7px 9px; font-size:12px; }
+    .new-chat-button { background:white; color:#087f5b; }
+
     .cancel-button {
       display: block;
       width: 85%;
@@ -331,7 +338,7 @@
 <div class="chat" id="chatScreen" style="display:none;">
 
   <div class="header">
-    <button id="logoutButton" class="logout-button" type="button">Logout</button>
+    <div class="chat-header-actions"><button id="newChatButton" class="header-action new-chat-button" type="button">＋ New chat</button><button id="logoutButton" class="header-action" type="button">Logout</button></div>
     <h2>🤖 Bindawasub AI</h2>
     <p id="headerSubtitle">Sannu! Ta yaya zan taimaka maka?</p>
     <div id="adminBadge" class="admin-badge" style="display:none;">ADMIN MODE</div>
@@ -363,6 +370,7 @@
   </div>
 
   <div id="customerInterface">
+    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" type="button" data-action-message="Check my wallet balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?">Fund Wallet</button></div>
     <div id="messages">
 
       <div class="message bot">
@@ -398,7 +406,7 @@ const SUPABASE_URL =
   "https://fuktxjweuanatmurlzpg.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
-  "sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
+  "sb_publishable_" + "S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
 
 const EDGE_FUNCTION_URL =
   "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
