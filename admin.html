@@ -729,7 +729,36 @@ $("saveManualFunding").onclick=async()=>{
   }catch(e){msg($("manualFundingMsg"),e.message,"error")}
 };
 async function loadAll(){await loadOverview();await loadAiManagement();await loadProviders();await loadServices();await loadProducts();await loadEndpoints();await loadMappings();await loadTransactions();await loadAnalytics();await loadManualFundingSettings();await loadManualFundingRequests()}
-(async()=>{const {data:{session}}=await sb.auth.getSession();if(session){try{await admin({action:"dashboard_summary"});$("loginView").classList.add("hidden");$("app").classList.remove("hidden");await loadAll()}catch{await sb.auth.signOut()}}})();
+(async()=>{
+  try{
+    const {data:{session},error}=await sb.auth.getSession();
+    if(error) throw error;
+    if(!session) return;
+
+    // A valid authenticated session is enough to reveal the dashboard.
+    // Individual dashboard sections are allowed to fail without logging the admin out.
+    $("loginView").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    msg($("overviewMsg"),"Authenticated. Loading dashboard…","info");
+
+    try{
+      await admin({action:"dashboard_summary"});
+    }catch(e){
+      console.error("Initial admin verification failed:",e);
+      msg($("overviewMsg"),"Session authenticated, but dashboard verification failed: "+(e.message||"Unknown error"),"error");
+      return;
+    }
+
+    try{
+      await loadAll();
+    }catch(e){
+      console.error("Dashboard load failed:",e);
+      msg($("overviewMsg"),"Dashboard opened, but some data could not be loaded: "+(e.message||"Unknown error"),"error");
+    }
+  }catch(e){
+    console.error("Admin session bootstrap failed:",e);
+  }
+})();
 </script>
 </body>
 </html>
