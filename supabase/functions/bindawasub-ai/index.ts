@@ -604,21 +604,25 @@ Deno.serve(async (req) => {
         );
 
         if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
-          const { data: previousAssistant } = await supabase
+          // The fund_wallet action returns before an assistant message is logged,
+          // so the previous assistant message may not exist here. Check the
+          // immediately previous user message as the durable conversation signal.
+          const { data: previousUserMessages } = await supabase
             .from("ai_messages")
-            .select("intent, message")
+            .select("message, created_at")
             .eq("conversation_id", conversationId)
-            .eq("role", "assistant")
+            .eq("role", "user")
             .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .limit(2);
 
-          const previousMessage = String(previousAssistant?.message || "").toLowerCase();
-          const previousIntent = String(previousAssistant?.intent || "").toLowerCase();
+          const previousUserMessage = String(
+            previousUserMessages?.[1]?.message || ""
+          ).toLowerCase().trim();
 
           if (
-            previousIntent === "fund_wallet" ||
-            /enter the amount|amount you want to add|fund your wallet by bank transfer/.test(previousMessage)
+            /fund.*wallet|wallet.*fund|funding.*wallet|add.*money|add.*amount|fund my wallet/.test(
+              previousUserMessage
+            )
           ) {
             body.action = "manual_funding_request";
             body.amount = parsedAmount;
