@@ -126,6 +126,83 @@
 <div id="modal" class="modal hidden"><div class="modalbox"><div class="section-title"><h2 id="modalTitle"></h2><button id="closeModal" class="secondary">Close</button></div><div id="modalMsg"></div><div id="modalBody"></div></div></div>
 
 <script>
+(function(){
+  const SUPABASE_URL="https://fuktxjweuanatmurlzpg.supabase.co";
+  const KEY="sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
+  const ADMIN_URL=SUPABASE_URL+"/functions/v1/bindawasub-admin";
+  const client=window.supabase.createClient(SUPABASE_URL,KEY);
+
+  async function login(e){
+    if(e){e.preventDefault();e.stopPropagation();}
+    const form=document.getElementById("loginForm");
+    const emailInput=document.getElementById("email");
+    const passwordInput=document.getElementById("password");
+    const btn=document.getElementById("loginBtn");
+    const msgBox=document.getElementById("loginMsg");
+    const email=(emailInput.value||"").trim();
+    const password=passwordInput.value||"";
+
+    if(!email||!password){
+      msgBox.innerHTML='<div class="msg error">Email and password are required.</div>';
+      return false;
+    }
+
+    btn.disabled=true;
+    btn.textContent="Signing in…";
+    msgBox.innerHTML='<div class="msg info">Authenticating…</div>';
+
+    try{
+      const result=await client.auth.signInWithPassword({email,password});
+      if(result.error) throw new Error(result.error.message);
+
+      const session=result.data&&result.data.session;
+      const accessToken=session&&session.access_token;
+      if(!accessToken) throw new Error("Authentication succeeded, but no session was created.");
+
+      msgBox.innerHTML='<div class="msg info">Verifying admin access…</div>';
+      const response=await fetch(ADMIN_URL,{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "apikey":KEY,
+          "Authorization":"Bearer "+accessToken
+        },
+        body:JSON.stringify({action:"dashboard_summary"})
+      });
+      const raw=await response.text();
+      let data={};
+      try{data=raw?JSON.parse(raw):{};}catch{}
+      if(!response.ok||data.success===false){
+        await client.auth.signOut();
+        throw new Error(data.error||("Admin verification failed (HTTP "+response.status+")."));
+      }
+
+      msgBox.innerHTML='<div class="msg success">Login successful. Loading dashboard…</div>';
+      window.location.reload();
+      return false;
+    }catch(error){
+      console.error("Bindawasub admin login:",error);
+      msgBox.innerHTML='<div class="msg error">'+String(error.message||"Login failed. Please try again.").replace(/[&<>"]/g,function(x){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[x])})+'</div>';
+      btn.disabled=false;
+      btn.textContent="Login";
+      return false;
+    }
+  }
+
+  function bind(){
+    const form=document.getElementById("loginForm");
+    const btn=document.getElementById("loginBtn");
+    if(form) form.addEventListener("submit",login);
+    if(btn) btn.addEventListener("click",login);
+    window.bindawasubAdminLogin=login;
+  }
+
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",bind);
+  else bind();
+})();
+</script>
+
+<script>
 const SUPABASE_URL="https://fuktxjweuanatmurlzpg.supabase.co";
 const KEY="sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
 const ADMIN_URL=SUPABASE_URL+"/functions/v1/bindawasub-admin";
