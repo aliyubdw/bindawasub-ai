@@ -1,10 +1,5 @@
 // Bindawasub AI — products, recipient validation and order confirmation
 
-let selectedProduct = null;
-let recipientPhone = null;
-let waitingForPhone = false;
-let waitingForConfirmation = false;
-
 function showProducts(products) {
 
   const messages =
@@ -52,11 +47,11 @@ function showProducts(products) {
 
     card.onclick = function() {
 
-      selectedProduct = product;
+      BindawasubCustomerState.selectedProduct = product;
 
-      waitingForPhone = true;
+      BindawasubCustomerState.waitingForPhone = true;
 
-      waitingForConfirmation = false;
+      BindawasubCustomerState.waitingForConfirmation = false;
 
 
       addMessage(
@@ -149,9 +144,9 @@ function showConfirmation() {
   box.textContent =
 `Ga bayanan sayayyarka:
 
-${selectedProduct.product_name}
-Farashi: ₦${Number(selectedProduct.selling_price).toLocaleString()}
-Lamba: ${recipientPhone}
+${BindawasubCustomerState.selectedProduct.product_name}
+Farashi: ₦${Number(BindawasubCustomerState.selectedProduct.selling_price).toLocaleString()}
+Lamba: ${BindawasubCustomerState.recipientPhone}
 
 Kana tabbatar da wannan sayayya?`;
 
@@ -217,8 +212,8 @@ Kana tabbatar da wannan sayayya?`;
 
         const response = await callEdgeFunction({
           action: "purchase",
-          product_id: selectedProduct.id,
-          phone_number: recipientPhone,
+          product_id: BindawasubCustomerState.selectedProduct.id,
+          phone_number: BindawasubCustomerState.recipientPhone,
           reference: reference
         });
 
@@ -244,8 +239,8 @@ Kana tabbatar da wannan sayayya?`;
           addMessage(
             `✅ An karɓi sayayyar.
 
-Package: ${selectedProduct.product_name}
-Lamba: ${recipientPhone}
+Package: ${BindawasubCustomerState.selectedProduct.product_name}
+Lamba: ${BindawasubCustomerState.recipientPhone}
 Farashi: ₦${Number(
               purchase.purchase_amount
             ).toLocaleString()}
@@ -322,15 +317,15 @@ A halin yanzu sayayyar tana jiran VTU processing. Ba a tura data zuwa provider b
       }
 
 
-      waitingForConfirmation =
+      BindawasubCustomerState.waitingForConfirmation =
         false;
 
 
-      selectedProduct =
+      BindawasubCustomerState.selectedProduct =
         null;
 
 
-      recipientPhone =
+      BindawasubCustomerState.recipientPhone =
         null;
 
 
@@ -376,13 +371,13 @@ A halin yanzu sayayyar tana jiran VTU processing. Ba a tura data zuwa provider b
       );
 
 
-      selectedProduct = null;
+      BindawasubCustomerState.selectedProduct = null;
 
-      recipientPhone = null;
+      BindawasubCustomerState.recipientPhone = null;
 
-      waitingForPhone = false;
+      BindawasubCustomerState.waitingForPhone = false;
 
-      waitingForConfirmation = false;
+      BindawasubCustomerState.waitingForConfirmation = false;
 
 
       confirm.remove();
@@ -402,7 +397,7 @@ A halin yanzu sayayyar tana jiran VTU processing. Ba a tura data zuwa provider b
   messages.appendChild(cancel);
 
 
-  waitingForConfirmation =
+  BindawasubCustomerState.waitingForConfirmation =
     true;
 
 }
