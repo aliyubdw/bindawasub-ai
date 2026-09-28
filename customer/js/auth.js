@@ -78,14 +78,14 @@ async function registerUser() {
 
     if (data.session) {
       const isAdmin = await verifyAdminMode();
-      await showChatScreen();
 
       if (isAdmin) {
-        document.getElementById("customerInterface").classList.add("admin-hidden");
-      } else {
-        document.getElementById("customerInterface").classList.remove("admin-hidden");
+        window.location.replace("./admin/");
+        return;
       }
 
+      await showChatScreen();
+      document.getElementById("customerInterface").classList.remove("admin-hidden");
       messageBox.textContent = "Account created successfully.";
     } else {
       showLoginForm();
@@ -129,13 +129,14 @@ async function loginUser() {
     }
 
     const isAdmin = await verifyAdminMode();
-    await showChatScreen();
 
     if (isAdmin) {
-      document.getElementById("customerInterface").classList.add("admin-hidden");
-    } else {
-      document.getElementById("customerInterface").classList.remove("admin-hidden");
+      window.location.replace("./admin/");
+      return;
     }
+
+    await showChatScreen();
+    document.getElementById("customerInterface").classList.remove("admin-hidden");
   } catch (error) {
     console.error("Post-login setup failed:", error);
     await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
@@ -171,13 +172,14 @@ async function applyAuthenticatedSession(session) {
 
   try {
     const isAdmin = await verifyAdminMode();
-    await showChatScreen();
 
     if (isAdmin) {
-      document.getElementById("customerInterface").classList.add("admin-hidden");
-    } else {
-      document.getElementById("customerInterface").classList.remove("admin-hidden");
+      window.location.replace("./admin/");
+      return;
     }
+
+    await showChatScreen();
+    document.getElementById("customerInterface").classList.remove("admin-hidden");
   } catch (error) {
     console.error("Session setup failed:", error);
     await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
