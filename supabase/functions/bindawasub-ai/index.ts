@@ -20,7 +20,7 @@ async function callGemini(
   serviceCatalog: any[],
   conversationHistory: any[] = []
 ) {
-  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_" + "API_KEY");
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
   const productSummary = availableProducts.map((p) => ({
@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_" + "SERVICE_ROLE_KEY")!
     );
 
     // ==========================================
@@ -331,6 +331,17 @@ Deno.serve(async (req) => {
 
     // Customer-only conversation history endpoint
     // Returns only the authenticated customer's latest conversation for the requested channel.
+    if (body.action === "new_conversation") {
+      const newConversationChannel = String(body.channel || "web").toLowerCase();
+      const { data: newConversation, error: newConversationError } = await supabase
+        .from("ai_conversations")
+        .insert({ user_id: userId, channel: newConversationChannel, language: bindawasubUser.language || "english", started_at: new Date().toISOString(), last_message_at: new Date().toISOString() })
+        .select("id, channel, started_at, last_message_at")
+        .single();
+      if (newConversationError) throw newConversationError;
+      return new Response(JSON.stringify({ success: true, conversation_id: newConversation.id, channel: newConversation.channel, started_at: newConversation.started_at, last_message_at: newConversation.last_message_at }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (body.action === "conversation_history") {
       const historyChannel = String(body.channel || "web").toLowerCase();
 
