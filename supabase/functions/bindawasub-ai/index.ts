@@ -593,7 +593,7 @@ Deno.serve(async (req) => {
     // ==========================================
     // This keeps the funding flow working even if an older frontend
     // does not send the explicit manual_funding_request action.
-    if (!body.action && conversationId) {
+    if (conversationId) {
       const amountMatch = String(originalMessage).trim().match(
         /^(?:₦\\s*|NGN\\s*|naira\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*$/i
       );
