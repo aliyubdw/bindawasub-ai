@@ -102,6 +102,45 @@ async function registerUser() {
   }
 }
 
+async function sendEmailLink() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const errorBox = document.getElementById("loginError");
+  const button = document.getElementById("emailLinkButton");
+
+  errorBox.textContent = "";
+
+  if (!email) {
+    errorBox.textContent = "Enter your email address first.";
+    document.getElementById("loginEmail").focus();
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Sending link...";
+
+  try {
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: window.location.origin + window.location.pathname
+      }
+    });
+
+    if (error) throw error;
+
+    errorBox.className = "login-success";
+    errorBox.textContent = "Check your email. We sent you a secure sign-in link.";
+  } catch (error) {
+    console.error("Email link login failed:", error);
+    errorBox.className = "login-error";
+    errorBox.textContent = error?.message || "Unable to send sign-in link.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Continue with email";
+  }
+}
+
 async function loginUser() {
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
