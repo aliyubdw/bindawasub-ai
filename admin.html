@@ -231,7 +231,7 @@ const $=id=>document.getElementById(id);
 const money=n=>"₦"+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
 function msg(el,text,type="info"){el.innerHTML=text?'<div class="msg '+type+'">'+escapeHtml(text)+'</div>':""}
 function escapeHtml(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
-async function token(){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired. Please log in again.");return session.access_token}
+async function token(){const first=await sb.auth.getSession();if(first.error)throw Error(first.error.message||"Unable to read session.");if(first.data&&first.data.session)return first.data.session.access_token;const refreshed=await sb.auth.refreshSession();if(refreshed.error||!refreshed.data||!refreshed.data.session)throw Error("Session expired. Please log in again.");return refreshed.data.session.access_token}
 async function admin(payload){const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||"Admin request failed.");return d}
 async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||d.message||"Request failed.");return d}
 
@@ -690,7 +690,7 @@ async function loadManualFundingSettings(){
   $("mfInstructions").value=s.instructions||"";
   $("mfActive").value=s.active===false?"false":"true";
 }
-async function loadManualFundingRequests(){
+async async function loadManualFundingRequests(){
   try{
     // Load the complete manual-funding history for admin, not only submitted requests.
     const statuses=["pending","submitted","approved","rejected"];
