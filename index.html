@@ -2235,7 +2235,7 @@ Misali: 08012345678`,
     if (!requestAction && waitingForFundingAmount) {
       const amountText = String(message || "").trim();
       const amountMatch = amountText.match(
-        /^(?:₦\\s*|NGN\\s*|naira\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*$/i
+        /^(?:₦\s*|NGN\s*|naira\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*$/i
       );
 
       if (amountMatch) {
