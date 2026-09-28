@@ -616,6 +616,32 @@ async function logoutUser() {
   hideAdminMode();
 }
 
+async function startNewConversation() {
+  const button = document.getElementById("newChatButton");
+  if (button) button.disabled = true;
+  try {
+    const response = await callEdgeFunction({ action: "new_conversation", channel: "web" });
+    const data = await response.json();
+    if (!response.ok || data.success !== true) throw new Error(data.error || "Failed to start a new conversation.");
+    selectedProduct = null;
+    recipientPhone = null;
+    waitingForPhone = false;
+    waitingForConfirmation = false;
+    const messages = document.getElementById("messages");
+    messages.innerHTML = "";
+    addMessage("Sannu! Sabuwar hira ta fara. Ta yaya zan taimaka maka?", "bot");
+    const input = document.getElementById("messageInput");
+    input.value = "";
+    input.placeholder = "Rubuta saƙonka...";
+    input.focus();
+  } catch (error) {
+    console.error("New conversation failed:", error);
+    addMessage("❌ An kasa fara sabuwar hira. Sake gwadawa.", "bot");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function loadConversationHistory() {
   if (isAdminUser) return;
 
