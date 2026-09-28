@@ -331,6 +331,38 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
 
+    const createManualFundingRequest = async (amount:number) => {
+      const { data: settings, error: settingsError } = await supabase
+        .from("manual_funding_settings")
+        .select("active, bank_name, account_name, account_number, instructions")
+        .eq("id", 1)
+        .maybeSingle();
+
+      if (settingsError) throw settingsError;
+      if (!settings?.active) return { success:false, error:"Manual wallet funding is temporarily unavailable." };
+      if (!Number.isFinite(amount) || amount <= 0) return { success:false, error:"Funding amount must be greater than zero." };
+
+      const reference = `MFR-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+      const { data: request, error: requestError } = await supabase
+        .from("manual_funding_requests")
+        .insert({ user_id:userId, amount, reference, status:"pending" })
+        .select("id, amount, reference, status, created_at")
+        .single();
+
+      if (requestError) throw requestError;
+
+      return {
+        success:true,
+        request,
+        bank_account: settings.account_number ? {
+          bank_name:settings.bank_name,
+          account_name:settings.account_name,
+          account_number:settings.account_number
+        } : null,
+        instructions:settings.instructions || "Transfer the exact amount to the configured Bindawasub bank account, then submit your transfer reference."
+      };
+    };
+
     // Customer-only conversation history endpoint
     // Returns only the authenticated customer's latest conversation for the requested channel.
     if (body.action === "new_conversation") {
@@ -968,238 +1000,255 @@ if (body.action === "customer_search") {
     }
 
     // ==========================================
-// FUND WALLET — BILLSTACK VIRTUAL ACCOUNT
+// ==========================================
+// FUND WALLET — MANUAL BANK TRANSFER (CURRENT MODE)
 // ==========================================
 
-if (body.action === "fund_wallet") {
-  const BILLSTACK_SECRET_KEY =
-    Deno.env.get("BILLSTACK_SECRET_KEY");
+if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
+  const { data: settings, error: settingsError } = await supabase
+    .from("manual_funding_settings")
+    .select("active, bank_name, account_name, account_number, instructions")
+    .eq("id", 1)
+    .maybeSingle();
 
-  if (!BILLSTACK_SECRET_KEY) {
-    throw new Error(
-      "BILLSTACK_SECRET_KEY is not configured"
-    );
+  if (settingsError) throw settingsError;
+
+  if (!settings?.active) {
+    return new Response(JSON.stringify({
+      success: false,
+      intent: "fund_wallet",
+      error: "Manual wallet funding is temporarily unavailable."
+    }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  // --------------------------------
-  // Check whether customer already
-  // has a BillStack virtual account
-  // --------------------------------
+  const requestedAmount = Number(body.amount || 0);
 
-  const { data: existingAccount, error: accountError } =
-    await supabase
-      .from("billstack_accounts")
-      .select(
-        "id, user_id, account_name, account_number, bank_name, billstack_customer_id, status"
-      )
-      .eq("user_id", userId)
-      .maybeSingle();
-
-  if (accountError) {
-    throw accountError;
-  }
-
-  // --------------------------------
-  // Already has an account
-  // --------------------------------
-
-  if (
-    existingAccount &&
-    existingAccount.account_number &&
-    existingAccount.billstack_customer_id
-  ) {
-    return new Response(
-      JSON.stringify({
-        success: true,
-        intent: "fund_wallet",
-        account: {
-          account_name: existingAccount.account_name,
-          account_number: existingAccount.account_number,
-          bank_name: existingAccount.bank_name,
-          reference:
-            existingAccount.billstack_customer_id,
-        },
-        answer:
-          "Transfer money to this account to fund your Bindawasub wallet.",
-      }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  // --------------------------------
-  // Customer details
-  // --------------------------------
-
-  const customerName =
-    (bindawasubUser.name || "").trim();
-
-  const nameParts =
-    customerName.split(/\s+/).filter(Boolean);
-
-  const firstName =
-    nameParts[0] || "Bindawasub";
-
-  const lastName =
-    nameParts.slice(1).join(" ") || "Customer";
-
-  const customerEmail =
-    authUser.email ||
-    `${bindawasubUser.phone}@bindawasub.com`;
-
-  const customerPhone =
-    bindawasubUser.phone;
-
-  if (!customerPhone) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error:
-          "Your phone number is required before creating a funding account.",
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  // --------------------------------
-  // Unique BillStack reference
-  // --------------------------------
-
-  const billstackReference =
-    `BW-WALLET-${userId}`;
-
-  // --------------------------------
-  // Create BillStack virtual account
-  // --------------------------------
-
-  const billstackResponse = await fetch(
-    "https://api.billstack.co/v2/thirdparty/generateVirtualAccount/",
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Bearer ${BILLSTACK_SECRET_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        reference: billstackReference,
-        email: customerEmail,
-        phone: customerPhone,
-        firstName,
-        lastName,
-        bank: "9PSB",
-      }),
-    }
-  );
-
-  const billstackData =
-    await billstackResponse.json();
-
-  console.log(
-    "BillStack virtual account response:",
-    JSON.stringify(billstackData)
-  );
-
-  if (
-    !billstackResponse.ok ||
-    billstackData?.status !== true ||
-    !billstackData?.data?.account?.length
-  ) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error:
-          billstackData?.message ||
-          "Unable to create BillStack virtual account.",
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  const billstackAccount =
-    billstackData.data.account[0];
-
-  const billstackCustomerReference =
-    billstackData.data.reference;
-
-  // --------------------------------
-  // Save account in Bindawasub
-  // --------------------------------
-
-  const { data: savedAccount, error: saveError } =
-    await supabase
-      .from("billstack_accounts")
-      .insert({
-        user_id: userId,
-        account_name:
-          billstackAccount.account_name,
-        account_number:
-          billstackAccount.account_number,
-        bank_name:
-          billstackAccount.bank_name,
-        billstack_customer_id:
-          billstackCustomerReference,
-        status: "active",
-      })
-      .select(
-        "account_name, account_number, bank_name, billstack_customer_id"
-      )
-      .single();
-
-  if (saveError) {
-    console.error(
-      "BillStack account save error:",
-      saveError
-    );
-
-    throw saveError;
-  }
-
-  return new Response(
-    JSON.stringify({
+  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+    return new Response(JSON.stringify({
       success: true,
       intent: "fund_wallet",
-      account: {
-        account_name:
-          savedAccount.account_name,
-        account_number:
-          savedAccount.account_number,
-        bank_name:
-          savedAccount.bank_name,
-        reference:
-          savedAccount.billstack_customer_id,
-      },
-      answer:
-        "Your Bindawasub funding account is ready. Transfer money to this account and your wallet will be credited automatically after BillStack confirms the payment.",
-    }),
-    {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+      funding_mode: "manual",
+      requires_amount: true,
+      bank_account: settings?.account_number ? {
+        bank_name: settings.bank_name,
+        account_name: settings.account_name,
+        account_number: settings.account_number
+      } : null,
+      instructions: settings?.instructions || "Enter the amount you want to fund, then transfer the exact amount using the payment details provided.",
+      answer: settings?.account_number
+        ? "You can fund your wallet by bank transfer. Please enter the amount you want to add."
+        : "Manual funding is ready. Please enter the amount you want to add. The bank transfer details will be shown once configured."
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const reference = `MFR-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+
+  const { data: request, error: requestError } = await supabase
+    .from("manual_funding_requests")
+    .insert({
+      user_id: userId,
+      amount: requestedAmount,
+      reference,
+      status: "pending"
+    })
+    .select("id, amount, reference, status, created_at")
+    .single();
+
+  if (requestError) throw requestError;
+
+  return new Response(JSON.stringify({
+    success: true,
+    intent: "fund_wallet",
+    funding_mode: "manual",
+    requires_payment: true,
+    request,
+    bank_account: settings?.account_number ? {
+      bank_name: settings.bank_name,
+      account_name: settings.account_name,
+      account_number: settings.account_number
+    } : null,
+    instructions: settings?.instructions || "Transfer the exact amount to the configured Bindawasub bank account, then submit your transfer reference.",
+    answer: settings?.account_number
+      ? `Funding request created for ₦${requestedAmount.toLocaleString("en-NG")}. Transfer the exact amount to the account below, then send your transfer reference.`
+      : `Funding request ${reference} created for ₦${requestedAmount.toLocaleString("en-NG")}. Bank transfer details have not been configured yet.`
+  }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 // ==========================================
+// SUBMIT MANUAL FUNDING PAYMENT REFERENCE
+// ==========================================
+
+if (body.action === "manual_funding_submit") {
+  const requestId = String(body.request_id || "").trim();
+  const paymentReference = String(body.payment_reference || "").trim();
+
+  if (!requestId || !paymentReference) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: "Funding request ID and payment reference are required."
+    }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const { data: request, error: requestError } = await supabase
+    .from("manual_funding_requests")
+    .select("id, amount, reference, status, payment_reference")
+    .eq("id", requestId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (requestError) throw requestError;
+  if (!request) {
+    return new Response(JSON.stringify({ success:false, error:"Funding request not found." }), { status:404, headers:{...corsHeaders,"Content-Type":"application/json"} });
+  }
+
+  if (!["pending","submitted"].includes(request.status)) {
+    return new Response(JSON.stringify({ success:false, error:`This funding request is already ${request.status}.` }), { status:400, headers:{...corsHeaders,"Content-Type":"application/json"} });
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("manual_funding_requests")
+    .update({
+      payment_reference: paymentReference,
+      status: "submitted",
+      submitted_at: new Date().toISOString()
+    })
+    .eq("id", request.id)
+    .eq("user_id", userId)
+    .select("id, amount, reference, payment_reference, status, submitted_at")
+    .single();
+
+  if (updateError) throw updateError;
+
+  return new Response(JSON.stringify({
+    success:true,
+    intent:"manual_funding_submit",
+    request:updated,
+    answer:"Payment reference submitted. Your funding request is now waiting for admin verification. Your wallet will be credited after the transfer is verified."
+  }), { status:200, headers:{...corsHeaders,"Content-Type":"application/json"} });
+}
+
+// ==========================================
+// MANUAL FUNDING HISTORY — CUSTOMER
+// ==========================================
+
+if (body.action === "manual_funding_history") {
+  const { data: requests, error: historyError } = await supabase
+    .from("manual_funding_requests")
+    .select("id, amount, reference, payment_reference, status, created_at, submitted_at, reviewed_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending:false })
+    .limit(20);
+
+  if (historyError) throw historyError;
+
+  return new Response(JSON.stringify({
+    success:true,
+    intent:"manual_funding_history",
+    requests:requests || [],
+    answer: requests?.length ? `Here are your latest ${requests.length} funding requests.` : "You have no manual funding requests yet."
+  }), { status:200, headers:{...corsHeaders,"Content-Type":"application/json"} });
+}
+
+// ==========================================
+// MANUAL FUNDING REQUESTS — ADMIN
+// ==========================================
+
+if (body.action === "manual_funding_requests") {
+  if (!isAdmin) return new Response(JSON.stringify({success:false,error:"Admin access required."}),{status:403,headers:{...corsHeaders,"Content-Type":"application/json"}});
+
+  const statusFilter = String(body.status || "submitted").toLowerCase();
+  const allowedStatuses = new Set(["pending","submitted","approved","rejected","cancelled","all"]);
+  const status = allowedStatuses.has(statusFilter) ? statusFilter : "submitted";
+
+  let query = supabase
+    .from("manual_funding_requests")
+    .select("id, user_id, amount, reference, payment_reference, status, note, created_at, submitted_at, reviewed_at, reviewed_by, users(name, phone, email)")
+    .order("created_at", {ascending:false})
+    .limit(100);
+
+  if (status !== "all") query = query.eq("status", status);
+
+  const { data: requests, error } = await query;
+  if (error) throw error;
+
+  return new Response(JSON.stringify({success:true,intent:"manual_funding_requests",requests:requests||[]}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+}
+
+if (body.action === "manual_funding_approve") {
+  if (!isAdmin) return new Response(JSON.stringify({success:false,error:"Admin access required."}),{status:403,headers:{...corsHeaders,"Content-Type":"application/json"}});
+
+  const requestId = String(body.request_id || "").trim();
+  if (!requestId) return new Response(JSON.stringify({success:false,error:"Funding request ID is required."}),{status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+
+  const { data, error } = await supabase.rpc("approve_manual_funding", {
+    p_request_id: requestId,
+    p_admin_user_id: userId
+  });
+  if (error) throw error;
+
+  const result = data?.[0];
+  return new Response(JSON.stringify({
+    success:!!result?.success,
+    intent:"manual_funding_approve",
+    funding:result || null,
+    answer:result?.message || "Funding approval completed."
+  }),{status:result?.success?200:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+}
+
+if (body.action === "manual_funding_reject") {
+  if (!isAdmin) return new Response(JSON.stringify({success:false,error:"Admin access required."}),{status:403,headers:{...corsHeaders,"Content-Type":"application/json"}});
+
+  const requestId = String(body.request_id || "").trim();
+  const note = body.note ? String(body.note).trim() : null;
+  if (!requestId) return new Response(JSON.stringify({success:false,error:"Funding request ID is required."}),{status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+
+  const { data: request, error: requestError } = await supabase
+    .from("manual_funding_requests")
+    .select("id,status")
+    .eq("id",requestId)
+    .maybeSingle();
+  if (requestError) throw requestError;
+  if (!request) return new Response(JSON.stringify({success:false,error:"Funding request not found."}),{status:404,headers:{...corsHeaders,"Content-Type":"application/json"}});
+  if (!["pending","submitted"].includes(request.status)) return new Response(JSON.stringify({success:false,error:`This funding request is already ${request.status}.`}),{status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+
+  const { data: updated, error: updateError } = await supabase
+    .from("manual_funding_requests")
+    .update({status:"rejected",note:note || null,reviewed_at:new Date().toISOString(),reviewed_by:userId})
+    .eq("id",requestId)
+    .select("id,amount,reference,payment_reference,status,note,reviewed_at")
+    .single();
+  if (updateError) throw updateError;
+
+  return new Response(JSON.stringify({success:true,intent:"manual_funding_reject",request:updated,answer:"Funding request rejected."}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+}
+
+if (body.action === "manual_funding_settings_get") {
+  if (!isAdmin) return new Response(JSON.stringify({success:false,error:"Admin access required."}),{status:403,headers:{...corsHeaders,"Content-Type":"application/json"}});
+  const { data, error } = await supabase.from("manual_funding_settings").select("*").eq("id",1).maybeSingle();
+  if (error) throw error;
+  return new Response(JSON.stringify({success:true,settings:data}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+}
+
+if (body.action === "manual_funding_settings_save") {
+  if (!isAdmin) return new Response(JSON.stringify({success:false,error:"Admin access required."}),{status:403,headers:{...corsHeaders,"Content-Type":"application/json"}});
+  const settings = body.settings || {};
+  const { data, error } = await supabase
+    .from("manual_funding_settings")
+    .upsert({
+      id:1,
+      active: settings.active !== false,
+      bank_name: settings.bank_name ? String(settings.bank_name).trim() : null,
+      account_name: settings.account_name ? String(settings.account_name).trim() : null,
+      account_number: settings.account_number ? String(settings.account_number).trim() : null,
+      instructions: settings.instructions ? String(settings.instructions).trim() : null,
+      updated_at:new Date().toISOString()
+    }, {onConflict:"id"})
+    .select("*")
+    .single();
+  if (error) throw error;
+  return new Response(JSON.stringify({success:true,settings:data}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+}
+
 // MANUAL WALLET FUNDING — ADMIN ONLY
 // ==========================================
 
@@ -2529,15 +2578,44 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "fund_wallet") {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            intent: "fund_wallet",
-            answer:
-              ai.reply ||
-              "You can fund your Bindawasub wallet using your funding account.",
-            ai_powered: true,
-          }),
+        const amountMatch = String(originalMessage || "").match(/(?:₦|ngn|naira|fund(?:\s+my)?(?:\s+wallet)?\s*(?:with|by|of)?\s*)([0-9,]+(?:\.\d+)?)/i);
+        const parsedAmount = amountMatch ? Number(String(amountMatch[1]).replace(/,/g, "")) : 0;
+
+        if (parsedAmount > 0) {
+          const funding = await createManualFundingRequest(parsedAmount);
+
+          if (!funding.success) {
+            return new Response(JSON.stringify({
+              success:false,
+              intent:"fund_wallet",
+              error:funding.error
+            }), { status:400, headers:{...corsHeaders,"Content-Type":"application/json"} });
+          }
+
+          return new Response(JSON.stringify({
+            success:true,
+            intent:"fund_wallet",
+            funding_mode:"manual",
+            requires_payment:true,
+            request:funding.request,
+            bank_account:funding.bank_account,
+            instructions:funding.instructions,
+            answer:funding.bank_account
+              ? `Funding request created for ₦${parsedAmount.toLocaleString("en-NG")}. Transfer the exact amount to the account shown, then send your transfer reference.`
+              : `Funding request ${funding.request.reference} created for ₦${parsedAmount.toLocaleString("en-NG")}. Bank transfer details are not configured yet.`,
+            ai_powered:true
+          }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+        }
+
+        return new Response(JSON.stringify({
+          success:true,
+          intent:"fund_wallet",
+          funding_mode:"manual",
+          requires_amount:true,
+          answer:"Sure. How much would you like to add to your wallet? For example: Fund my wallet with ₦5,000.",
+          ai_powered:true
+        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }),
           {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
