@@ -1,4 +1,4 @@
-// Bindawasub AI — shared API and Supabase client
+// Bindawasub AI — shared API and persistent Supabase session
 
 const SUPABASE_URL =
   "https://fuktxjweuanatmurlzpg.supabase.co";
@@ -7,32 +7,46 @@ const SUPABASE_PUBLISHABLE_KEY =
   "sb_publishable_" + "S1iARs058S3_XAUP1S_0Lw_oEnJuFe2";
 
 const EDGE_FUNCTION_URL =
-  "https://fuktxjweuanatmurlzpg.supabase.co/functions/v1/bindawasub-ai";
+  SUPABASE_URL + "/functions/v1/bindawasub-ai";
 
-const supabaseClient =
-  window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
-  );
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      storage: window.localStorage,
+      storageKey: "bindawasub-customer-auth"
+    }
+  }
+);
 
-let waitingForFundingAmount = false;
-let activeFundingRequestId = null;
+async function getAccessToken(forceRefresh = false) {
+  const current = await supabaseClient.auth.getSession();
 
-async function getAccessToken() {
-  const { data, error } =
-    await supabaseClient.auth.getSession();
-
-  if (error || !data.session) {
-    throw new Error("Ba a shiga cikin asusu ba.");
+  if (current.error) {
+    throw new Error(current.error.message || "Unable to read session.");
   }
 
-  return data.session.access_token;
+  if (!forceRefresh && current.data?.session?.access_token) {
+    return current.data.session.access_token;
+  }
+
+  const refreshed = await supabaseClient.auth.refreshSession();
+
+  if (refreshed.error || !refreshed.data?.session) {
+    throw new Error("Ba a shiga cikin asusu ba. Sake shiga.");
+  }
+
+  return refreshed.data.session.access_token;
 }
 
 async function callEdgeFunction(payload) {
-  const token = await getAccessToken();
+  let token = await getAccessToken(false);
 
-  return fetch(EDGE_FUNCTION_URL, {
+  let response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -41,4 +55,20 @@ async function callEdgeFunction(payload) {
     },
     body: JSON.stringify(payload)
   });
+
+  if (response.status === 401 || response.status === 403) {
+    token = await getAccessToken(true);
+
+    response = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_PUBLISHABLE_KEY,
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  return response;
 }
