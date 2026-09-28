@@ -478,10 +478,12 @@ Deno.serve(async (req) => {
         .from("ai_messages")
         .select("role, message, intent, created_at")
         .eq("conversation_id", conversation.id)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(100);
 
       if (messagesError) throw messagesError;
+
+      const orderedHistoryMessages = (historyMessages || []).reverse();
 
       return new Response(JSON.stringify({
         success: true,
@@ -489,7 +491,7 @@ Deno.serve(async (req) => {
         conversation_id: conversation.id,
         started_at: conversation.started_at,
         last_message_at: conversation.last_message_at,
-        messages: historyMessages || []
+        messages: orderedHistoryMessages
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -2393,10 +2395,22 @@ if (body.action === "manual_fund") {
 
 
     if (aiConfig?.gemini_enabled === false) {
+      const disabledAnswer = aiConfig.fallback_message || "I can help with Bindawasub services, wallet balance, funding, and purchases.";
+      await persistAssistantMessage(disabledAnswer, "other", "gemini_disabled");
+      await logAiActivity(
+        "ai_disabled_response",
+        "other",
+        originalMessage,
+        disabledAnswer,
+        true,
+        null,
+        null,
+        { ai_powered: false, gemini_disabled: true }
+      );
       return new Response(JSON.stringify({
         success: true,
         intent: "other",
-        answer: aiConfig.fallback_message || "I can help with Bindawasub services, wallet balance, funding, and purchases.",
+        answer: disabledAnswer,
         ai_powered: false,
         gemini_disabled: true
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -2914,12 +2928,26 @@ if (body.action === "manual_fund") {
     } catch (aiError) {
       console.error("Gemini fallback error:", aiError);
 
+      const fallbackAnswer =
+        "I can help you check available services, prices, wallet balance, and make purchases.";
+
+      await persistAssistantMessage(fallbackAnswer, "unknown", "fallback");
+      await logAiActivity(
+        "ai_fallback_response",
+        "unknown",
+        originalMessage,
+        fallbackAnswer,
+        false,
+        aiError instanceof Error ? aiError.message : String(aiError),
+        null,
+        { ai_powered: false }
+      );
+
       return new Response(
         JSON.stringify({
           success: true,
           intent: "unknown",
-          answer:
-            "I can help you check available services, prices, wallet balance, and make purchases.",
+          answer: fallbackAnswer,
           ai_powered: false,
         }),
         {
