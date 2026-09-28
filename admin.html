@@ -12,7 +12,7 @@
 <body>
 <div id="loginView" class="login card">
 <h2>Bindawasub Admin</h2><p class="muted">Secure administration dashboard</p><div id="loginMsg"></div>
-<form id="loginForm" autocomplete="off"><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Password</label><input id="password" type="password" required></div><button id="loginBtn" type="button">Login</button></form>
+<form id="loginForm" autocomplete="on" onsubmit="return handleAdminLogin(event)"><div class="field"><label>Email</label><input id="email" type="email" required></div><div class="field"><label>Password</label><input id="password" type="password" required></div><button id="loginBtn" type="submit">Login</button></form>
 </div>
 
 <div id="app" class="shell hidden">
@@ -143,9 +143,6 @@ function escapeHtml(v){return String(v??"").replaceAll("&","&amp;").replaceAll("
 async function token(){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("Session expired. Please log in again.");return session.access_token}
 async function admin(payload){const r=await fetch(ADMIN_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||"Admin request failed.");return d}
 async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+await token()},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw Error(d.error||d.message||"Request failed.");return d}
-
-$("loginBtn").addEventListener("click",handleAdminLogin);
-$("loginForm").addEventListener("submit",handleAdminLogin);
 
 async function handleAdminLogin(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
