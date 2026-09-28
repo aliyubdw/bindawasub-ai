@@ -33,7 +33,7 @@ async function loadManualFundingRequests(){
       const reason=r.note||r.rejection_reason||"—";
       const reviewed=r.reviewed_at?r.reviewed_at.replace("T"," ").replace("Z",""):"—";
       const action=(status==="pending"||status==="submitted")
-        ? `<button onclick="approveManualFunding('undefined')">Approve</button> <button class="danger" onclick="rejectManualFunding('undefined')">Reject</button>`
+        ? '<div class="actions funding-actions"><button type="button" onclick="approveManualFunding(\\''+r.id+'\\')">Approve</button><button type="button" class="danger" onclick="rejectManualFunding(\\''+r.id+'\\')">Reject</button></div>'
         : '<span class="muted">Reviewed</span>';
       return '<tr><td><strong>'+escapeHtml(customer)+'</strong><br><span class="muted">'+escapeHtml(u.phone||u.email||"")+'</span></td><td>'+money(r.amount)+'</td><td><code>'+escapeHtml(r.reference||"—")+'</code></td><td><code>'+escapeHtml(r.payment_reference||"—")+'</code></td><td>'+escapeHtml(submitted)+'</td><td><span class="badge '+statusClass+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(reason)+'</td><td>'+escapeHtml(reviewed)+'</td><td>'+action+'</td></tr>';
     }).join("")||'<tr><td colspan="9" class="muted">No funding history found.</td></tr>';
