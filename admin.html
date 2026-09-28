@@ -636,7 +636,7 @@ async function loadManualFundingSettings(){
 }
 async function loadManualFundingRequests(){
   try{
-    const d=await aiAdmin({action:"manual_funding_requests",status:"submitted"});
+    const d=await admin({action:"manual_funding_requests",status:"submitted"});
     const rows=d.requests||[];
     $("manualFundingRows").innerHTML=rows.map(r=>{
       const u=r.users||r.user||{};
@@ -650,7 +650,7 @@ async function loadManualFundingRequests(){
 async function approveManualFunding(id){
   if(!confirm("Approve this funding request and credit the customer's wallet?"))return;
   try{
-    const d=await aiAdmin({action:"manual_funding_approve",request_id:id});
+    const d=await admin({action:"manual_funding_approve",request_id:id});
     msg($("manualFundingMsg"),d.answer||"Funding approved and wallet credited.","success");
     await loadManualFundingRequests(); await loadOverview();
   }catch(e){msg($("manualFundingMsg"),e.message,"error")}
@@ -659,7 +659,7 @@ async function rejectManualFunding(id){
   const note=prompt("Reason for rejection:","");
   if(note===null)return;
   try{
-    const d=await aiAdmin({action:"manual_funding_reject",request_id:id,note});
+    const d=await admin({action:"manual_funding_reject",request_id:id,note});
     msg($("manualFundingMsg"),d.answer||"Funding request rejected.","success");
     await loadManualFundingRequests();
   }catch(e){msg($("manualFundingMsg"),e.message,"error")}
