@@ -1055,6 +1055,7 @@ async function showChatScreen() {
 
   if (!isAdminUser) {
     await loadConversationHistory();
+    startFundingStatusNotifications();
     document.getElementById("messageInput").focus();
   }
 }
@@ -1101,6 +1102,7 @@ async function initAuth() {
 
     // Do NOT log the user out on TOKEN_REFRESHED or other transient auth events.
     if (event === "SIGNED_OUT") {
+      stopFundingStatusNotifications();
       hideAdminMode();
       document.getElementById("chatScreen").style.display = "none";
       document.getElementById("loginScreen").style.display = "block";
@@ -2095,6 +2097,100 @@ function showFundingHistory(funding) {
 
   messages.appendChild(box);
   messages.scrollTop = messages.scrollHeight;
+}
+
+/* =========================================
+   MANUAL FUNDING STATUS NOTIFICATIONS
+========================================= */
+
+const fundingStatusState = new Map();
+let fundingStatusTimer = null;
+
+async function syncManualFundingStatus(initial = false) {
+  if (isAdminUser) return;
+
+  try {
+    const response = await callEdgeFunction({
+      action: "manual_funding_history"
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data?.success !== true) return;
+
+    const requests = Array.isArray(data.requests) ? data.requests : [];
+
+    for (const request of requests) {
+      const id = String(request.id || "");
+      const status = String(request.status || "").toLowerCase();
+
+      if (!id) continue;
+
+      const previousStatus = fundingStatusState.get(id);
+
+      if (
+        !initial &&
+        previousStatus &&
+        previousStatus !== status &&
+        (status === "approved" || status === "rejected") &&
+        (previousStatus === "pending" || previousStatus === "submitted")
+      ) {
+        const amount = Number(request.amount || 0).toLocaleString("en-NG");
+        const reference = request.reference || "—";
+
+        if (status === "approved") {
+          addMessage(
+            `✅ Your wallet funding has been approved.
+
+Amount: ₦${amount}
+Reference: ${reference}
+
+The ₦${amount} has been credited to your Bindawasub wallet.`,
+            "bot"
+          );
+        } else {
+          const reason = request.note ? `\nReason: ${request.note}` : "";
+
+          addMessage(
+            `❌ Your wallet funding request was rejected.
+
+Amount: ₦${amount}
+Reference: ${reference}${reason}
+
+If you believe this was a mistake, please contact Bindawasub support.`,
+            "bot"
+          );
+        }
+
+        if (activeFundingRequestId === id) {
+          activeFundingRequestId = null;
+        }
+      }
+
+      fundingStatusState.set(id, status);
+    }
+  } catch (error) {
+    console.debug("Funding status check skipped:", error);
+  }
+}
+
+function startFundingStatusNotifications() {
+  if (fundingStatusTimer) {
+    clearInterval(fundingStatusTimer);
+  }
+
+  syncManualFundingStatus(true);
+
+  fundingStatusTimer = setInterval(() => {
+    syncManualFundingStatus(false);
+  }, 5000);
+}
+
+function stopFundingStatusNotifications() {
+  if (fundingStatusTimer) {
+    clearInterval(fundingStatusTimer);
+    fundingStatusTimer = null;
+  }
 }
 
 /* =========================================
