@@ -51,6 +51,7 @@
 <section id="services" class="panel">
 <div class="card"><div class="section-title"><h2>Services</h2><button id="newService">+ Add Service</button></div><div id="serviceMsg"></div><div class="table-wrap"><table><thead><tr><th>Service</th><th>Code</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>Provider Service Routing</h2><button id="newProviderService">+ Add Provider Service</button></div><div id="providerServiceMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Service</th><th>Purchase Endpoint</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="providerServiceRows"></tbody></table></div><p class="muted">This controls which providers are allowed to serve each Bindawasub service. It does not expose API credentials.</p></div>
+<div class="card"><div class="section-title"><h2>Provider Service Capabilities</h2><button id="newProviderServiceOperation">+ Add Capability</button></div><div id="providerServiceOperationMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Service</th><th>Operation</th><th>Endpoint</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="providerServiceOperationRows"></tbody></table></div><p class="muted">Each provider/service capability maps an operation to a configured endpoint. Examples: purchase, balance, status, catalog. New operation types can be added without changing the execution engine.</p></div>
 <div class="card"><div class="section-title"><h2>Service Fields</h2><button id="newServiceField">+ Add Field</button></div><div class="grid2"><div class="field"><label>Service</label><select id="serviceFieldService"></select></div><div><span class="muted">Define the customer inputs required by each service. Examples: meter number, decoder number, amount, exam type.</span></div></div><div id="serviceFieldMsg"></div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Label</th><th>Type</th><th>Required</th><th>Sensitive</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceFieldRows"></tbody></table></div></div>
 
 <div class="card"><div class="section-title"><h2>Networks</h2><button id="newNetwork">+ Add Network</button></div>
@@ -130,6 +131,7 @@ async function loadServices(){
     $("serviceRows").innerHTML=services.map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\''+s.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No services configured.</td></tr>';
     refreshServiceFieldServiceOptions();
     await loadProviderServices();
+    await loadProviderServiceOperations();
     await loadServiceFields();
     await loadCatalogDimensions();
   }catch(e){msg($("serviceMsg"),e.message,"error")}
@@ -147,6 +149,51 @@ async function loadProviderServices(){
   $("providerServiceRows").innerHTML=providerServices.map(x=>'<tr><td>'+escapeHtml(x.api_providers?.name||x.api_providers?.code||"—")+'</td><td>'+escapeHtml(x.service_type)+'</td><td>'+escapeHtml(x.priority)+'</td><td><span class="badge '+(x.enabled?"on":"off")+'">'+(x.enabled?"Enabled":"Disabled")+'</span></td><td><button class="secondary" onclick="editProviderService(\''+x.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="6" class="muted">No provider-service mappings.</td></tr>';
 }
 window.editProviderService=id=>openProviderService(providerServices.find(x=>x.id===id)||null);
+let providerServiceOperations=[];
+async function loadProviderServiceOperations(){
+  providerServiceOperations=[];
+  for(const ps of providerServices){
+    try{
+      const d=await admin({action:"list_provider_service_operations",provider_service_id:ps.id});
+      for(const op of (d.operations||[])) providerServiceOperations.push({...op,provider_service:ps});
+    }catch(e){msg($("providerServiceOperationMsg"),e.message,"error");}
+  }
+  $("providerServiceOperationRows").innerHTML=providerServiceOperations.map(x=>{
+    const ep=x.api_endpoints||{};
+    return '<tr><td>'+escapeHtml(x.provider_service?.api_providers?.name||"—")+'</td><td>'+escapeHtml(x.provider_service?.service_type||"—")+'</td><td><strong>'+escapeHtml(x.operation)+'</strong></td><td>'+escapeHtml((ep.method||"")+" "+(ep.path||""))+'</td><td>'+escapeHtml(x.priority)+'</td><td><span class="badge '+(x.active&&ep.active?"on":"off")+'">'+(x.active&&ep.active?"Active":"Disabled")+'</span></td><td><button class="secondary" onclick="editProviderServiceOperation(\''+x.id+'\')">Edit</button></td></tr>';
+  }).join("")||'<tr><td colspan="7" class="muted">No provider service capabilities configured.</td></tr>';
+}
+window.editProviderServiceOperation=id=>openProviderServiceOperation(providerServiceOperations.find(x=>x.id===id)||null);
+$("newProviderServiceOperation").onclick=()=>openProviderServiceOperation(null);
+async function openProviderServiceOperation(x){
+  $("modalTitle").textContent=x?"Edit Provider Service Capability":"Add Provider Service Capability";
+  $("modalBody").innerHTML='<div class="grid2"><div class="field"><label>Provider Service *</label><select id="psoService"></select></div><div class="field"><label>Operation *</label><input id="psoOperation" placeholder="e.g. balance, status, catalog"></div><div class="field"><label>Endpoint *</label><select id="psoEndpoint"></select><div class="muted">Only endpoints for the selected provider/service and operation are shown.</div></div><div class="field"><label>Priority</label><input id="psoPriority" type="number" min="0" value="10"></div><div class="field"><label><input id="psoActive" type="checkbox" style="width:auto" checked> Active</label></div></div><div class="field"><label>Metadata (JSON)</label><textarea id="psoMetadata">{}</textarea></div><button id="saveProviderServiceOperation">Save Capability</button>';
+  $("psoService").innerHTML=providerServices.map(ps=>'<option value="'+ps.id+'">'+escapeHtml(ps.api_providers?.name||ps.api_providers?.code||"—")+' → '+escapeHtml(ps.service_type)+'</option>').join("");
+  $("psoService").value=x?.provider_service_id||providerServices[0]?.id||"";
+  $("psoOperation").value=x?.operation||"";
+  $("psoPriority").value=x?.priority??10;
+  $("psoActive").checked=x?.active!==false;
+  $("psoMetadata").value=JSON.stringify(x?.metadata||{},null,2);
+  async function loadCapabilityEndpoints(){
+    const ps=providerServices.find(v=>v.id===$("psoService").value);
+    if(!ps){$("psoEndpoint").innerHTML='<option value="">No provider service</option>';return;}
+    const d=await admin({action:"list_endpoints",provider_id:ps.provider_id});
+    const op=$("psoOperation").value.trim().toLowerCase();
+    const eps=(d.endpoints||[]).filter(e=>e.service_type===ps.service_type && e.operation===op);
+    $("psoEndpoint").innerHTML='<option value="">Select endpoint...</option>'+eps.map(e=>'<option value="'+e.id+'">'+escapeHtml((e.method||"")+" "+(e.path||""))+(e.active?"":" (inactive)")+'</option>').join("");
+    $("psoEndpoint").value=x?.endpoint_id||"";
+  }
+  $("psoService").onchange=loadCapabilityEndpoints;
+  $("psoOperation").oninput=loadCapabilityEndpoints;
+  $("modal").classList.remove("hidden"); await loadCapabilityEndpoints();
+  $("saveProviderServiceOperation").onclick=async()=>{
+    try{
+      let metadata={};try{metadata=JSON.parse($("psoMetadata").value||"{}")}catch{throw Error("Invalid capability metadata JSON.")}
+      await admin({action:"save_provider_service_operation",id:x?.id,provider_service_id:$("psoService").value,operation:$("psoOperation").value,endpoint_id:$("psoEndpoint").value,priority:$("psoPriority").value,active:$("psoActive").checked,metadata});
+      $("modal").classList.add("hidden");await loadProviderServiceOperations();
+    }catch(e){msg($("modalMsg"),e.message,"error")}
+  };
+}
 $("newProviderService").onclick=()=>openProviderService(null);
 async function openProviderService(x){
   $("modalTitle").textContent=x?"Edit Provider Service":"Add Provider Service";
@@ -162,7 +209,7 @@ async function openProviderService(x){
   }
   $("psProvider").onchange=loadProviderPurchaseEndpoints;$("psService").onchange=loadProviderPurchaseEndpoints;
   $("modal").classList.remove("hidden"); await loadProviderPurchaseEndpoints();
-  $("saveProviderService").onclick=async()=>{try{let metadata={};try{metadata=JSON.parse($("psMetadata").value||"{}")}catch{throw Error("Invalid routing metadata JSON.")}await admin({action:"save_provider_service",id:x?.id,provider_id:$("psProvider").value,service_type:$("psService").value,endpoint_id:$("psEndpoint").value||null,priority:$("psPriority").value,enabled:$("psEnabled").checked,metadata});$("modal").classList.add("hidden");await loadProviderServices()}catch(e){msg($("modalMsg"),e.message,"error")}};
+  $("saveProviderService").onclick=async()=>{try{let metadata={};try{metadata=JSON.parse($("psMetadata").value||"{}")}catch{throw Error("Invalid routing metadata JSON.")}await admin({action:"save_provider_service",id:x?.id,provider_id:$("psProvider").value,service_type:$("psService").value,endpoint_id:$("psEndpoint").value||null,priority:$("psPriority").value,enabled:$("psEnabled").checked,metadata});$("modal").classList.add("hidden");await loadProviderServices();await loadProviderServiceOperations()}catch(e){msg($("modalMsg"),e.message,"error")}};
 }
 async function loadServiceFields(){
   const serviceId=$("serviceFieldService").value;
