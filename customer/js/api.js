@@ -46,6 +46,11 @@ async function getAccessToken(forceRefresh = false) {
 async function callEdgeFunction(payload) {
   let token = await getAccessToken(false);
 
+  const requestPayload =
+    payload && typeof payload === "object"
+      ? { channel: getCustomerChannel(), ...payload }
+      : payload;
+
   let response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
     headers: {
@@ -53,7 +58,7 @@ async function callEdgeFunction(payload) {
       "apikey": SUPABASE_PUBLISHABLE_KEY,
       "Authorization": "Bearer " + token
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(requestPayload)
   });
 
   if (response.status === 401 || response.status === 403) {
@@ -66,7 +71,7 @@ async function callEdgeFunction(payload) {
         "apikey": SUPABASE_PUBLISHABLE_KEY,
         "Authorization": "Bearer " + token
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(requestPayload)
     });
   }
 
