@@ -710,7 +710,7 @@ async function loadManualFundingSettings(){
   $("mfInstructions").value=s.instructions||"";
   $("mfActive").value=s.active===false?"false":"true";
 }
-async async function loadManualFundingRequests(){
+async function loadManualFundingRequests(){
   try{
     // Load the complete manual-funding history for admin, not only submitted requests.
     const statuses=["pending","submitted","approved","rejected"];
