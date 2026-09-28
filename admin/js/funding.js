@@ -33,10 +33,24 @@ async function loadManualFundingRequests(){
       const reason=r.note||r.rejection_reason||"—";
       const reviewed=r.reviewed_at?r.reviewed_at.replace("T"," ").replace("Z",""):"—";
       const action=(status==="pending"||status==="submitted")
-        ? '<div class="actions funding-actions"><button type="button" onclick="approveManualFunding(\''+r.id+'\')">Approve</button><button type="button" class="danger" onclick="rejectManualFunding(\''+r.id+'\')">Reject</button></div>'
+        ? '<div class="funding-actions"><button type="button" class="approve-funding" data-id="'+escapeHtml(r.id)+'">Approve</button><button type="button" class="danger reject-funding" data-id="'+escapeHtml(r.id)+'">Reject</button></div>'
         : '<span class="muted">Reviewed</span>';
-      return '<tr><td><strong>'+escapeHtml(customer)+'</strong><br><span class="muted">'+escapeHtml(u.phone||u.email||"")+'</span></td><td>'+money(r.amount)+'</td><td><code>'+escapeHtml(r.reference||"—")+'</code></td><td><code>'+escapeHtml(r.payment_reference||"—")+'</code></td><td>'+escapeHtml(submitted)+'</td><td><span class="badge '+statusClass+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(reason)+'</td><td>'+escapeHtml(reviewed)+'</td><td>'+action+'</td></tr>';
+      return '<tr><td><strong>'+escapeHtml(customer)+'</strong><br><span class="muted">'+escapeHtml(u.phone||u.email||"")+'</span></td><td>'+action+'</td><td>'+money(r.amount)+'</td><td><code>'+escapeHtml(r.reference||"—")+'</code></td><td><code>'+escapeHtml(r.payment_reference||"—")+'</code></td><td>'+escapeHtml(submitted)+'</td><td><span class="badge '+statusClass+'">'+escapeHtml(status)+'</span></td><td>'+escapeHtml(reason)+'</td><td>'+escapeHtml(reviewed)+'</td></tr>';
     }).join("")||'<tr><td colspan="9" class="muted">No funding history found.</td></tr>';
+
+    const fundingRows=document.getElementById("manualFundingRows");
+    if(fundingRows && !fundingRows.dataset.actionsBound){
+      fundingRows.addEventListener("click",event=>{
+        const approve=event.target.closest(".approve-funding");
+        if(approve){
+          approveManualFunding(approve.dataset.id);
+          return;
+        }
+        const reject=event.target.closest(".reject-funding");
+        if(reject) rejectManualFunding(reject.dataset.id);
+      });
+      fundingRows.dataset.actionsBound="true";
+    }
 
     const submittedCount=rows.filter(r=>r.status==="submitted"||r.status==="pending").length;
     msg($("manualFundingMsg"),submittedCount+" funding request(s) awaiting admin review.",submittedCount?"info":"success");
