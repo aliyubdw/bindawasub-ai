@@ -2233,10 +2233,20 @@ Misali: 08012345678`,
     let requestAmount = null;
 
     if (!requestAction && waitingForFundingAmount) {
-      const amountMatch = String(message || "").match(/^(?:₦|ngn|naira)?\\s*([0-9,]+(?:\\.\\d+)?)$/i);
+      const amountText = String(message || "").trim();
+      const amountMatch = amountText.match(
+        /^(?:₦\\s*|NGN\\s*|naira\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*$/i
+      );
+
       if (amountMatch) {
-        requestAction = "manual_funding_request";
-        requestAmount = Number(String(amountMatch[1]).replace(/,/g, ""));
+        const parsedAmount = Number(
+          String(amountMatch[1]).replace(/,/g, "")
+        );
+
+        if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+          requestAction = "manual_funding_request";
+          requestAmount = parsedAmount;
+        }
       }
     }
 
