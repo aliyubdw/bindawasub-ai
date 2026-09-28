@@ -589,6 +589,45 @@ Deno.serve(async (req) => {
 
 
     // ==========================================
+    // RECOVER MANUAL FUNDING AMOUNT FROM CHAT CONTEXT
+    // ==========================================
+    // This keeps the funding flow working even if an older frontend
+    // does not send the explicit manual_funding_request action.
+    if (!body.action && conversationId) {
+      const amountMatch = String(originalMessage).trim().match(
+        /^(?:₦\\s*|NGN\\s*|naira\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*$/i
+      );
+
+      if (amountMatch) {
+        const parsedAmount = Number(
+          String(amountMatch[1]).replace(/,/g, "")
+        );
+
+        if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+          const { data: previousAssistant } = await supabase
+            .from("ai_messages")
+            .select("intent, message")
+            .eq("conversation_id", conversationId)
+            .eq("role", "assistant")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const previousMessage = String(previousAssistant?.message || "").toLowerCase();
+          const previousIntent = String(previousAssistant?.intent || "").toLowerCase();
+
+          if (
+            previousIntent === "fund_wallet" ||
+            /enter the amount|amount you want to add|fund your wallet by bank transfer/.test(previousMessage)
+          ) {
+            body.action = "manual_funding_request";
+            body.amount = parsedAmount;
+          }
+        }
+      }
+    }
+
+    // ==========================================
     // AI MANAGEMENT LOGGING
     // ==========================================
     async function logAiMessage(
