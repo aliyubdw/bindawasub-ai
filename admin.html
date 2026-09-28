@@ -146,19 +146,23 @@ async function aiAdmin(payload){const r=await fetch(AI_URL,{method:"POST",header
 
 $("loginForm").addEventListener("submit",async e=>{
   e.preventDefault();
+  e.stopPropagation();
   const btn=$("loginBtn");
+  const emailInput=$("email");
+  const passwordInput=$("password");
+  const email=emailInput.value.trim();
+  const password=passwordInput.value;
+  if(!email||!password){msg($("loginMsg"),"Email and password are required.","error");return false;}
   btn.disabled=true;
   btn.textContent="Signing in…";
   msg($("loginMsg"),"Signing in…","info");
   try{
-    const email=$("email").value.trim();
-    const password=$("password").value;
-    if(!email||!password) throw Error("Email and password are required.");
+    // Keep the form in place until both Supabase authentication and admin verification succeed.
     const {data,error}=await sb.auth.signInWithPassword({email,password});
     if(error) throw error;
     const accessToken=data?.session?.access_token;
     if(!accessToken) throw Error("Login succeeded, but no session was returned. Please try again.");
-    const r=await fetch(ADMIN_URL,{
+    const response=await fetch(ADMIN_URL,{
       method:"POST",
       headers:{
         "Content-Type":"application/json",
@@ -166,18 +170,28 @@ $("loginForm").addEventListener("submit",async e=>{
       },
       body:JSON.stringify({action:"list_products"})
     });
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||d.success===false) throw Error(d.error||"Admin access required.");
+    const raw=await response.text();
+    let result={};
+    try{result=raw?JSON.parse(raw):{};}catch{result={error:raw||"Invalid response from admin service."};}
+    if(!response.ok||result.success===false){
+      await sb.auth.signOut();
+      throw Error(result.error||"Admin access required.");
+    }
     $("loginView").classList.add("hidden");
     $("app").classList.remove("hidden");
+    msg($("loginMsg"),"","info");
     await loadAll();
   }catch(e){
     console.error("Bindawasub admin login error:",e);
-    msg($("loginMsg"),e?.message||"Login failed. Check the browser console for details.","error");
+    msg($("loginMsg"),e?.message||"Login failed. Please try again.","error");
+    // Restore the button but deliberately keep the entered credentials visible.
+    emailInput.value=email;
+    passwordInput.value=password;
   }finally{
     btn.disabled=false;
     btn.textContent="Login";
   }
+  return false;
 });
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active")});
