@@ -5,16 +5,35 @@
 </div>
 
 <div id="app" class="shell hidden">
-<div class="header"><h1>Bindawasub Admin</h1><p>Manage providers, plans, pricing, customers and business analytics.</p></div>
-<div class="nav">
-<button data-tab="overview" class="active">Overview</button>
-<button data-tab="providers">APIs & Providers</button><button data-tab="services">Services</button>
-<button data-tab="products">Products & Plans</button>
-<button data-tab="transactions">Transactions</button>
-<button data-tab="analytics">Analytics</button>
-<button data-tab="operations">Operations</button><button data-tab="funding">Manual Funding</button><button data-tab="reliability">Reliability Tests</button><button data-tab="ai-management">AI Management</button>
-<button id="logout" class="danger">Logout</button>
-</div>
+<button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Open navigation">☰</button>
+<div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+<aside id="adminSidebar" class="sidebar">
+  <div class="brand">
+    <div class="brand-mark">B</div>
+    <div><strong>Bindawasub</strong><span>Admin Console</span></div>
+  </div>
+  <nav class="nav sidebar-nav" aria-label="Admin navigation">
+    <div class="nav-label">Workspace</div>
+    <button data-tab="overview" class="active"><span class="nav-icon">⌂</span><span>Overview</span></button>
+    <button data-tab="providers"><span class="nav-icon">⇄</span><span>APIs & Providers</span></button>
+    <button data-tab="services"><span class="nav-icon">◈</span><span>Services</span></button>
+    <button data-tab="products"><span class="nav-icon">▣</span><span>Products & Plans</span></button>
+    <button data-tab="transactions"><span class="nav-icon">↔</span><span>Transactions</span></button>
+    <button data-tab="analytics"><span class="nav-icon">▥</span><span>Analytics</span></button>
+    <div class="nav-label">Operations</div>
+    <button data-tab="operations"><span class="nav-icon">⌕</span><span>Customer Operations</span></button>
+    <button data-tab="funding"><span class="nav-icon">₦</span><span>Manual Funding</span></button>
+    <button data-tab="reliability"><span class="nav-icon">✓</span><span>Reliability Tests</span></button>
+    <div class="nav-label">AI</div>
+    <button data-tab="ai-management"><span class="nav-icon">✦</span><span>AI Management</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="secure-note"><span>●</span><div><strong>Secure session</strong><small>Server-side credentials</small></div></div>
+    <button id="logout" class="logout-btn danger"><span class="nav-icon">↪</span><span>Logout</span></button>
+  </div>
+</aside>
+<main class="main-content">
+<div class="header"><div><div class="eyebrow">CONTROL CENTER</div><h1>Bindawasub Admin</h1><p>Manage providers, plans, pricing, customers and business analytics.</p></div><div class="header-status"><span class="status-dot"></span> System online</div></div>
 
 <section id="overview" class="panel active">
 <div id="overviewMsg"></div>
@@ -110,7 +129,7 @@
 </div>
 <div class="card"><h2>Reset Customer Password</h2><div id="resetMsg"></div><div class="grid2"><div class="field"><label>Customer email</label><input id="resetEmail" type="email"></div><div class="field"><label>New password</label><input id="resetPassword" type="password" minlength="8"></div></div><button id="resetBtn">Reset Password</button></div>
 </section>
-</div>
+</main></div>
 
 <div id="modal" class="modal hidden"><div class="modalbox"><div class="section-title"><h2 id="modalTitle"></h2><button id="closeModal" class="secondary">Close</button></div><div id="modalMsg"></div><div id="modalBody"></div></div></div>
 
