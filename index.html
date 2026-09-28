@@ -23,6 +23,17 @@
     <button id="showRegisterButton" type="button" style="margin-top:8px;background:#eeeeee;color:#333;">Create account</button>
   </div>
 
+
+  <div id="profileCompletionForm" style="display:none;">
+    <h3 style="margin:0 0 8px;">Complete your Bindawasub account</h3>
+    <p class="muted" style="margin-bottom:12px;">One more step: add your name and phone number.</p>
+    <input id="profileEmail" type="email" placeholder="Email" autocomplete="email" readonly>
+    <input id="profileName" type="text" placeholder="Full name" autocomplete="name">
+    <input id="profilePhone" type="tel" placeholder="Phone number (08012345678)" autocomplete="tel">
+    <button id="completeProfileButton" type="button">Continue</button>
+    <button id="profileBackButton" type="button" style="margin-top:8px;background:#eeeeee;color:#333;">Back</button>
+  </div>
+
   <div id="registerForm" style="display:none;">
     <input id="registerName" type="text" placeholder="Full name" autocomplete="name">
     <input id="registerPhone" type="tel" placeholder="Phone number (08012345678)" autocomplete="tel">
