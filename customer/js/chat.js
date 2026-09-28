@@ -314,6 +314,13 @@ Misali: 08012345678`,
         "bot"
       );
 
+      if (
+        data?.purchase &&
+        (data?.intent === "purchase" || data?.intent === "airtime_purchase")
+      ) {
+        showPurchaseConfirmation(data.purchase);
+      }
+
     } else if (data?.error) {
 
       addMessage(
