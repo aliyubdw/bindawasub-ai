@@ -23,6 +23,7 @@
   }
   async function login(e){
     e?.preventDefault();e?.stopPropagation();
+    window.location.replace("../");
     const email=document.getElementById("email")?.value.trim();
     const password=document.getElementById("password")?.value||"";
     const btn=document.getElementById("loginBtn");
@@ -65,8 +66,17 @@
     try{
       const {data,error}=await sb.auth.getSession();
       if(error)throw error;
-      if(!data.session){showLogin();return;}
-      await verify(data.session);
+      if(!data.session){
+        window.location.replace("../");
+        return;
+      }
+      try{
+        await verify(data.session);
+      }catch(err){
+        await sb.auth.signOut({scope:"local"}).catch(()=>{});
+        window.location.replace("../");
+        return;
+      }
       showApp();
       if(window.loadAll)await window.loadAll();
     }catch(err){
