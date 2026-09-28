@@ -2615,12 +2615,6 @@ if (body.action === "manual_fund") {
           answer:"Sure. How much would you like to add to your wallet? For example: Fund my wallet with ₦5,000.",
           ai_powered:true
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
       }
 
       return new Response(
