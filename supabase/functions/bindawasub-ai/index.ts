@@ -2559,10 +2559,6 @@ if (body.action === "manual_fund") {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
-    }
-    } else {
-      // BillStack fund_wallet handler below.
-    }
     } catch (aiError) {
       console.error("Gemini fallback error:", aiError);
 
@@ -2579,6 +2575,10 @@ if (body.action === "manual_fund") {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    } else {
+      // BillStack fund_wallet handler below.
     }
 
   } catch (error) {
