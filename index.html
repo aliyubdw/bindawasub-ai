@@ -693,6 +693,23 @@
     </div>
     <button id="adminFundButton" type="button" disabled>Fund Customer Wallet</button>
 
+    <div style="margin-top:16px;">
+      <h4 style="margin:0 0 8px;">Manual Funding Settings</h4>
+      <div class="admin-grid">
+        <input id="manualBankName" type="text" placeholder="Bank name">
+        <input id="manualAccountName" type="text" placeholder="Account name">
+        <input id="manualAccountNumber" type="text" placeholder="Account number">
+      </div>
+      <textarea id="manualFundingInstructions" rows="3" placeholder="Instructions for customers"></textarea>
+      <button id="manualFundingSettingsSave" type="button">Save Funding Details</button>
+    </div>
+
+    <div style="margin-top:16px;">
+      <h4 style="margin:0 0 8px;">Pending Manual Funding</h4>
+      <button id="manualFundingRefresh" type="button">Refresh Requests</button>
+      <div id="manualFundingRequests"></div>
+    </div>
+
     <div class="admin-grid">
       <input id="adminResetEmail" type="email" placeholder="Customer email">
       <input id="adminResetPassword" type="password" placeholder="New password (8+ chars)">
@@ -1277,6 +1294,114 @@ async function fundAdminCustomer() {
   } finally {
     button.disabled = !adminSelectedCustomer;
     button.textContent = "Fund Customer Wallet";
+  }
+}
+
+async function loadManualFundingSettings() {
+  try {
+    const data = await adminCall({ action: "manual_funding_settings_get" });
+    const s = data.settings || {};
+    document.getElementById("manualBankName").value = s.bank_name || "";
+    document.getElementById("manualAccountName").value = s.account_name || "";
+    document.getElementById("manualAccountNumber").value = s.account_number || "";
+    document.getElementById("manualFundingInstructions").value = s.instructions || "";
+  } catch (error) {
+    showAdminMessage(error.message || "Unable to load funding settings.", true);
+  }
+}
+
+async function saveManualFundingSettings() {
+  const button = document.getElementById("manualFundingSettingsSave");
+  button.disabled = true;
+  try {
+    await adminCall({
+      action: "manual_funding_settings_save",
+      settings: {
+        active: true,
+        bank_name: document.getElementById("manualBankName").value.trim(),
+        account_name: document.getElementById("manualAccountName").value.trim(),
+        account_number: document.getElementById("manualAccountNumber").value.trim(),
+        instructions: document.getElementById("manualFundingInstructions").value.trim()
+      }
+    });
+    showAdminMessage("Manual funding details saved.");
+  } catch (error) {
+    showAdminMessage(error.message || "Unable to save funding details.", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function loadManualFundingRequests() {
+  const box = document.getElementById("manualFundingRequests");
+  box.textContent = "Loading...";
+  try {
+    const data = await adminCall({ action: "manual_funding_requests", status: "submitted" });
+    const requests = data.requests || [];
+
+    if (!requests.length) {
+      box.textContent = "No submitted funding requests.";
+      return;
+    }
+
+    box.innerHTML = "";
+    requests.forEach(request => {
+      const user = Array.isArray(request.users) ? request.users[0] : request.users;
+      const item = document.createElement("div");
+      item.className = "admin-customer";
+      item.style.marginTop = "8px";
+
+      const info = document.createElement("div");
+      info.textContent =
+        (user?.name || "Customer") + " • " +
+        (user?.phone || "No phone") + " • ₦" +
+        Number(request.amount || 0).toLocaleString() +
+        " • " + request.reference +
+        (request.payment_reference ? " • Payment: " + request.payment_reference : "");
+
+      const approve = document.createElement("button");
+      approve.type = "button";
+      approve.textContent = "Approve";
+      approve.style.marginTop = "6px";
+      approve.onclick = async () => {
+        if (!window.confirm("Approve and credit ₦" + Number(request.amount || 0).toLocaleString() + " to this customer?")) return;
+        approve.disabled = true;
+        try {
+          const result = await adminCall({ action:"manual_funding_approve", request_id:request.id });
+          showAdminMessage(result.answer || "Funding approved.");
+          await loadManualFundingRequests();
+        } catch (error) {
+          showAdminMessage(error.message || "Funding approval failed.", true);
+          approve.disabled = false;
+        }
+      };
+
+      const reject = document.createElement("button");
+      reject.type = "button";
+      reject.textContent = "Reject";
+      reject.style.marginTop = "6px";
+      reject.style.marginLeft = "6px";
+      reject.onclick = async () => {
+        const note = window.prompt("Reason for rejection:", "");
+        if (note === null) return;
+        reject.disabled = true;
+        try {
+          await adminCall({ action:"manual_funding_reject", request_id:request.id, note });
+          showAdminMessage("Funding request rejected.");
+          await loadManualFundingRequests();
+        } catch (error) {
+          showAdminMessage(error.message || "Funding rejection failed.", true);
+          reject.disabled = false;
+        }
+      };
+
+      item.appendChild(info);
+      item.appendChild(approve);
+      item.appendChild(reject);
+      box.appendChild(item);
+    });
+  } catch (error) {
+    box.textContent = error.message || "Unable to load funding requests.";
   }
 }
 
@@ -2331,7 +2456,15 @@ document
 
 document
   .getElementById("adminResetButton")
-  .addEventListener("click", resetAdminCustomerPassword);
+  .addEventListener("click", resetAdminCustomerPassword);\n\ndocument
+  .getElementById("manualFundingSettingsSave")
+  .addEventListener("click", saveManualFundingSettings);
+
+document
+  .getElementById("manualFundingRefresh")
+  .addEventListener("click", loadManualFundingRequests);
+
+
 
 
 
