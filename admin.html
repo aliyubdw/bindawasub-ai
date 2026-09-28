@@ -217,7 +217,6 @@ async function handleAdminLogin(e){
   return false;
 }
 
-});
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active")});
 
