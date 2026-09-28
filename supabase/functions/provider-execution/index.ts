@@ -93,13 +93,14 @@ async function dryRunPurchase(req:Request, body:any) {
     if(mError) throw new Error("Provider mapping lookup failed: "+mError.message);
     mapping=(mappings||[]).find((m:any)=>m.provider_status==="active"); if(!mapping) throw new Error("No active provider plan mapping is available for this product."); provider=mapping.api_providers;
   } else {
-    const {data:services,error:sError}=await db.from("provider_services").select("id,provider_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)").eq("service_type",serviceType).eq("enabled",true).eq("api_providers.status","active").order("priority",{ascending:true});
+    const {data:services,error:sError}=await db.from("provider_services").select("id,provider_id,endpoint_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)").eq("service_type",serviceType).eq("enabled",true).eq("api_providers.status","active").order("priority",{ascending:true});
     if(sError) throw new Error("Provider service lookup failed: "+sError.message);
     const service=(services||[])[0]; if(!service) throw new Error("No active provider is configured for "+serviceType+"."); provider=service.api_providers;
   }
   let endpoint:any=null; let eError:any=null;
   if(mapping?.endpoint_id){ const r=await db.from("api_endpoints").select("*").eq("id",mapping.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle(); endpoint=r.data; eError=r.error; }
-  else { const r=await db.from("api_endpoints").select("*").eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle(); endpoint=r.data; eError=r.error; }
+  else if(service?.endpoint_id){ const r=await db.from("api_endpoints").select("*").eq("id",service.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle(); endpoint=r.data; eError=r.error; }
+  else { const r=await db.from("api_endpoints").select("*").eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).order("id",{ascending:true}).limit(1).maybeSingle(); endpoint=r.data; eError=r.error; }
   if(eError || !endpoint) throw new Error("No active purchase endpoint is configured for "+provider.name+".");
   const credentials=await getCredentials(provider.id);
   const reference="BW-"+tx.id;
@@ -143,7 +144,7 @@ async function executePurchase(req:Request, body:any) {
     candidates=(data||[]).filter((m:any)=>m.provider_status==="active").map((m:any)=>({mapping:m,service:null,provider:m.api_providers}));
   } else {
     const {data,error}=await db.from("provider_services")
-      .select("id,provider_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)")
+      .select("id,provider_id,endpoint_id,priority,metadata,api_providers!inner(id,name,code,base_url,status)")
       .eq("service_type",serviceType).eq("enabled",true).eq("api_providers.status","active").order("priority",{ascending:true});
     if(error) throw new Error("Provider service lookup failed: "+error.message);
     candidates=(data||[]).map((s:any)=>({mapping:null,service:s,provider:s.api_providers}));
@@ -161,8 +162,10 @@ async function executePurchase(req:Request, body:any) {
       const r=await db.from("api_endpoints").select("*").eq("id",mapping.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
       if(r.error) throw new Error("Purchase endpoint lookup failed: "+r.error.message);
       endpoint=r.data;
+    } else if(service?.endpoint_id){
+      const r=await db.from("api_endpoints").select("*").eq("id",service.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
     } else {
-      const r=await db.from("api_endpoints").select("*").eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
+      const r=await db.from("api_endpoints").select("*").eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).order("id",{ascending:true}).limit(1).maybeSingle();
       if(r.error) throw new Error("Purchase endpoint lookup failed: "+r.error.message);
       endpoint=r.data;
     }
