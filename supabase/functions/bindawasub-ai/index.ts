@@ -1177,7 +1177,7 @@ if (body.action === "manual_funding_submit") {
 if (body.action === "manual_funding_history") {
   const { data: requests, error: historyError } = await supabase
     .from("manual_funding_requests")
-    .select("id, amount, reference, payment_reference, status, created_at, submitted_at, reviewed_at")
+    .select("id, amount, reference, payment_reference, status, note, created_at, submitted_at, reviewed_at")
     .eq("user_id", userId)
     .order("created_at", { ascending:false })
     .limit(20);
@@ -1245,24 +1245,21 @@ if (body.action === "manual_funding_reject") {
   const note = body.note ? String(body.note).trim() : null;
   if (!requestId) return new Response(JSON.stringify({success:false,error:"Funding request ID is required."}),{status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
 
-  const { data: request, error: requestError } = await supabase
-    .from("manual_funding_requests")
-    .select("id,status")
-    .eq("id",requestId)
-    .maybeSingle();
-  if (requestError) throw requestError;
-  if (!request) return new Response(JSON.stringify({success:false,error:"Funding request not found."}),{status:404,headers:{...corsHeaders,"Content-Type":"application/json"}});
-  if (!["pending","submitted"].includes(request.status)) return new Response(JSON.stringify({success:false,error:`This funding request is already ${request.status}.`}),{status:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
+  const { data, error } = await supabase.rpc("reject_manual_funding", {
+    p_request_id: requestId,
+    p_admin_user_id: userId,
+    p_reason: note
+  });
+  if (error) throw error;
 
-  const { data: updated, error: updateError } = await supabase
-    .from("manual_funding_requests")
-    .update({status:"rejected",note:note || null,reviewed_at:new Date().toISOString(),reviewed_by:userId})
-    .eq("id",requestId)
-    .select("id,amount,reference,payment_reference,status,note,reviewed_at")
-    .single();
-  if (updateError) throw updateError;
+  const result = data?.[0];
 
-  return new Response(JSON.stringify({success:true,intent:"manual_funding_reject",request:updated,answer:"Funding request rejected."}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+  return new Response(JSON.stringify({
+    success:!!result?.success,
+    intent:"manual_funding_reject",
+    request:result || null,
+    answer:result?.message || "Funding rejection completed."
+  }),{status:result?.success?200:400,headers:{...corsHeaders,"Content-Type":"application/json"}});
 }
 
 if (body.action === "manual_funding_settings_get") {
