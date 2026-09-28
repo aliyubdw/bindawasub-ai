@@ -306,6 +306,330 @@
       font-weight: bold;
       cursor: pointer;
     }
+  
+    /* =========================================
+       CUSTOMER UI REFRESH
+    ========================================= */
+    :root {
+      --brand: #087f5b;
+      --brand-dark: #056044;
+      --brand-soft: #eaf8f2;
+      --surface: #ffffff;
+      --surface-soft: #f7faf8;
+      --text: #17231f;
+      --muted: #71807a;
+      --border: #e3ebe7;
+      --shadow: 0 18px 55px rgba(20, 55, 43, 0.12);
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(8,127,91,.10), transparent 30%),
+        linear-gradient(180deg, #f6faf8 0%, #eef5f1 100%);
+      color: var(--text);
+    }
+
+    .chat {
+      max-width: 760px;
+      height: min(92vh, 900px);
+      border: 1px solid rgba(8,127,91,.10);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .header {
+      padding: 18px 20px 16px;
+      background: linear-gradient(135deg, #087f5b 0%, #056044 100%);
+      position: relative;
+    }
+
+    .header h2 {
+      font-size: 19px;
+      letter-spacing: -.2px;
+      padding-right: 190px;
+    }
+
+    .header p {
+      color: rgba(255,255,255,.82);
+      margin-top: 4px;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 13px;
+      background: rgba(255,255,255,.16);
+      display: grid;
+      place-items: center;
+      font-size: 21px;
+      flex: 0 0 auto;
+    }
+
+    .header-copy {
+      min-width: 0;
+    }
+
+    .header-copy h2 {
+      padding-right: 0;
+      margin: 0;
+    }
+
+    .online-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 5px;
+      font-size: 11px;
+      color: rgba(255,255,255,.78);
+    }
+
+    .online-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #8df0c5;
+      box-shadow: 0 0 0 3px rgba(141,240,197,.12);
+    }
+
+    .chat-header-actions {
+      position: absolute;
+      top: 17px;
+      right: 18px;
+      float: none;
+    }
+
+    .header-action {
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      background: rgba(255,255,255,.12);
+    }
+
+    .new-chat-button {
+      background: #fff;
+      color: var(--brand);
+      border-color: #fff;
+      font-weight: 700;
+    }
+
+    .customer-toolbar {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.96);
+      scrollbar-width: none;
+    }
+
+    .customer-toolbar::-webkit-scrollbar { display: none; }
+
+    .quick-action {
+      padding: 9px 13px;
+      border-radius: 11px;
+      border: 1px solid #d8e7e1;
+      box-shadow: 0 1px 2px rgba(0,0,0,.03);
+      font-weight: 600;
+      transition: transform .15s, border-color .15s, background .15s;
+    }
+
+    .quick-action:hover {
+      background: var(--brand-soft);
+      border-color: #a9d5c5;
+    }
+
+    .quick-action:active { transform: scale(.97); }
+
+    .quick-action.primary {
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+      border-color: #b8ddcf;
+    }
+
+    #messages {
+      padding: 20px 18px 14px;
+      background:
+        radial-gradient(circle at 85% 10%, rgba(8,127,91,.035), transparent 25%),
+        #fbfdfc;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      margin-bottom: 10px;
+      padding: 11px 14px;
+      border-radius: 16px;
+      max-width: min(88%, 610px);
+      line-height: 1.5;
+      box-shadow: 0 1px 2px rgba(20,55,43,.04);
+    }
+
+    .user {
+      background: var(--brand);
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+
+    .bot {
+      background: white;
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 5px;
+    }
+
+    .input-area {
+      padding: 12px 14px 14px;
+      border-top: 1px solid var(--border);
+      background: white;
+      gap: 8px;
+    }
+
+    .input-area input {
+      min-width: 0;
+      border: 1px solid #d8e4df;
+      background: #f9fbfa;
+      border-radius: 13px;
+      padding: 13px 14px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+
+    .input-area input:focus {
+      background: white;
+      border-color: #79bca5;
+      box-shadow: 0 0 0 3px rgba(8,127,91,.09);
+    }
+
+    #sendButton {
+      min-width: 72px;
+      border-radius: 13px;
+      font-weight: 700;
+    }
+
+    .chat-helper {
+      padding: 0 14px 11px;
+      background: white;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .welcome-card {
+      margin: 4px auto 16px;
+      max-width: 590px;
+      padding: 20px;
+      background: linear-gradient(145deg, #f0faf6, #ffffff);
+      border: 1px solid #d9ebe4;
+      border-radius: 20px;
+      text-align: center;
+    }
+
+    .welcome-card .welcome-icon {
+      width: 46px;
+      height: 46px;
+      margin: 0 auto 10px;
+      border-radius: 15px;
+      background: var(--brand);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+    }
+
+    .welcome-card h3 {
+      margin: 0;
+      font-size: 17px;
+      color: var(--text);
+    }
+
+    .welcome-card p {
+      margin: 7px auto 0;
+      max-width: 470px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .suggestion-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .suggestion {
+      border: 1px solid #d4e6df;
+      background: white;
+      color: var(--brand-dark);
+      border-radius: 999px;
+      padding: 8px 11px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .suggestion:hover { background: var(--brand-soft); }
+
+    .product-card {
+      border: 1px solid #cfe3db;
+      border-radius: 15px;
+      padding: 15px;
+      color: var(--text);
+      background: white;
+      box-shadow: 0 3px 12px rgba(20,55,43,.05);
+    }
+
+    .product-card:hover {
+      background: #f8fcfa;
+      border-color: #7fbea9;
+      transform: translateY(-1px);
+    }
+
+    .product-price { color: var(--brand); }
+
+    .confirm-button, .cancel-button {
+      width: min(85%, 440px);
+      border-radius: 12px;
+    }
+
+    @media (max-width: 760px) {
+      body { align-items: stretch; }
+
+      .chat {
+        max-width: none;
+        width: 100%;
+        height: 100dvh;
+        min-height: 100dvh;
+        border-radius: 0;
+        border: 0;
+        box-shadow: none;
+      }
+
+      .header { padding: 14px 14px 13px; }
+      .header h2 { font-size: 17px; }
+      .brand-mark { width: 36px; height: 36px; border-radius: 11px; }
+      .chat-header-actions { top: 13px; right: 12px; }
+      .chat-header-actions .header-action { padding: 7px 8px; }
+      .header-copy { padding-right: 160px; }
+      #messages { padding: 16px 12px 10px; }
+      .message { max-width: 92%; }
+      .welcome-card { margin: 2px 2px 14px; padding: 17px 13px; }
+      .input-area { padding: 9px 10px 8px; }
+      #sendButton { min-width: 64px; padding-left: 12px; padding-right: 12px; }
+      .chat-helper { padding-bottom: 8px; }
+    }
+
+    @media (max-width: 430px) {
+      .header-copy { padding-right: 128px; }
+      .new-chat-button { font-size: 0; }
+      .new-chat-button::before { content: "＋"; font-size: 18px; }
+      .chat-header-actions { gap: 5px; }
+      .header-action:last-child { font-size: 0; }
+      .header-action:last-child::before { content: "↪"; font-size: 16px; }
+    }
+
   </style>
 </head>
 
@@ -338,9 +662,18 @@
 <div class="chat" id="chatScreen" style="display:none;">
 
   <div class="header">
-    <div class="chat-header-actions"><button id="newChatButton" class="header-action new-chat-button" type="button">＋ New chat</button><button id="logoutButton" class="header-action" type="button">Logout</button></div>
-    <h2>🤖 Bindawasub AI</h2>
-    <p id="headerSubtitle">Sannu! Ta yaya zan taimaka maka?</p>
+    <div class="chat-header-actions">
+      <button id="newChatButton" class="header-action new-chat-button" type="button">＋ New chat</button>
+      <button id="logoutButton" class="header-action" type="button">Logout</button>
+    </div>
+    <div class="header-brand">
+      <div class="brand-mark">🤖</div>
+      <div class="header-copy">
+        <h2>Bindawasub AI</h2>
+        <p id="headerSubtitle">Your VTU assistant</p>
+        <span class="online-status"><span class="online-dot"></span> Online</span>
+      </div>
+    </div>
     <div id="adminBadge" class="admin-badge" style="display:none;">ADMIN MODE</div>
   </div>
 
@@ -373,8 +706,16 @@
     <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" type="button" data-action-message="Check my wallet balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?">Fund Wallet</button></div>
     <div id="messages">
 
-      <div class="message bot">
-        Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?
+      <div class="welcome-card" id="welcomeCard">
+        <div class="welcome-icon">✦</div>
+        <h3>Sannu! Barka da zuwa Bindawasub AI</h3>
+        <p>Buy data, check your wallet, view transactions, or ask me anything about your Bindawasub account.</p>
+        <div class="suggestion-row">
+          <button class="suggestion" type="button" data-action-message="I want to buy data">Buy data</button>
+          <button class="suggestion" type="button" data-action-message="Check my wallet balance">Check wallet</button>
+          <button class="suggestion" type="button" data-action-message="Show my recent transactions">Recent transactions</button>
+          <button class="suggestion" type="button" data-action-message="How can I fund my wallet?">Fund wallet</button>
+        </div>
       </div>
 
     </div>
@@ -396,6 +737,7 @@
       </button>
 
     </div>
+    <div class="chat-helper">Secure account session • Your conversations are saved</div>
   </div>
 
 </div>
@@ -1008,6 +1350,9 @@ let waitingForConfirmation = false;
 ========================================= */
 
 function addMessage(text, type) {
+
+  const welcome = document.getElementById("welcomeCard");
+  if (welcome) welcome.remove();
 
   const messages =
     document.getElementById("messages");
@@ -1895,6 +2240,17 @@ document
   });
 
 initAuth();
+
+
+/* Customer quick actions */
+document.querySelectorAll("[data-action-message]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    const message = button.getAttribute("data-action-message");
+    const welcome = document.getElementById("welcomeCard");
+    if (welcome) welcome.remove();
+    sendMessage(message);
+  });
+});
 
 document
   .getElementById("messageInput")
