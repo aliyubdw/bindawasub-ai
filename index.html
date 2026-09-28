@@ -1138,6 +1138,8 @@ async function verifyAdminMode() {
         "Admin mode — customer tools are available below.";
       document.getElementById("adminStatus").textContent =
         "Logged in as " + (data.user?.name || "Admin");
+      loadManualFundingSettings();
+      loadManualFundingRequests();
     }
 
     return isAdminUser;
