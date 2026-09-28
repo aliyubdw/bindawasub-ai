@@ -774,5 +774,47 @@ async function loadAll(){await loadOverview();await loadAiManagement();await loa
   }
 })();
 </script>
+<script>
+(function(){
+  function showApp(){
+    const login=document.getElementById("loginView");
+    const app=document.getElementById("app");
+    if(login) login.classList.add("hidden");
+    if(app) app.classList.remove("hidden");
+  }
+  function bindNavigation(){
+    document.querySelectorAll(".nav button[data-tab]").forEach(function(btn){
+      if(btn.dataset.failsafeBound) return;
+      btn.dataset.failsafeBound="1";
+      btn.addEventListener("click",function(){
+        document.querySelectorAll(".nav button[data-tab]").forEach(function(x){x.classList.remove("active")});
+        document.querySelectorAll(".panel").forEach(function(x){x.classList.remove("active")});
+        btn.classList.add("active");
+        const panel=document.getElementById(btn.dataset.tab);
+        if(panel) panel.classList.add("active");
+      });
+    });
+  }
+  async function fallbackLoad(){
+    showApp();
+    bindNavigation();
+    try{
+      const {data:{session},error}=await window.supabase.createClient(
+        "https://fuktxjweuanatmurlzpg.supabase.co",
+        "sb_publishable_S1iARs058S3_XAUP1S_0Lw_oEnJuFe2"
+      ).auth.getSession();
+      if(error||!session) return;
+      if(typeof window.loadAll==="function"){
+        await window.loadAll();
+        return;
+      }
+    }catch(e){
+      console.error("Failsafe dashboard loader:",e);
+    }
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",fallbackLoad);
+  else fallbackLoad();
+})();
+</script>
 </body>
 </html>
