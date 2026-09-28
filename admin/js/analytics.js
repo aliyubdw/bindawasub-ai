@@ -1,0 +1,5 @@
+// Bindawasub Admin — analytics
+
+async function loadAnalytics(){try{const d=await admin({action:"analytics",days:$("analyticsDays").value});const rows=d.series||[];$("analyticsRows").innerHTML=rows.slice().reverse().map(x=>'<tr><td>'+escapeHtml(x.date)+'</td><td>'+money(x.sales)+'</td><td>'+money(x.profit)+'</td><td>'+x.transactions+'</td><td>'+x.successful+'</td><td>'+x.failed+'</td><td>'+money(x.funding)+'</td><td>'+x.new_customers+'</td></tr>').join("")||'<tr><td colspan="8" class="muted">No activity in this period.</td></tr>';drawChart("salesChart",rows.map(x=>x.sales));drawChart("profitChart",rows.map(x=>x.profit));msg($("analyticsMsg"),"Analytics refreshed.","success")}catch(e){msg($("analyticsMsg"),e.message,"error")}}
+
+function drawChart(id,values){const max=Math.max(...values,1);$(id).innerHTML=values.slice(-60).map((v,i)=>'<div class="bar" title="'+money(v)+'" style="height:'+Math.max(3,(Number(v)/max)*160)+'px"><span>'+((i+1)%5===0?i+1:"")+'</span></div>').join("")||'<span class="muted">No data</span>'}
