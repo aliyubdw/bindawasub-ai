@@ -197,8 +197,22 @@
     window.bindawasubAdminLogin=login;
   }
 
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",bind);
-  else bind();
+  async function restoreSession(){
+    try{
+      const result=await client.auth.getSession();
+      if(result.error) throw result.error;
+      if(!result.data || !result.data.session) return;
+      const loginView=document.getElementById("loginView");
+      const app=document.getElementById("app");
+      if(loginView) loginView.classList.add("hidden");
+      if(app) app.classList.remove("hidden");
+      const overviewMsg=document.getElementById("overviewMsg");
+      if(overviewMsg) overviewMsg.innerHTML='<div class="msg info">Session restored. Loading dashboard…</div>';
+    }catch(error){ console.error("Bindawasub session restore:",error); }
+  }
+
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",()=>{bind();restoreSession();});
+  else { bind(); restoreSession(); }
 })();
 </script>
 
