@@ -21,6 +21,10 @@ document
   .addEventListener("click", logoutUser);
 
 document
+  .getElementById("telegramLinkButton")
+  .addEventListener("click", createTelegramLinkCode);
+
+document
   .getElementById("adminSearchButton")
   .addEventListener("click", searchAdminCustomers);
 
