@@ -9,6 +9,10 @@ document
   .addEventListener("click", sendEmailLink);
 
 document
+  .getElementById("googleButton")
+  .addEventListener("click", loginWithGoogle);
+
+document
   .getElementById("registerButton")
   .addEventListener("click", registerUser);
 
