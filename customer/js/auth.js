@@ -1,4 +1,4 @@
-// Bindawasub AI — customer authentication and session management
+// Bindawasub AI — customer authentication and persistent session management
 
 function normalizeRegistrationPhone(phone) {
   let number = String(phone || "").replace(/\s+/g, "").replace(/-/g, "");
@@ -71,28 +71,19 @@ async function registerUser() {
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          name,
-          phone
-        }
-      }
+      options: { data: { name, phone } }
     });
 
     if (error) throw error;
 
     if (data.session) {
-      showChatScreen();
+      const isAdmin = await verifyAdminMode();
+      await showChatScreen();
 
-      try {
-        const isAdmin = await verifyAdminMode();
-        if (isAdmin) {
-          document.getElementById("customerInterface").classList.add("admin-hidden");
-        } else {
-          document.getElementById("customerInterface").classList.remove("admin-hidden");
-        }
-      } catch (setupError) {
-        console.error("Post-registration setup failed:", setupError);
+      if (isAdmin) {
+        document.getElementById("customerInterface").classList.add("admin-hidden");
+      } else {
+        document.getElementById("customerInterface").classList.remove("admin-hidden");
       }
 
       messageBox.textContent = "Account created successfully.";
@@ -127,24 +118,18 @@ async function loginUser() {
   loginButton.disabled = true;
   loginButton.textContent = "Ana shiga...";
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error || !data.session) {
-    errorBox.textContent = error?.message || "Login failed.";
-    loginButton.disabled = false;
-    loginButton.textContent = "Login";
-    return;
-  }
-
-  // Do NOT show the customer interface first.
-  // Determine admin/customer mode before displaying the app.
   try {
-    const isAdmin = await verifyAdminMode();
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    showChatScreen();
+    if (error || !data.session) {
+      throw new Error(error?.message || "Login failed.");
+    }
+
+    const isAdmin = await verifyAdminMode();
+    await showChatScreen();
 
     if (isAdmin) {
       document.getElementById("customerInterface").classList.add("admin-hidden");
@@ -153,73 +138,93 @@ async function loginUser() {
     }
   } catch (error) {
     console.error("Post-login setup failed:", error);
-    await supabaseClient.auth.signOut();
-    errorBox.textContent = "An kasa tabbatar da asusun. Sake gwadawa.";
+    await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
+    errorBox.textContent = error?.message || "An kasa shiga. Sake gwadawa.";
     document.getElementById("loginScreen").style.display = "block";
     document.getElementById("chatScreen").style.display = "none";
+  } finally {
     loginButton.disabled = false;
     loginButton.textContent = "Login";
-    return;
   }
-
-  loginButton.disabled = false;
-  loginButton.textContent = "Login";
 }
 
 async function logoutUser() {
-  await supabaseClient.auth.signOut();
+  try {
+    await supabaseClient.auth.signOut({ scope: "local" });
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+
   document.getElementById("chatScreen").style.display = "none";
   document.getElementById("loginScreen").style.display = "block";
   document.getElementById("loginPassword").value = "";
   hideAdminMode();
 }
 
-async function initAuth() {
-  const { data } = await supabaseClient.auth.getSession();
+let authBooted = false;
+let authTransitionRunning = false;
 
-  if (data.session) {
-    try {
-      const isAdmin = await verifyAdminMode();
-      showChatScreen();
+async function applyAuthenticatedSession(session) {
+  if (!session || authTransitionRunning) return;
 
-      if (isAdmin) {
-        document.getElementById("customerInterface").classList.add("admin-hidden");
-      } else {
-        document.getElementById("customerInterface").classList.remove("admin-hidden");
-      }
-    } catch (error) {
-      console.error("Session setup failed:", error);
-      await supabaseClient.auth.signOut();
+  authTransitionRunning = true;
+
+  try {
+    const isAdmin = await verifyAdminMode();
+    await showChatScreen();
+
+    if (isAdmin) {
+      document.getElementById("customerInterface").classList.add("admin-hidden");
+    } else {
+      document.getElementById("customerInterface").classList.remove("admin-hidden");
     }
+  } catch (error) {
+    console.error("Session setup failed:", error);
+    await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
+    document.getElementById("chatScreen").style.display = "none";
+    document.getElementById("loginScreen").style.display = "block";
+  } finally {
+    authTransitionRunning = false;
   }
+}
+
+async function initAuth() {
+  if (authBooted) return;
+  authBooted = true;
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log("Auth event:", event, "has session:", !!session);
 
-    // Only a real signed-in/initial session should display the app.
-    if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
-      setTimeout(async () => {
-        try {
-          const isAdmin = await verifyAdminMode();
-          showChatScreen();
+    if (event === "SIGNED_OUT" || !session) {
+      if (event === "SIGNED_OUT") {
+        stopFundingStatusNotifications();
+        hideAdminMode();
+        document.getElementById("chatScreen").style.display = "none";
+        document.getElementById("loginScreen").style.display = "block";
+      }
+      return;
+    }
 
-          if (isAdmin) {
-            document.getElementById("customerInterface").classList.add("admin-hidden");
-          } else {
-            document.getElementById("customerInterface").classList.remove("admin-hidden");
-          }
-        } catch (error) {
-          console.error("Auth setup failed:", error);
-        }
+    if (
+      event === "INITIAL_SESSION" ||
+      event === "SIGNED_IN" ||
+      event === "TOKEN_REFRESHED" ||
+      event === "USER_UPDATED"
+    ) {
+      setTimeout(() => {
+        applyAuthenticatedSession(session);
       }, 0);
     }
-
-    // Do NOT log the user out on TOKEN_REFRESHED or other transient auth events.
-    if (event === "SIGNED_OUT") {
-      stopFundingStatusNotifications();
-      hideAdminMode();
-      document.getElementById("chatScreen").style.display = "none";
-      document.getElementById("loginScreen").style.display = "block";
-    }
   });
+
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    console.error("Initial session read failed:", error);
+    return;
+  }
+
+  if (data.session) {
+    await applyAuthenticatedSession(data.session);
+  }
 }
