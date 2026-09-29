@@ -131,10 +131,25 @@ async function getAccessToken(forceRefresh = false) {
   }
 
   const expiresAtMs = Number(session.expires_at || 0) * 1000;
-  const expiresSoon = !expiresAtMs || expiresAtMs <= Date.now() + 60_000;
+  const stillValid = expiresAtMs > Date.now() + 5_000;
 
-  if (!forceRefresh && !expiresSoon && session.access_token) {
+  // Supabase getSession() can refresh an expiring session itself. Do not
+  // immediately call refreshSession() again after getSession(), because that
+  // can rotate the refresh token twice and produce:
+  // "Refresh result discarded: session state changed mid-flight".
+  if (!forceRefresh && stillValid && session.access_token) {
     return session.access_token;
+  }
+
+  if (forceRefresh && stillValid && session.access_token) {
+    // A recent successful refresh may already have produced this valid token.
+    if (
+      lastSuccessfulAccessToken &&
+      session.access_token === lastSuccessfulAccessToken &&
+      Date.now() - lastSuccessfulRefreshAt < 5000
+    ) {
+      return session.access_token;
+    }
   }
 
   try {
