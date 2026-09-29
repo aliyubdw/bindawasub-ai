@@ -118,29 +118,26 @@ async function watchTransactionStatus(transactionId) {
   try {
     while (attempts < maxAttempts) {
       attempts += 1;
-      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      if (attempts === 1) {
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
 
       try {
         const response = await callEdgeFunction({
-          action: "transaction_status",
+          action: "requery_pending_purchase",
           transaction_id: id
         });
         const data = await response.json().catch(() => null);
 
-        if (!response.ok || data?.success !== true || !data?.transaction) continue;
+        if (!response.ok || data?.success !== true) continue;
 
-        const tx = data.transaction;
-        const status = String(tx.status || "").toLowerCase();
+        const status = String(data.status || "").toLowerCase();
 
         if (status === "successful") {
           addMessage("✅ Your purchase has now been confirmed successfully.", "bot");
-          showPurchaseConfirmation({
-            ...tx,
-            transaction_id: tx.id,
-            description: tx.product_name || "Purchase",
-            reference: tx.provider_reference || null,
-            provider_reference: tx.provider_reference || null
-          });
           break;
         }
 
@@ -151,17 +148,10 @@ async function watchTransactionStatus(transactionId) {
               : "↩️ Your purchase was reversed and the wallet adjustment has been handled.",
             "bot"
           );
-          showPurchaseConfirmation({
-            ...tx,
-            transaction_id: tx.id,
-            description: tx.product_name || "Purchase",
-            reference: tx.provider_reference || null,
-            provider_reference: tx.provider_reference || null
-          });
           break;
         }
       } catch (error) {
-        console.error("Pending transaction status check failed:", error);
+        console.error("Pending transaction requery failed:", error);
       }
     }
   } finally {
