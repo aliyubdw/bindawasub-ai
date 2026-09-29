@@ -444,7 +444,7 @@ Deno.serve(async (req) => {
       const newConversationChannel = String(body.channel || "web").toLowerCase();
       const { data: newConversation, error: newConversationError } = await supabase
         .from("ai_conversations")
-        .insert({ user_id: userId, channel: newConversationChannel, language: aiConfig?.default_language || "english", started_at: new Date().toISOString(), last_message_at: new Date().toISOString() })
+        .insert({ user_id: userId, channel: newConversationChannel, language: "english", started_at: new Date().toISOString(), last_message_at: new Date().toISOString() })
         .select("id, channel, started_at, last_message_at")
         .single();
       if (newConversationError) throw newConversationError;
