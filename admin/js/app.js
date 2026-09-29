@@ -15,11 +15,20 @@ async function loadAll(){
     ["funding requests",loadManualFundingRequests]
   ];
 
-  // Keep independent dashboard modules from blocking the funding module.
-  await Promise.allSettled(loaders.map(([name,fn])=>Promise.resolve().then(()=>fn()).catch(error=>{
-    console.error("Admin module failed:",name,error);
-  })));
+  // Run independent modules together. One slow/broken module must never
+  // prevent the dashboard overview from rendering.
+  await Promise.allSettled(loaders.map(([name,fn])=>
+    Promise.resolve()
+      .then(()=>fn())
+      .catch(error=>{
+        console.error("Admin module failed:",name,error);
+      })
+  ));
 }
+
+// Explicitly expose the loader because the admin auth module starts the
+// dashboard after restoring the session.
+window.loadAll=loadAll;
 
 let fundingPollTimer=null;
 
@@ -52,6 +61,5 @@ document.addEventListener("DOMContentLoaded",()=>{
     loadManualFundingRequests();
   });
 
-  // Funding requests refresh automatically while the admin console is open.
   startFundingPolling();
 });
