@@ -108,7 +108,7 @@
   </div>
 
   <div id="customerInterface">
-    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" id="chatHistoryButton" type="button">Chat History</button><button class="quick-action" id="telegramLinkButton" type="button">Connect Telegram</button><button class="quick-action" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button></div>
+    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" id="chatHistoryButton" type="button">Chat History</button><button class="quick-action" id="profileButton" type="button">Profile</button><button class="quick-action" id="telegramLinkButton" type="button">Connect Telegram</button><button class="quick-action" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button></div>
 
     <div id="conversationHistoryPanel" class="conversation-history-panel" hidden>
       <div class="conversation-history-header">
@@ -156,6 +156,19 @@
     <div class="chat-helper">Secure account session • Your conversations are saved</div>
   </div>
 
+  <div id="profileModal" class="profile-modal" hidden>
+    <div class="profile-modal-card" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+      <div class="profile-modal-header">
+        <div>
+          <span class="profile-modal-kicker">ACCOUNT</span>
+          <h2 id="profileModalTitle">My Profile</h2>
+        </div>
+        <button id="profileCloseButton" class="profile-close-button" type="button" aria-label="Close profile">×</button>
+      </div>
+      <div id="profileModalBody"></div>
+    </div>
+  </div>
+
 </div>
 
 <script src="./customer/js/state.js?v=20260929-2"></script>
@@ -164,6 +177,7 @@
 <script src="./customer/js/wallet.js?v=20260929"></script>
 <script src="./customer/js/products.js?v=20260929"></script>
 <script src="./customer/js/transactions.js?v=20260929"></script>
+<script src="./customer/js/profile.js?v=20260929"></script>
 <script src="./customer/js/chat.js?v=20260929-3"></script>
 <script src="./customer/js/admin.js?v=20260929"></script>
 <script src="./customer/js/auth.js?v=20260929"></script>
