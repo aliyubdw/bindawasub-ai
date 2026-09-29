@@ -438,40 +438,155 @@ Deno.serve(async (req) => {
       };
     };
 
-    // Customer-only conversation history endpoint
-    // Returns only the authenticated customer's latest conversation for the requested channel.
+    // Customer conversation endpoints. Every query is scoped to the authenticated customer.
     if (body.action === "new_conversation") {
       const newConversationChannel = String(body.channel || "web").toLowerCase();
       const { data: newConversation, error: newConversationError } = await supabase
         .from("ai_conversations")
-        .insert({ user_id: userId, channel: newConversationChannel, language: "english", started_at: new Date().toISOString(), last_message_at: new Date().toISOString() })
+        .insert({
+          user_id: userId,
+          channel: newConversationChannel,
+          language: "english",
+          started_at: new Date().toISOString(),
+          last_message_at: new Date().toISOString()
+        })
         .select("id, channel, started_at, last_message_at")
         .single();
+
       if (newConversationError) throw newConversationError;
-      return new Response(JSON.stringify({ success: true, conversation_id: newConversation.id, channel: newConversation.channel, started_at: newConversation.started_at, last_message_at: newConversation.last_message_at }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      return new Response(JSON.stringify({
+        success: true,
+        conversation_id: newConversation.id,
+        channel: newConversation.channel,
+        started_at: newConversation.started_at,
+        last_message_at: newConversation.last_message_at
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
-    if (body.action === "conversation_history") {
+    if (body.action === "conversation_list") {
       const historyChannel = String(body.channel || "web").toLowerCase();
 
-      const { data: conversation, error: conversationError } = await supabase
+      const { data: conversations, error: conversationError } = await supabase
         .from("ai_conversations")
         .select("id, channel, started_at, last_message_at")
         .eq("user_id", userId)
         .eq("channel", historyChannel)
         .order("last_message_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(30);
+
+      if (conversationError) throw conversationError;
+
+      const conversationRows = conversations || [];
+      const ids = conversationRows.map((item:any) => item.id);
+      let messageRows:any[] = [];
+
+      if (ids.length > 0) {
+        const { data: rows, error: messagesError } = await supabase
+          .from("ai_messages")
+          .select("conversation_id, role, message, created_at")
+          .in("conversation_id", ids)
+          .order("created_at", { ascending: true })
+          .limit(2000);
+
+        if (messagesError) throw messagesError;
+        messageRows = rows || [];
+      }
+
+      const summaryById = new Map<string, any>();
+
+      for (const row of messageRows) {
+        if (!summaryById.has(row.conversation_id)) {
+          summaryById.set(row.conversation_id, {
+            first_user_message: row.role === "user" ? row.message : null,
+            preview: row.message || "",
+            message_count: 0
+          });
+        }
+
+        const summary = summaryById.get(row.conversation_id);
+        summary.message_count += 1;
+
+        if (!summary.first_user_message && row.role === "user") {
+          summary.first_user_message = row.message;
+        }
+
+        summary.preview = row.message || summary.preview;
+      }
+
+      const formattedConversations = conversationRows.map((conversation:any) => {
+        const summary = summaryById.get(conversation.id) || {
+          first_user_message: null,
+          preview: "",
+          message_count: 0
+        };
+
+        const titleSource = String(summary.first_user_message || summary.preview || "").trim();
+        const title = titleSource
+          ? (titleSource.length > 42 ? titleSource.slice(0, 42) + "…" : titleSource)
+          : "New conversation";
+
+        return {
+          id: conversation.id,
+          channel: conversation.channel,
+          started_at: conversation.started_at,
+          last_message_at: conversation.last_message_at,
+          title,
+          preview: summary.preview
+            ? (String(summary.preview).length > 80 ? String(summary.preview).slice(0, 80) + "…" : String(summary.preview))
+            : "",
+          message_count: summary.message_count
+        };
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        channel: historyChannel,
+        conversations: formattedConversations
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    if (body.action === "conversation_history") {
+      const historyChannel = String(body.channel || "web").toLowerCase();
+      const requestedConversationId = String(body.conversation_id || "").trim();
+
+      let conversationQuery = supabase
+        .from("ai_conversations")
+        .select("id, channel, started_at, last_message_at")
+        .eq("user_id", userId)
+        .eq("channel", historyChannel);
+
+      if (requestedConversationId) {
+        conversationQuery = conversationQuery.eq("id", requestedConversationId);
+      } else {
+        conversationQuery = conversationQuery
+          .order("last_message_at", { ascending: false })
+          .limit(1);
+      }
+
+      const { data: conversation, error: conversationError } = await conversationQuery.maybeSingle();
 
       if (conversationError) throw conversationError;
 
       if (!conversation) {
         return new Response(JSON.stringify({
-          success: true,
+          success: false,
+          error: requestedConversationId
+            ? "Conversation not found."
+            : "No conversation found.",
           channel: historyChannel,
           conversation_id: null,
           messages: []
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }), {
+          status: requestedConversationId ? 404 : 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
 
       const { data: historyMessages, error: messagesError } = await supabase
@@ -492,7 +607,10 @@ Deno.serve(async (req) => {
         started_at: conversation.started_at,
         last_message_at: conversation.last_message_at,
         messages: orderedHistoryMessages
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
     // AI MANAGEMENT: admin-only dashboard summary
@@ -610,8 +728,38 @@ Deno.serve(async (req) => {
     let conversationContext: any = {};
 
     {
-      const { data: existingConversation, error: conversationLookupError } =
-        await supabase
+      const requestedConversationId = String(body.conversation_id || "").trim();
+
+      let existingConversation:any = null;
+      let conversationLookupError:any = null;
+
+      if (requestedConversationId) {
+        const result = await supabase
+          .from("ai_conversations")
+          .select("id, conversation_context, pending_product_id, pending_phone_number, pending_at, pending_service_type, pending_airtime_amount, pending_network, pending_customer_input")
+          .eq("id", requestedConversationId)
+          .eq("user_id", userId)
+          .eq("channel", channel)
+          .maybeSingle();
+
+        existingConversation = result.data;
+        conversationLookupError = result.error;
+
+        if (conversationLookupError) {
+          throw conversationLookupError;
+        }
+
+        if (!existingConversation) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: "Conversation not found."
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      } else {
+        const result = await supabase
           .from("ai_conversations")
           .select("id, conversation_context, pending_product_id, pending_phone_number, pending_at, pending_service_type, pending_airtime_amount, pending_network, pending_customer_input")
           .eq("user_id", userId)
@@ -620,8 +768,12 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-      if (conversationLookupError) {
-        console.error("Conversation lookup error:", conversationLookupError);
+        existingConversation = result.data;
+        conversationLookupError = result.error;
+
+        if (conversationLookupError) {
+          console.error("Conversation lookup error:", conversationLookupError);
+        }
       }
 
       if (existingConversation) {
