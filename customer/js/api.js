@@ -26,6 +26,8 @@ const supabaseClient = window.supabase.createClient(
   }
 );
 
+let sessionRefreshPromise = null;
+
 async function getAccessToken(forceRefresh = false) {
   const current = await supabaseClient.auth.getSession();
 
@@ -45,17 +47,37 @@ async function getAccessToken(forceRefresh = false) {
     return session.access_token;
   }
 
-  const refreshed = await supabaseClient.auth.refreshSession();
-
-  if (refreshed.error || !refreshed.data?.session?.access_token) {
-    // The browser can keep an old/stale local session after the refresh
-    // token has been revoked. Clear it so the next request cannot keep
-    // retrying with an expired token.
-    await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
-    throw new Error("Your session has expired. Please log in again.");
+  // Prevent multiple refreshSession() calls from running concurrently.
+  // Supabase may discard one refresh result if the session changes while
+  // another refresh is already in flight.
+  if (!sessionRefreshPromise) {
+    sessionRefreshPromise = supabaseClient.auth.refreshSession()
+      .finally(() => {
+        sessionRefreshPromise = null;
+      });
   }
 
-  return refreshed.data.session.access_token;
+  let refreshed;
+  try {
+    refreshed = await sessionRefreshPromise;
+  } catch (error) {
+    refreshed = { error };
+  }
+
+  if (refreshed?.data?.session?.access_token) {
+    return refreshed.data.session.access_token;
+  }
+
+  // Another automatic Supabase refresh may have completed successfully
+  // while this request was in flight. Read the latest session before
+  // deciding that the user is actually signed out.
+  const latest = await supabaseClient.auth.getSession();
+
+  if (!latest.error && latest.data?.session?.access_token) {
+    return latest.data.session.access_token;
+  }
+
+  throw new Error("Your session has expired. Please log in again.");
 }
 
 async function callEdgeFunction(payload) {
