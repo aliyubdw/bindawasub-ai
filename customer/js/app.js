@@ -48,6 +48,14 @@ document
   .addEventListener("click", startNewConversation);
 
 document
+  .getElementById("chatHistoryButton")
+  .addEventListener("click", toggleConversationHistory);
+
+document
+  .getElementById("conversationHistoryRefresh")
+  .addEventListener("click", loadConversationList);
+
+document
   .getElementById("telegramLinkButton")
   .addEventListener("click", createTelegramLinkCode);
 
@@ -105,4 +113,6 @@ document
   });
 
 resetCustomerOrderState();
+BindawasubCustomerState.activeConversationId = null;
+BindawasubCustomerState.historyOpen = false;
 initAuth();
