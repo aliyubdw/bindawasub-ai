@@ -7,10 +7,8 @@ async function startNewConversation() {
     const response = await callEdgeFunction({ action: "new_conversation", channel: getCustomerChannel() });
     const data = await response.json();
     if (!response.ok || data.success !== true) throw new Error(data.error || "Failed to start a new conversation.");
-    BindawasubCustomerState.selectedProduct = null;
-    BindawasubCustomerState.recipientPhone = null;
-    BindawasubCustomerState.waitingForPhone = false;
-    BindawasubCustomerState.waitingForConfirmation = false;
+    resetCustomerOrderState();
+    resetCustomerFundingState();
     const messages = document.getElementById("messages");
     messages.innerHTML = "";
     addMessage("Hello! A new conversation has started. How can I help you today?", "bot");
