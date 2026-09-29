@@ -44,6 +44,10 @@ document
   .addEventListener("click", logoutUser);
 
 document
+  .getElementById("newChatButton")
+  .addEventListener("click", startNewConversation);
+
+document
   .getElementById("telegramLinkButton")
   .addEventListener("click", createTelegramLinkCode);
 
