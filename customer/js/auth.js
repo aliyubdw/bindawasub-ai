@@ -334,9 +334,17 @@ async function applyAuthenticatedSession(session) {
     document.getElementById("customerInterface").classList.remove("admin-hidden");
   } catch (error) {
     console.error("Session setup failed:", error);
-    await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
+
+    // Keep the valid Supabase session alive. A profile/dashboard service
+    // failure must never turn into a fake "login failed" state.
     document.getElementById("chatScreen").style.display = "none";
     document.getElementById("loginScreen").style.display = "block";
+
+    const loginError = document.getElementById("loginError");
+    if (loginError) {
+      loginError.textContent =
+        error?.message || "Login succeeded, but Bindawasub could not load your account. Please try again.";
+    }
   } finally {
     authTransitionRunning = false;
   }
