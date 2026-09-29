@@ -173,6 +173,16 @@ async function registerUser() {
   }
 }
 
+function getGoogleRedirectUrl() {
+  const host = window.location.hostname;
+
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    return window.location.origin + window.location.pathname;
+  }
+
+  return "https://bindawasub-ai.vercel.app/";
+}
+
 async function loginWithGoogle() {
   const button = document.getElementById("googleButton");
   const errorBox = document.getElementById("loginError");
@@ -190,7 +200,7 @@ async function loginWithGoogle() {
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin + window.location.pathname
+        redirectTo: getGoogleRedirectUrl()
       }
     });
 
