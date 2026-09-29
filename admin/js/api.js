@@ -7,6 +7,7 @@ const AI_URL=SUPABASE_URL+"/functions/v1/bindawasub-ai";
 const RESET_URL=SUPABASE_URL+"/functions/v1/admin-reset-password";
 const EXECUTION_URL=SUPABASE_URL+"/functions/v1/provider-execution";
 const RELIABILITY_TEST_URL=SUPABASE_URL+"/functions/v1/provider-execution-test";
+const CRM_URL=SUPABASE_URL+"/functions/v1/bindawasub-crm";
 
 const sb=window.supabase.createClient(SUPABASE_URL,KEY,{
   auth:{
@@ -42,3 +43,4 @@ async function requestWithSession(url,payload){
 }
 async function admin(payload){return requestWithSession(ADMIN_URL,payload)}
 async function aiAdmin(payload){return requestWithSession(AI_URL,payload)}
+async function crmAdmin(payload){return requestWithSession(CRM_URL,payload)}
