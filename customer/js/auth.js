@@ -174,12 +174,6 @@ async function registerUser() {
 }
 
 function getGoogleRedirectUrl() {
-  const host = window.location.hostname;
-
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
-    return window.location.origin + window.location.pathname;
-  }
-
   return "https://bindawasub-ai.vercel.app/";
 }
 
