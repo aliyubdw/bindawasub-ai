@@ -39,14 +39,71 @@ function renderOverviewTransactions(rows){
   }).join("")||'<tr><td colspan="7" class="muted">No recent transactions.</td></tr>';
 }
 
+let overviewDays=1;
+
+function overviewRangeDays(start,end){
+  const a=new Date(start+"T00:00:00");
+  const b=new Date(end+"T00:00:00");
+  const diff=Math.round((b-a)/86400000)+1;
+  return Number.isFinite(diff)&&diff>0?Math.min(diff,365):null;
+}
+
+function setOverviewRangeButton(range){
+  document.querySelectorAll(".range-btn").forEach(btn=>{
+    btn.classList.toggle("active",btn.dataset.range===String(range));
+  });
+  $("customOverviewRange")?.classList.toggle("hidden",range!=="custom");
+}
+
+async function refreshOverviewAnalytics(days=overviewDays){
+  const chart=$("overviewChart");
+  try{
+    const analytics=await admin({action:"analytics",days});
+    renderOverviewChart(analytics.series||[]);
+  }catch(error){
+    console.error("Overview analytics failed:",error);
+    if(chart)chart.innerHTML='<span class="muted">Unable to load transaction overview.</span>';
+  }
+}
+
+function bindOverviewRanges(){
+  if(window.__overviewRangesBound)return;
+  window.__overviewRangesBound=true;
+
+  document.querySelectorAll(".range-btn").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      const range=btn.dataset.range;
+      if(range==="custom"){
+        setOverviewRangeButton("custom");
+        return;
+      }
+      overviewDays=Number(range)||1;
+      setOverviewRangeButton(range);
+      await refreshOverviewAnalytics(overviewDays);
+    });
+  });
+
+  $("applyOverviewRange")?.addEventListener("click",async()=>{
+    const start=$("overviewStartDate")?.value;
+    const end=$("overviewEndDate")?.value;
+    const days=overviewRangeDays(start,end);
+    if(!days){
+      msg($("overviewMsg"),"Choose a valid start and end date.","error");
+      return;
+    }
+    overviewDays=days;
+    await refreshOverviewAnalytics(days);
+    msg($("overviewMsg"),"Custom range applied.","success");
+  });
+}
+
 async function loadOverview(){
   const chart=$("overviewChart");
   const body=$("overviewTransactionRows");
+  bindOverviewRanges();
   try{
-    // Keep the KPI call independent, then load the two visual panels in
-    // parallel so one query cannot leave both panels stuck on "Loading…".
     const summaryPromise=admin({action:"dashboard_summary"});
-    const analyticsPromise=admin({action:"analytics",days:7});
+    const analyticsPromise=admin({action:"analytics",days:overviewDays});
     const transactionsPromise=admin({action:"list_transactions",status:"",search:"",limit:6});
 
     const d=await summaryPromise;
