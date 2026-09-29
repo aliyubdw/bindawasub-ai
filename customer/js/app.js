@@ -19,6 +19,18 @@ document
   .getElementById("showLoginButton")
   .addEventListener("click", showLoginForm);
 
+const registerForm = document.getElementById("registerForm");
+if (registerForm && !document.getElementById("googleRegisterButton")) {
+  const googleRegisterButton = document.createElement("button");
+  googleRegisterButton.id = "googleRegisterButton";
+  googleRegisterButton.type = "button";
+  googleRegisterButton.textContent = "Create account with Google";
+  googleRegisterButton.style.cssText = "margin-top:8px;background:#fff;color:#333;border:1px solid #d8dedb;width:100%;cursor:pointer;";
+  googleRegisterButton.addEventListener("click", loginWithGoogle);
+  const backButton = document.getElementById("showLoginButton");
+  registerForm.insertBefore(googleRegisterButton, backButton);
+}
+
 document
   .getElementById("completeProfileButton")
   .addEventListener("click", completeProfile);
