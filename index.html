@@ -147,15 +147,35 @@
 
 </div>
 
-<script src="./customer/js/state.js"></script>
-<script src="./customer/js/api.js"></script>
-<script src="./customer/js/telegram.js"></script>
-<script src="./customer/js/wallet.js"></script>
-<script src="./customer/js/products.js"></script>
-<script src="./customer/js/transactions.js"></script>
-<script src="./customer/js/chat.js"></script>
-<script src="./customer/js/admin.js"></script>
-<script src="./customer/js/auth.js"></script>
-<script src="./customer/js/app.js"></script>
+<script src="./customer/js/state.js?v=20260929"></script>
+<script src="./customer/js/api.js?v=20260929"></script>
+<script src="./customer/js/telegram.js?v=20260929"></script>
+<script src="./customer/js/wallet.js?v=20260929"></script>
+<script src="./customer/js/products.js?v=20260929"></script>
+<script src="./customer/js/transactions.js?v=20260929"></script>
+<script src="./customer/js/chat.js?v=20260929"></script>
+<script src="./customer/js/admin.js?v=20260929"></script>
+<script src="./customer/js/auth.js?v=20260929"></script>
+<script src="./customer/js/app.js?v=20260929"></script>
+<script>
+  window.addEventListener("load", function () {
+    const googleButton = document.getElementById("googleButton");
+    if (!googleButton) return;
+    googleButton.style.pointerEvents = "auto";
+    googleButton.style.cursor = "pointer";
+    googleButton.disabled = false;
+
+    googleButton.onclick = async function () {
+      if (typeof window.loginWithGoogle === "function") {
+        return window.loginWithGoogle();
+      }
+      const errorBox = document.getElementById("loginError");
+      if (errorBox) {
+        errorBox.className = "login-error";
+        errorBox.textContent = "Google sign-in is still loading. Please refresh the page.";
+      }
+    };
+  });
+</script>
 </body>
 </html>
