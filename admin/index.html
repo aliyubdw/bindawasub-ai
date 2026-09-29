@@ -34,7 +34,18 @@
 <div class="header"><div class="header-copy"><div class="eyebrow">CONTROL CENTER</div><h1>Good to see you, Admin</h1><p>Monitor your VTU business, customers, payments and AI operations.</p></div><div class="global-search"><span class="search-icon">⌕</span><input id="globalSearch" type="search" placeholder="Search customers, transactions, phone numbers..." aria-label="Search admin workspace"></div><div class="header-actions"><button id="headerRefresh" class="icon-button" type="button" title="Refresh dashboard" aria-label="Refresh dashboard">↻</button><div class="header-status"><span class="status-dot"></span> System online</div></div></div>
 
 <section id="overview" class="panel active">
-<div id="overviewMsg"></div><div class="dashboard-welcome"><div><span class="welcome-kicker">BUSINESS SNAPSHOT</span><h2>Your operation at a glance</h2><p>Keep an eye on sales, customer activity, funding and provider health from one workspace.</p></div><div class="quick-actions"><button data-tab-jump="transactions" class="secondary">View transactions</button><button data-tab-jump="crm" class="secondary">Customers</button><button data-tab-jump="funding" class="secondary">Funding</button></div></div>
+<div id="overviewMsg"></div><div class="dashboard-welcome"><div><span class="welcome-kicker">BUSINESS SNAPSHOT</span><h2>Your operation at a glance</h2><p>Keep an eye on sales, customer activity, funding and provider health from one workspace.</p></div><div class="overview-range">
+  <button type="button" class="range-btn active" data-range="1">1 Day</button>
+  <button type="button" class="range-btn" data-range="7">7 Days</button>
+  <button type="button" class="range-btn" data-range="30">30 Days</button>
+  <button type="button" class="range-btn" data-range="custom">Custom</button>
+  <div class="custom-range hidden" id="customOverviewRange">
+    <input id="overviewStartDate" type="date" aria-label="Start date">
+    <span>to</span>
+    <input id="overviewEndDate" type="date" aria-label="End date">
+    <button type="button" id="applyOverviewRange" class="secondary">Apply</button>
+  </div>
+</div></div>
 <div class="dashboard-kpis">
   <div class="card metric"><div class="label">Total Revenue</div><div id="mSales" class="value">—</div><div class="metric-note">Successful sales</div></div>
   <div class="card metric"><div class="label">Transactions</div><div id="mSuccess" class="value">—</div><div class="metric-note">Successful transactions</div></div>
@@ -163,7 +174,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./js/api.js"></script>
 <script src="./js/shared.js"></script>
-<script src="./js/overview.js?v=20260929-2"></script>
+<script src="./js/overview.js?v=20260929-3"></script>
 <script src="./js/services.js"></script>
 <script src="./js/providers.js"></script>
 <script src="./js/products.js"></script>
