@@ -1307,3 +1307,34 @@ body{
   #profileModalBody { padding: 16px; }
   .profile-info-grid { grid-template-columns: 1fr; }
 }
+
+
+.profile-secondary-button {
+  width: 100%;
+  background: #f4f7f5;
+  color: #19352b;
+  border: 1px solid var(--border);
+}
+.profile-history-list { display:flex; flex-direction:column; gap:8px; }
+.profile-history-row {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:11px 12px; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface-soft);
+}
+.profile-history-row strong { display:block; font-size:13px; }
+.profile-history-row span { font-size:11px; color:var(--muted); }
+.profile-status-badge {
+  flex:0 0 auto; padding:5px 8px; border-radius:999px;
+  font-size:10px !important; font-weight:800; text-transform:capitalize;
+}
+.profile-status-badge.successful,.profile-status-badge.completed { background:#dff5e9; color:#14643e; }
+.profile-status-badge.pending,.profile-status-badge.processing { background:#fff1cf; color:#805900; }
+.profile-status-badge.failed,.profile-status-badge.rejected { background:#ffe2e2; color:#9b1c1c; }
+.profile-empty { padding:15px; text-align:center; color:var(--muted); font-size:12px; }
+.profile-telegram-status {
+  display:flex; flex-direction:column; gap:3px; padding:12px;
+  border:1px solid var(--border); border-radius:12px; background:var(--surface-soft);
+  font-size:12px;
+}
+.profile-telegram-status strong { color:#147548; }
+.profile-telegram-status span,.profile-telegram-status small { color:var(--muted); }
