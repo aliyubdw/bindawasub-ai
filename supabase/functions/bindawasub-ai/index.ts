@@ -1037,28 +1037,34 @@ if (body.action === "customer_search") {
       const requestedLimit =
         Math.min(Math.max(Number(body.limit || 5), 1), 10);
 
-      const { data: recentTransactions, error: transactionError } =
-        await supabase
-          .from("transactions")
-          .select(`
-            id,
-            created_at,
-            phone_number,
-            amount,
-            status,
-            provider,
-            provider_reference,
-            product_id,
-            products (
-              product_name,
-              volume,
-              validity_type,
-              validity_value,
-              validity_unit,
-              service_networks(code,name)
-            )
-          `)
-          .eq("user_id", userId)
+      let transactionQuery = supabase
+        .from("transactions")
+        .select(`
+          id,
+          created_at,
+          phone_number,
+          amount,
+          status,
+          provider,
+          provider_reference,
+          product_id,
+          products (
+            product_name,
+            volume,
+            validity_type,
+            validity_value,
+            validity_unit,
+            service_networks(code,name)
+          )
+        `)
+        .eq("user_id", userId);
+
+      if (body.action === "transaction_status" && body.transaction_id) {
+        transactionQuery = transactionQuery
+          .eq("id", String(body.transaction_id).trim())
+          .limit(1);
+      } else {
+        transactionQuery = transactionQuery
           .order("created_at", { ascending: false })
           .limit(
             body.action === "last_transaction" ||
@@ -1066,6 +1072,10 @@ if (body.action === "customer_search") {
               ? 1
               : requestedLimit
           );
+      }
+
+      const { data: recentTransactions, error: transactionError } =
+        await transactionQuery;
 
       if (transactionError) {
         console.error("Transaction history error:", transactionError);
