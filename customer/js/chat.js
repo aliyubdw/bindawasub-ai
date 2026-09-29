@@ -156,7 +156,6 @@ async function loadConversationList() {
   const list = document.getElementById("conversationHistoryList");
   if (!panel || !list) return;
 
-  panel.hidden = false;
   list.innerHTML = '<div class="conversation-history-loading">Loading conversations…</div>';
 
   try {
