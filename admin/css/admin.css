@@ -42,7 +42,8 @@ html,body{max-width:100%;overflow-x:hidden}
 .table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .table-wrap table{min-width:720px}
 @media(max-width:780px){
-  .sidebar{width:min(82vw,300px);padding:16px 10px}
+  .sidebar{width:min(82vw,300px);padding:16px 10px;z-index:24}
+
   .sidebar-toggle{left:12px;top:12px;width:42px;height:42px;border-radius:11px;box-shadow:0 8px 24px rgba(8,127,91,.18)}
   .main-content{width:100%;max-width:100%;margin-left:0;padding:12px 10px 28px}
   .header{width:100%;max-width:100%;padding:58px 4px 12px;margin-bottom:12px}
