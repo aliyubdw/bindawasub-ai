@@ -33,14 +33,26 @@ async function getAccessToken(forceRefresh = false) {
     throw new Error(current.error.message || "Unable to read session.");
   }
 
-  if (!forceRefresh && current.data?.session?.access_token) {
-    return current.data.session.access_token;
+  const session = current.data?.session || null;
+  if (!session) {
+    throw new Error("Ba a shiga cikin asusu ba. Sake shiga.");
+  }
+
+  const expiresAtMs = Number(session.expires_at || 0) * 1000;
+  const expiresSoon = !expiresAtMs || expiresAtMs <= Date.now() + 60_000;
+
+  if (!forceRefresh && !expiresSoon && session.access_token) {
+    return session.access_token;
   }
 
   const refreshed = await supabaseClient.auth.refreshSession();
 
-  if (refreshed.error || !refreshed.data?.session) {
-    throw new Error("Ba a shiga cikin asusu ba. Sake shiga.");
+  if (refreshed.error || !refreshed.data?.session?.access_token) {
+    // The browser can keep an old/stale local session after the refresh
+    // token has been revoked. Clear it so the next request cannot keep
+    // retrying with an expired token.
+    await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
+    throw new Error("Your session has expired. Please log in again.");
   }
 
   return refreshed.data.session.access_token;
