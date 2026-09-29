@@ -244,11 +244,11 @@ async function loginUser() {
     // This prevents loginUser() and onAuthStateChange() from racing and
     // loading two different account states in the same browser.
   } catch (error) {
-    console.error("Post-login setup failed:", error);
-    await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
+    // Do not sign the customer out here. If Supabase successfully created a
+    // session but a later UI/bootstrap step fails, destroying the valid
+    // session makes the app look like it logged the customer out immediately.
+    console.error("Login failed:", error);
     errorBox.textContent = error?.message || "An kasa shiga. Sake gwadawa.";
-    document.getElementById("loginScreen").style.display = "block";
-    document.getElementById("chatScreen").style.display = "none";
   } finally {
     loginButton.disabled = false;
     loginButton.textContent = "Login";
@@ -335,16 +335,16 @@ async function applyAuthenticatedSession(session) {
   } catch (error) {
     console.error("Session setup failed:", error);
 
-    // Keep the valid Supabase session alive. A profile/dashboard service
-    // failure must never turn into a fake "login failed" state.
-    document.getElementById("chatScreen").style.display = "none";
-    document.getElementById("loginScreen").style.display = "block";
-
+    // Do not sign out or destroy the authenticated session when the profile
+    // service has a temporary/database error. Show the error while keeping
+    // the login session available for a retry.
     const loginError = document.getElementById("loginError");
     if (loginError) {
       loginError.textContent =
         error?.message || "Login succeeded, but Bindawasub could not load your account. Please try again.";
     }
+    document.getElementById("chatScreen").style.display = "none";
+    document.getElementById("loginScreen").style.display = "block";
   } finally {
     authTransitionRunning = false;
   }
