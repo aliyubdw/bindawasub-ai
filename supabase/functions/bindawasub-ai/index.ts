@@ -1026,6 +1026,88 @@ if (body.action === "customer_search") {
 
 
     // ==========================================
+    // CUSTOMER FAST REQUERY FOR PENDING PURCHASE
+    // ==========================================
+
+    if (body.action === "requery_pending_purchase") {
+      const transactionId = String(body.transaction_id || "").trim();
+
+      if (!transactionId) {
+        return new Response(
+          JSON.stringify({ success:false, error:"transaction_id is required." }),
+          { status:400, headers:{...corsHeaders,"Content-Type":"application/json"} }
+        );
+      }
+
+      const { data: pendingTx, error: pendingTxError } = await supabase
+        .from("transactions")
+        .select("id,user_id,status,provider_reference")
+        .eq("id", transactionId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (pendingTxError) throw pendingTxError;
+      if (!pendingTx) {
+        return new Response(
+          JSON.stringify({ success:false, error:"Transaction not found." }),
+          { status:404, headers:{...corsHeaders,"Content-Type":"application/json"} }
+        );
+      }
+
+      if (["successful","failed","reversed"].includes(String(pendingTx.status || "").toLowerCase())) {
+        return new Response(
+          JSON.stringify({
+            success:true,
+            intent:"requery_pending_purchase",
+            transaction_id:pendingTx.id,
+            status:pendingTx.status,
+            finalized:true
+          }),
+          { status:200, headers:{...corsHeaders,"Content-Type":"application/json"} }
+        );
+      }
+
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      if (!serviceRoleKey || !supabaseUrl) {
+        throw new Error("Supabase server configuration is incomplete.");
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/provider-execution`,
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json",
+            "Authorization":`Bearer ${serviceRoleKey}`,
+            "apikey":serviceRoleKey
+          },
+          body:JSON.stringify({
+            action:"requery_transaction",
+            transaction_id:transactionId
+          })
+        }
+      );
+
+      const raw = await response.text();
+      let result:any;
+      try { result = JSON.parse(raw); } catch { result = { success:false, error:raw }; }
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Provider requery failed.");
+      }
+
+      return new Response(
+        JSON.stringify({
+          success:true,
+          intent:"requery_pending_purchase",
+          ...result
+        }),
+        { status:200, headers:{...corsHeaders,"Content-Type":"application/json"} }
+      );
+    }
+
+    // ==========================================
     // CUSTOMER TRANSACTION HISTORY / STATUS
     // ==========================================
 
