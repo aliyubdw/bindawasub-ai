@@ -6,6 +6,8 @@
 
 const BindawasubCustomerState = {
   channel: "web",
+  activeConversationId: null,
+  historyOpen: false,
   waitingForFundingAmount: false,
   activeFundingRequestId: null,
   selectedProduct: null,
