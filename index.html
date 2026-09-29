@@ -108,7 +108,18 @@
   </div>
 
   <div id="customerInterface">
-    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" id="telegramLinkButton" type="button">Connect Telegram</button><button class="quick-action" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button></div>
+    <div class="customer-toolbar" id="customerToolbar"><button class="quick-action primary" type="button" data-action-message="I want to buy data">Buy Data</button><button class="quick-action" id="chatHistoryButton" type="button">Chat History</button><button class="quick-action" id="telegramLinkButton" type="button">Connect Telegram</button><button class="quick-action" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button><button class="quick-action" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history">Transactions</button><button class="quick-action" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button></div>
+
+    <div id="conversationHistoryPanel" class="conversation-history-panel" hidden>
+      <div class="conversation-history-header">
+        <div>
+          <strong>Saved conversations</strong>
+          <span>Open a previous chat</span>
+        </div>
+        <button id="conversationHistoryRefresh" type="button">Refresh</button>
+      </div>
+      <div id="conversationHistoryList"></div>
+    </div>
     <div id="messages">
 
       <div class="welcome-card" id="welcomeCard">
@@ -147,8 +158,8 @@
 
 </div>
 
-<script src="./customer/js/state.js?v=20260929"></script>
-<script src="./customer/js/api.js?v=20260929"></script>
+<script src="./customer/js/state.js?v=20260929-2"></script>
+<script src="./customer/js/api.js?v=20260929-2"></script>
 <script src="./customer/js/telegram.js?v=20260929"></script>
 <script src="./customer/js/wallet.js?v=20260929"></script>
 <script src="./customer/js/products.js?v=20260929"></script>
