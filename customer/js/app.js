@@ -43,6 +43,18 @@ document
   .getElementById("logoutButton")
   .addEventListener("click", logoutUser);
 
+// Customer profile drawer
+const profileButton = document.getElementById("profileButton");
+const profileCloseButton = document.getElementById("profileCloseButton");
+const profileModal = document.getElementById("profileModal");
+if (profileButton) profileButton.addEventListener("click", openCustomerProfile);
+if (profileCloseButton) profileCloseButton.addEventListener("click", closeCustomerProfile);
+if (profileModal) {
+  profileModal.addEventListener("click", function(event) {
+    if (event.target === profileModal) closeCustomerProfile();
+  });
+}
+
 document
   .getElementById("newChatButton")
   .addEventListener("click", startNewConversation);
