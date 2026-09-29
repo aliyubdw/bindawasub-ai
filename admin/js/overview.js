@@ -39,7 +39,8 @@ function renderOverviewTransactions(rows){
   }).join("")||'<tr><td colspan="7" class="muted">No recent transactions.</td></tr>';
 }
 
-let overviewDays=1;
+let overviewDays=null;
+let overviewRange="all";
 
 function overviewRangeDays(start,end){
   const a=new Date(start+"T00:00:00");
@@ -49,16 +50,19 @@ function overviewRangeDays(start,end){
 }
 
 function setOverviewRangeButton(range){
+  overviewRange=String(range);
   document.querySelectorAll(".range-btn").forEach(btn=>{
-    btn.classList.toggle("active",btn.dataset.range===String(range));
+    btn.classList.toggle("active",btn.dataset.range===overviewRange);
   });
-  $("customOverviewRange")?.classList.toggle("hidden",range!=="custom");
+  $("customOverviewRange")?.classList.toggle("hidden",overviewRange!=="custom");
 }
 
 async function refreshOverviewAnalytics(days=overviewDays){
   const chart=$("overviewChart");
   try{
-    const analytics=await admin({action:"analytics",days});
+    const payload={action:"analytics"};
+    if(days)payload.days=days;
+    const analytics=await admin(payload);
     renderOverviewChart(analytics.series||[]);
   }catch(error){
     console.error("Overview analytics failed:",error);
@@ -77,9 +81,11 @@ function bindOverviewRanges(){
         setOverviewRangeButton("custom");
         return;
       }
-      overviewDays=Number(range)||1;
+      overviewRange=range;
+      overviewDays=range==="all"?null:(Number(range)||1);
       setOverviewRangeButton(range);
       await refreshOverviewAnalytics(overviewDays);
+      await refreshOverviewSummary(overviewDays);
     });
   });
 
@@ -92,9 +98,28 @@ function bindOverviewRanges(){
       return;
     }
     overviewDays=days;
+    overviewRange="custom";
     await refreshOverviewAnalytics(days);
+    await refreshOverviewSummary(days);
     msg($("overviewMsg"),"Custom range applied.","success");
   });
+}
+
+async function refreshOverviewSummary(days){
+  try{
+    const payload={action:"dashboard_summary"};
+    if(days)payload.days=days;
+    const d=await admin(payload);
+    const s=d.summary||{};
+    $("mCustomers").textContent=s.customers??"0";
+    $("mProducts").textContent=s.products??"0";
+    $("mProviders").textContent=s.providers??"0";
+    $("mWallet").textContent=money(s.wallet_liability||0);
+    $("mSales").textContent=money(s.sales||0);
+    $("mProfit").textContent=money(s.profit||0);
+    $("mSuccess").textContent=s.successful_transactions??"0";
+    $("mPending").textContent=s.pending_transactions??"0";
+  }catch(error){console.error("Overview summary failed:",error);}
 }
 
 async function loadOverview(){
@@ -103,7 +128,9 @@ async function loadOverview(){
   bindOverviewRanges();
   try{
     const summaryPromise=admin({action:"dashboard_summary"});
-    const analyticsPromise=admin({action:"analytics",days:overviewDays});
+    const analyticsPayload={action:"analytics"};
+    if(overviewDays)analyticsPayload.days=overviewDays;
+    const analyticsPromise=admin(analyticsPayload);
     const transactionsPromise=admin({action:"list_transactions",status:"",search:"",limit:6});
 
     const d=await summaryPromise;
