@@ -173,6 +173,42 @@ async function registerUser() {
   }
 }
 
+async function loginWithGoogle() {
+  const button = document.getElementById("googleButton");
+  const errorBox = document.getElementById("loginError");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Opening Google...";
+  }
+  if (errorBox) {
+    errorBox.className = "login-error";
+    errorBox.textContent = "";
+  }
+
+  try {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + window.location.pathname
+      }
+    });
+
+    if (error) throw error;
+  } catch (error) {
+    console.error("Google login failed:", error);
+    if (errorBox) {
+      errorBox.textContent = error?.message || "Unable to continue with Google.";
+    }
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Continue with Google";
+    }
+  }
+}
+
+window.loginWithGoogle = loginWithGoogle;
+
 async function loginUser() {
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
