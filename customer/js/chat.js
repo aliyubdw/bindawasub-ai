@@ -3,24 +3,86 @@
 async function startNewConversation() {
   const button = document.getElementById("newChatButton");
   if (button) button.disabled = true;
+
   try {
-    const response = await callEdgeFunction({ action: "new_conversation", channel: getCustomerChannel() });
+    const response = await callEdgeFunction({
+      action: "new_conversation",
+      channel: getCustomerChannel()
+    });
+
     const data = await response.json();
-    if (!response.ok || data.success !== true) throw new Error(data.error || "Failed to start a new conversation.");
+
+    if (!response.ok || data.success !== true || !data.conversation_id) {
+      throw new Error(data.error || "Failed to start a new conversation.");
+    }
+
+    BindawasubCustomerState.activeConversationId = data.conversation_id;
+    BindawasubCustomerState.historyOpen = false;
+
+    const historyPanel = document.getElementById("conversationHistoryPanel");
+    if (historyPanel) historyPanel.hidden = true;
+
     resetCustomerOrderState();
     resetCustomerFundingState();
+
     const messages = document.getElementById("messages");
     messages.innerHTML = "";
+
     addMessage("Hello! A new conversation has started. How can I help you today?", "bot");
+
     const input = document.getElementById("messageInput");
     input.value = "";
     input.placeholder = "Rubuta saƙonka...";
     input.focus();
+
+    await loadConversationList();
   } catch (error) {
     console.error("New conversation failed:", error);
     addMessage("❌ An kasa fara sabuwar hira. Sake gwadawa.", "bot");
   } finally {
     if (button) button.disabled = false;
+  }
+}
+
+async function loadConversationMessages(conversationId) {
+  const id = String(conversationId || "").trim();
+  if (!id) return;
+
+  const messages = document.getElementById("messages");
+  if (!messages) return;
+
+  try {
+    const response = await callEdgeFunction({
+      action: "conversation_history",
+      channel: getCustomerChannel(),
+      conversation_id: id
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(data.error || "Failed to load conversation.");
+    }
+
+    BindawasubCustomerState.activeConversationId = data.conversation_id;
+    resetCustomerOrderState();
+    resetCustomerFundingState();
+    messages.innerHTML = "";
+
+    if (Array.isArray(data.messages) && data.messages.length > 0) {
+      data.messages.forEach(item => {
+        const role = item.role === "user" ? "user" : "bot";
+        addMessage(item.message || "", role);
+      });
+    } else {
+      addMessage("This conversation is empty. Send a message to continue.", "bot");
+    }
+
+    messages.scrollTop = messages.scrollHeight;
+    document.getElementById("messageInput")?.focus();
+  } catch (error) {
+    console.error("Conversation load failed:", error);
+    addMessage("❌ Ba a iya bude wannan hirar ba. Sake gwadawa.", "bot");
   }
 }
 
@@ -42,6 +104,7 @@ async function loadConversationHistory() {
       throw new Error(data.error || "Failed to load conversation history.");
     }
 
+    BindawasubCustomerState.activeConversationId = data.conversation_id || null;
     messages.innerHTML = "";
 
     if (Array.isArray(data.messages) && data.messages.length > 0) {
@@ -50,10 +113,7 @@ async function loadConversationHistory() {
         addMessage(item.message || "", role);
       });
     } else {
-      addMessage(
-        "Hello! Welcome to Bindawasub. How can I help you today?",
-        "bot"
-      );
+      addMessage("Hello! Welcome to Bindawasub. How can I help you today?", "bot");
     }
 
     messages.scrollTop = messages.scrollHeight;
@@ -61,14 +121,102 @@ async function loadConversationHistory() {
     console.error("Conversation history load failed:", error);
 
     if (!messages.children.length) {
-      addMessage(
-        "Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?",
-        "bot"
-      );
+      addMessage("Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?", "bot");
     }
   }
 }
 
+function formatConversationDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-NG", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function toggleConversationHistory() {
+  const panel = document.getElementById("conversationHistoryPanel");
+  if (!panel) return;
+
+  BindawasubCustomerState.historyOpen = !BindawasubCustomerState.historyOpen;
+  panel.hidden = !BindawasubCustomerState.historyOpen;
+
+  if (BindawasubCustomerState.historyOpen) {
+    loadConversationList();
+  }
+}
+
+async function loadConversationList() {
+  if (isAdminUser) return;
+
+  const panel = document.getElementById("conversationHistoryPanel");
+  const list = document.getElementById("conversationHistoryList");
+  if (!panel || !list) return;
+
+  panel.hidden = false;
+  list.innerHTML = '<div class="conversation-history-loading">Loading conversations…</div>';
+
+  try {
+    const response = await callEdgeFunction({
+      action: "conversation_list",
+      channel: getCustomerChannel()
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(data.error || "Failed to load conversations.");
+    }
+
+    const conversations = Array.isArray(data.conversations) ? data.conversations : [];
+
+    if (!conversations.length) {
+      list.innerHTML = '<div class="conversation-history-empty">No saved conversations yet.</div>';
+      return;
+    }
+
+    list.innerHTML = "";
+
+    conversations.forEach(conversation => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "conversation-history-item" +
+        (conversation.id === BindawasubCustomerState.activeConversationId ? " active" : "");
+
+      const title = document.createElement("div");
+      title.className = "conversation-history-title";
+      title.textContent = conversation.title || "Conversation";
+
+      const meta = document.createElement("div");
+      meta.className = "conversation-history-meta";
+      meta.textContent = String(formatConversationDate(conversation.last_message_at || conversation.started_at)) +
+        " • " + String(Number(conversation.message_count || 0)) + " messages";
+
+      const preview = document.createElement("div");
+      preview.className = "conversation-history-preview";
+      preview.textContent = conversation.preview || "";
+
+      item.appendChild(title);
+      item.appendChild(meta);
+      if (conversation.preview) item.appendChild(preview);
+
+      item.addEventListener("click", async () => {
+        await loadConversationMessages(conversation.id);
+        BindawasubCustomerState.historyOpen = false;
+        panel.hidden = true;
+        await loadConversationList();
+      });
+
+      list.appendChild(item);
+    });
+  } catch (error) {
+    console.error("Conversation list load failed:", error);
+    list.innerHTML = '<div class="conversation-history-empty">❌ Unable to load saved conversations.</div>';
+  }
+}
 async function showChatScreen() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("chatScreen").style.display = "flex";
@@ -309,7 +457,10 @@ Misali: 08012345678`,
     const response = await callEdgeFunction({
       message: message,
       ...(requestAction ? { action: requestAction } : {}),
-      ...(requestAmount ? { amount: requestAmount } : {})
+      ...(requestAmount ? { amount: requestAmount } : {}),
+      ...(BindawasubCustomerState.activeConversationId
+        ? { conversation_id: BindawasubCustomerState.activeConversationId }
+        : {})
     });
 
     /* Read the raw response first so we never
