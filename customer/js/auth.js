@@ -261,6 +261,9 @@ async function loginUser() {
 }
 
 async function logoutUser() {
+  resetCustomerSessionState();
+  lastAuthenticatedUserId = null;
+
   try {
     await supabaseClient.auth.signOut({ scope: "local" });
   } catch (error) {
@@ -275,10 +278,46 @@ async function logoutUser() {
 
 let authBooted = false;
 let authTransitionRunning = false;
+let lastAuthenticatedUserId = null;
+
+function resetCustomerSessionState() {
+  // Never allow conversation state from one authenticated account
+  // to survive into another account in the same browser session.
+  BindawasubCustomerState.activeConversationId = null;
+  BindawasubCustomerState.historyOpen = false;
+  resetCustomerOrderState();
+  resetCustomerFundingState();
+
+  const messages = document.getElementById("messages");
+  if (messages) messages.innerHTML = "";
+
+  const historyList = document.getElementById("conversationHistoryList");
+  if (historyList) historyList.innerHTML = "";
+
+  const historyPanel = document.getElementById("conversationHistoryPanel");
+  if (historyPanel) historyPanel.hidden = true;
+
+  const input = document.getElementById("messageInput");
+  if (input) input.value = "";
+}
 
 async function applyAuthenticatedSession(session) {
   if (!session || authTransitionRunning) return;
 
+  const authenticatedUserId = String(session.user?.id || "").trim();
+  if (!authenticatedUserId) {
+    console.error("Authenticated session has no user id.");
+    return;
+  }
+
+  // Detect account changes even when Supabase changes the session
+  // without a full page reload (for example, account A -> account B).
+  if (lastAuthenticatedUserId && lastAuthenticatedUserId !== authenticatedUserId) {
+    resetCustomerSessionState();
+    hideAdminMode();
+  }
+
+  lastAuthenticatedUserId = authenticatedUserId;
   authTransitionRunning = true;
 
   try {
@@ -317,6 +356,8 @@ async function initAuth() {
 
     if (event === "SIGNED_OUT" || !session) {
       if (event === "SIGNED_OUT") {
+        resetCustomerSessionState();
+        lastAuthenticatedUserId = null;
         stopFundingStatusNotifications();
         hideAdminMode();
         document.getElementById("chatScreen").style.display = "none";
