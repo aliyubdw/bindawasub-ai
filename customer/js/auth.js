@@ -239,15 +239,10 @@ async function loginUser() {
       throw new Error(error?.message || "Login failed.");
     }
 
-    const isAdmin = await verifyAdminMode();
-
-    if (isAdmin) {
-      window.location.replace("./admin/");
-      return;
-    }
-
-    await showChatScreen();
-    document.getElementById("customerInterface").classList.remove("admin-hidden");
+    // Do not initialize the account here.
+    // The single SIGNED_IN/INITIAL_SESSION handler below owns session boot.
+    // This prevents loginUser() and onAuthStateChange() from racing and
+    // loading two different account states in the same browser.
   } catch (error) {
     console.error("Post-login setup failed:", error);
     await supabaseClient.auth.signOut({ scope: "local" }).catch(() => {});
