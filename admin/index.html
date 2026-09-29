@@ -35,18 +35,36 @@
 
 <section id="overview" class="panel active">
 <div id="overviewMsg"></div>
-<div class="grid">
-<div class="card metric"><div class="label">Customers</div><div id="mCustomers" class="value">—</div></div>
-<div class="card metric"><div class="label">Products / Plans</div><div id="mProducts" class="value">—</div></div>
-<div class="card metric"><div class="label">Providers</div><div id="mProviders" class="value">—</div></div>
-<div class="card metric"><div class="label">Wallet Liability</div><div id="mWallet" class="value">—</div></div>
-<div class="card metric"><div class="label">Sales</div><div id="mSales" class="value">—</div></div>
-<div class="card metric"><div class="label">Profit</div><div id="mProfit" class="value">—</div></div>
-<div class="card metric"><div class="label">Successful</div><div id="mSuccess" class="value">—</div></div>
-<div class="card metric"><div class="label">Pending</div><div id="mPending" class="value">—</div></div>
+<div class="dashboard-kpis">
+  <div class="card metric"><div class="label">Total Revenue</div><div id="mSales" class="value">—</div><div class="metric-note">Successful sales</div></div>
+  <div class="card metric"><div class="label">Transactions</div><div id="mSuccess" class="value">—</div><div class="metric-note">Successful transactions</div></div>
+  <div class="card metric"><div class="label">Active Customers</div><div id="mCustomers" class="value">—</div><div class="metric-note">Registered customers</div></div>
+  <div class="card metric"><div class="label">Net Profit</div><div id="mProfit" class="value">—</div><div class="metric-note">Successful transaction profit</div></div>
 </div>
-<div class="card"><div class="section-title"><h2>System foundation</h2><button id="refreshOverview" class="secondary">Refresh</button></div>
-<p class="muted">The dashboard is now separated from the customer AI function. Provider credentials remain server-side; this screen stores only secret names/references, never API keys.</p></div>
+<div class="dashboard-main-grid">
+  <div class="card dashboard-card">
+    <div class="dashboard-card-head"><div><h2>Transaction Overview</h2><p>Successful sales activity over the last 7 days</p></div><span class="badge on">Live</span></div>
+    <div id="overviewChart" class="overview-chart"><span class="muted">Loading activity…</span></div>
+  </div>
+  <div class="card dashboard-card">
+    <div class="dashboard-card-head"><div><h2>System Health</h2><p>Core Bindawasub services</p></div></div>
+    <div class="health-list">
+      <div class="health-row"><span class="health-indicator"></span><div><strong>Admin API</strong><small>Operational</small></div><em>Live</em></div>
+      <div class="health-row"><span class="health-indicator"></span><div><strong>Supabase</strong><small>Database connected</small></div><em>Live</em></div>
+      <div class="health-row"><span class="health-indicator"></span><div><strong>Provider routing</strong><small><span id="mProviders">—</span> configured</small></div><em>Ready</em></div>
+    </div>
+    <button class="secondary" data-tab-jump="reliability">View system health</button>
+  </div>
+</div>
+<div class="card recent-card">
+  <div class="dashboard-card-head"><div><h2>Recent Transactions</h2><p>Latest customer activity</p></div><button id="dashboardTransactionsButton" class="secondary">View all</button></div>
+  <div class="table-wrap"><table class="dashboard-table"><thead><tr><th>Transaction</th><th>Customer</th><th>Service</th><th>Provider</th><th>Amount</th><th>Status</th><th>Time</th></tr></thead><tbody id="overviewTransactionRows"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody></table></div>
+</div>
+<div class="dashboard-secondary">
+  <div class="card mini-stat"><span>Products / Plans</span><strong id="mProducts">—</strong></div>
+  <div class="card mini-stat"><span>Wallet Liability</span><strong id="mWallet">—</strong></div>
+  <div class="card mini-stat"><span>Pending Transactions</span><strong id="mPending">—</strong></div>
+</div>
 </section>
 
 <section id="providers" class="panel">
