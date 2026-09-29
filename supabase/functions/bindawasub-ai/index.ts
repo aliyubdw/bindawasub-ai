@@ -361,20 +361,6 @@ Deno.serve(async (req) => {
       bindawasubUser = result.data;
       userError = result.error;
 
-      if (!bindawasubUser && authUser.email) {
-        const { data: emailUser, error: emailLookupError } = await supabase
-          .from("users")
-          .select("id, auth_user_id, phone, name, role, language")
-          .eq("email", authUser.email)
-          .limit(1)
-          .maybeSingle();
-
-        if (emailLookupError) {
-          console.error("Bindawasub email lookup error:", emailLookupError);
-        } else if (emailUser) {
-          bindawasubUser = emailUser;
-        }
-      }
     }
 
     if (userError || !bindawasubUser) {
