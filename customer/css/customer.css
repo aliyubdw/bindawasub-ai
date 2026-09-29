@@ -1338,3 +1338,54 @@ body{
 }
 .profile-telegram-status strong { color:#147548; }
 .profile-telegram-status span,.profile-telegram-status small { color:var(--muted); }
+
+
+/* Profile slide-out drawer */
+.profile-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(7, 20, 15, .42);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: flex-end;
+  opacity: 1;
+  transition: background .25s ease;
+}
+.profile-modal[hidden] { display: none; }
+.profile-drawer {
+  width: min(430px, 92vw);
+  height: 100%;
+  max-height: 100vh;
+  overflow-y: auto;
+  border-radius: 20px 0 0 20px;
+  transform: translateX(0);
+  animation: profileDrawerIn .28s ease both;
+  box-shadow: -14px 0 40px rgba(0,0,0,.16);
+}
+@keyframes profileDrawerIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.profile-drawer .profile-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: inherit;
+  padding-bottom: 14px;
+}
+.profile-drawer .profile-modal-header h2 { margin-bottom: 0; }
+@media (max-width: 520px) {
+  .profile-modal { align-items: flex-end; }
+  .profile-drawer {
+    width: 100%;
+    height: min(92vh, 760px);
+    max-height: 92vh;
+    border-radius: 22px 22px 0 0;
+    animation: profileDrawerUp .28s ease both;
+  }
+  @keyframes profileDrawerUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+}
