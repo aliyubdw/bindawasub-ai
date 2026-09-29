@@ -105,6 +105,70 @@ function addMessage(text, type) {
     messages.scrollHeight;
 }
 
+const pendingTransactionWatchers = new Map();
+
+async function watchTransactionStatus(transactionId) {
+  const id = String(transactionId || "").trim();
+  if (!id || pendingTransactionWatchers.has(id)) return;
+
+  let attempts = 0;
+  const maxAttempts = 18;
+  pendingTransactionWatchers.set(id, true);
+
+  try {
+    while (attempts < maxAttempts) {
+      attempts += 1;
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      try {
+        const response = await callEdgeFunction({
+          action: "transaction_status",
+          transaction_id: id
+        });
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok || data?.success !== true || !data?.transaction) continue;
+
+        const tx = data.transaction;
+        const status = String(tx.status || "").toLowerCase();
+
+        if (status === "successful") {
+          addMessage("✅ Your purchase has now been confirmed successfully.", "bot");
+          showPurchaseConfirmation({
+            ...tx,
+            transaction_id: tx.id,
+            description: tx.product_name || "Purchase",
+            reference: tx.provider_reference || null,
+            provider_reference: tx.provider_reference || null
+          });
+          break;
+        }
+
+        if (status === "failed" || status === "reversed") {
+          addMessage(
+            status === "failed"
+              ? "❌ Your purchase was confirmed as failed and the wallet refund has been handled."
+              : "↩️ Your purchase was reversed and the wallet adjustment has been handled.",
+            "bot"
+          );
+          showPurchaseConfirmation({
+            ...tx,
+            transaction_id: tx.id,
+            description: tx.product_name || "Purchase",
+            reference: tx.provider_reference || null,
+            provider_reference: tx.provider_reference || null
+          });
+          break;
+        }
+      } catch (error) {
+        console.error("Pending transaction status check failed:", error);
+      }
+    }
+  } finally {
+    pendingTransactionWatchers.delete(id);
+  }
+}
+
 async function sendMessage(customMessage = null, customAction = null) {
 
   const input =
@@ -319,6 +383,12 @@ Misali: 08012345678`,
         (data?.intent === "purchase" || data?.intent === "airtime_purchase")
       ) {
         showPurchaseConfirmation(data.purchase);
+        if (
+          String(data.purchase.status || "").toLowerCase() === "pending" &&
+          data.purchase.transaction_id
+        ) {
+          watchTransactionStatus(data.purchase.transaction_id);
+        }
       }
 
     } else if (data?.error) {
