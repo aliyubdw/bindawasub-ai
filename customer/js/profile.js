@@ -129,6 +129,29 @@ function renderCustomerProfile(profile) {
       </div>
     </div>
 
+    <div class="profile-section profile-funding-section">
+      <div class="profile-section-title">Funding history</div>
+      <div id="profileFundingHistory" class="profile-history-list"><div class="profile-loading">Loading funding history…</div></div>
+    </div>
+
+    <div class="profile-section profile-telegram-section">
+      <div class="profile-section-title">Telegram</div>
+      <div id="profileTelegramStatus" class="profile-telegram-status">Checking connection…</div>
+    </div>
+
+    <div class="profile-section profile-password-section">
+      <div class="profile-section-title">Security</div>
+      <button id="profileChangePasswordButton" type="button" class="profile-secondary-button">Change password</button>
+      <div id="profilePasswordPanel" class="profile-edit-panel" hidden>
+        <label>New password</label>
+        <input id="profileNewPassword" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+        <label>Confirm new password</label>
+        <input id="profileConfirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Repeat your password">
+        <div id="profilePasswordMessage" class="profile-edit-message"></div>
+        <button id="profileSavePasswordButton" type="button">Update password</button>
+      </div>
+    </div>
+
     <div class="profile-security-note">
       <strong>Security</strong>
       <span>Your email and password are managed securely by Supabase Authentication.</span>
@@ -146,6 +169,13 @@ function renderCustomerProfile(profile) {
   });
 
   document.getElementById("profileSaveButton").addEventListener("click", saveCustomerProfile);
+  document.getElementById("profileChangePasswordButton").addEventListener("click", function() {
+    document.getElementById("profilePasswordPanel").hidden = false;
+    this.hidden = true;
+  });
+  document.getElementById("profileSavePasswordButton").addEventListener("click", changeCustomerPassword);
+  loadProfileFundingHistory();
+  loadProfileTelegramStatus();
 }
 
 async function saveCustomerProfile() {
@@ -182,3 +212,74 @@ async function saveCustomerProfile() {
 
 window.openCustomerProfile = openCustomerProfile;
 window.closeCustomerProfile = closeCustomerProfile;
+
+
+async function loadProfileFundingHistory() {
+  const el = document.getElementById("profileFundingHistory");
+  if (!el) return;
+  try {
+    const data = await callProfileFunction({ action: "funding_history", limit: 10 });
+    if (!data.items?.length) {
+      el.innerHTML = '<div class="profile-empty">No wallet funding records yet.</div>';
+      return;
+    }
+    el.innerHTML = data.items.map(item => `
+      <div class="profile-history-row">
+        <div><strong>${formatNaira(item.amount)}</strong><span>${profileEscape(item.payment_method || "Wallet funding")} · ${profileEscape(formatDate(item.created_at))}</span></div>
+        <span class="profile-status-badge ${profileEscape(item.status)}">${profileEscape(item.status || "pending")}</span>
+      </div>`).join("");
+  } catch (error) {
+    el.innerHTML = '<div class="profile-error">Unable to load funding history.</div>';
+  }
+}
+
+async function loadProfileTelegramStatus() {
+  const el = document.getElementById("profileTelegramStatus");
+  if (!el) return;
+  try {
+    const data = await callProfileFunction({ action: "telegram_status" });
+    if (data.connected) {
+      el.innerHTML = `<strong>Connected</strong><span>@${profileEscape(data.telegram_username || "Telegram account")}</span>`;
+    } else {
+      el.innerHTML = '<span>Not connected</span><small>Use “Connect Telegram” from the customer toolbar.</small>';
+    }
+  } catch (error) {
+    el.textContent = "Telegram status unavailable.";
+  }
+}
+
+async function changeCustomerPassword() {
+  const message = document.getElementById("profilePasswordMessage");
+  const button = document.getElementById("profileSavePasswordButton");
+  const password = document.getElementById("profileNewPassword").value;
+  const confirmation = document.getElementById("profileConfirmPassword").value;
+  message.className = "profile-edit-message";
+  message.textContent = "";
+
+  if (password.length < 8) {
+    message.className = "profile-edit-message error";
+    message.textContent = "Password must be at least 8 characters.";
+    return;
+  }
+  if (password !== confirmation) {
+    message.className = "profile-edit-message error";
+    message.textContent = "Passwords do not match.";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Updating…";
+  try {
+    const { error } = await supabaseClient.auth.updateUser({ password });
+    if (error) throw error;
+    document.getElementById("profileNewPassword").value = "";
+    document.getElementById("profileConfirmPassword").value = "";
+    message.textContent = "Password updated successfully.";
+  } catch (error) {
+    message.className = "profile-edit-message error";
+    message.textContent = error?.message || "Unable to update password.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Update password";
+  }
+}
