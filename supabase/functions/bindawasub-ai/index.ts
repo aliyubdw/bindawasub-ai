@@ -2778,7 +2778,7 @@ if (body.action === "manual_fund") {
       // Deterministic routing for Airtime. Once an Airtime task has started,
       // keep numeric/phone follow-ups in the Airtime flow instead of Data.
       const activeAirtimeContext = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
-      const explicitAirtimeRequest = /\\bairtime\\b|\\btalktime\\b/i.test(String(originalMessage || ""));
+      const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
       if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {
         ai.intent = "airtime_purchase";
         ai.service_type = "airtime";
@@ -2786,6 +2786,14 @@ if (body.action === "manual_fund") {
         ai.product_id = null;
         ai.product_name = null;
         ai.volume = null;
+
+        const numericAmount = String(originalMessage || "").trim().match(/^(?:₦\s*|NGN\s*)?([0-9][0-9,]*(?:\.\d+)?)$/i);
+        if (numericAmount) {
+          const parsedAmount = Number(numericAmount[1].replace(/,/g, ""));
+          if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+            ai.amount = parsedAmount;
+          }
+        }
       } else if (explicitAirtimeRequest) {
         const airtimeNetworkMatch = String(originalMessage || "").match(/\\b(mtn|airtel|glo|9mobile|9mobile\\s*\\(\\s*t2\\s*\\)|t2)\\b/i);
         if (airtimeNetworkMatch) {
