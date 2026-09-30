@@ -46,12 +46,43 @@ async function loadQuickAccessServices() {
     { name: "9mobile (T2)", code: "9mobile" }
   ];
 
-  const billServices = [
-    { name: "Electricity", code: "electricity" },
-    { name: "NECO PIN", code: "neco" },
-    { name: "TV Subscription", code: "tv" },
-    { name: "WAEC PIN", code: "waec" }
-  ];
+  // Load every active bill/service from the live service catalog.
+  // This keeps the Bills selector automatically in sync when a new bill
+  // service is added in Supabase.
+  let billServices = [];
+  try {
+    if (window.supabaseClient) {
+      const { data, error } = await window.supabaseClient
+        .from("service_definitions")
+        .select("code,name,category,description")
+        .eq("active", true)
+        .neq("category", "telecom")
+        .order("name", { ascending: true });
+
+      if (!error && Array.isArray(data)) {
+        billServices = data.map(function(service) {
+          return {
+            name: service.name,
+            code: service.code,
+            category: service.category,
+            description: service.description
+          };
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Bills catalog load failed:", error);
+  }
+
+  // Safe fallback for the currently configured bill services.
+  if (!billServices.length) {
+    billServices = [
+      { name: "Electricity", code: "electricity" },
+      { name: "NECO PIN", code: "neco" },
+      { name: "TV Subscription", code: "tv" },
+      { name: "WAEC PIN", code: "waec" }
+    ];
+  }
 
   if (airtimeButton) {
     airtimeButton.addEventListener("click", async function() {
@@ -73,7 +104,9 @@ async function loadQuickAccessServices() {
         "Select the bill or service you want to pay.",
         billServices,
         function(service) {
-          sendMessage("I want to pay for " + service.name);
+          // Include the service code so the backend can deterministically
+          // route the request to the selected bill service.
+          sendMessage("I want to pay for " + service.name + " (" + service.code + ")");
         }
       );
     });
