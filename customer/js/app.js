@@ -93,7 +93,7 @@ async function loadQuickAccessServices() {
         function(network) {
           // Start Airtime through a deterministic backend action so Gemini
           // cannot interpret the selected network as a Data request.
-          sendMessage("Airtime", "start_airtime");
+          sendMessage("Airtime on " + network.code, "start_airtime");
         }
       );
     });
