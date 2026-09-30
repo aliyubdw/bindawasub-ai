@@ -2787,7 +2787,6 @@ if (body.action === "manual_fund") {
         ai.product_name = null;
         ai.volume = null;
       } else {
-      {
         ai.intent = String(ai.intent || "unknown").trim().toLowerCase();
 
         // Deterministic routing for an explicitly selected bill/service.
