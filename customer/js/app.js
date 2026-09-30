@@ -41,15 +41,30 @@ async function loadQuickAccessServices() {
 
   if (airtimeButton) {
     airtimeButton.addEventListener("click", async function() {
-      const { data, error } = await supabase
-        .from("service_networks")
-        .select("id,code,name,active,service_definitions!inner(code,name,active)")
+      // Do not use a nested PostgREST relationship here. Fetch the
+      // Airtime service first, then its active networks directly.
+      const serviceResult = await supabase
+        .from("service_definitions")
+        .select("id,code,name,active")
+        .eq("code", "airtime")
         .eq("active", true)
-        .eq("service_definitions.code", "airtime")
-        .eq("service_definitions.active", true)
+        .maybeSingle();
+
+      if (serviceResult.error || !serviceResult.data) {
+        console.error("Airtime service lookup failed:", serviceResult.error);
+        sendMessage("I want to buy airtime");
+        return;
+      }
+
+      const networkResult = await supabase
+        .from("service_networks")
+        .select("id,code,name,active")
+        .eq("service_id", serviceResult.data.id)
+        .eq("active", true)
         .order("name");
 
-      if (error || !data?.length) {
+      if (networkResult.error || !networkResult.data?.length) {
+        console.error("Airtime network lookup failed:", networkResult.error);
         sendMessage("I want to buy airtime");
         return;
       }
@@ -57,7 +72,12 @@ async function loadQuickAccessServices() {
       await showServiceSelector(
         "📱 Airtime",
         "Select the network you want to buy airtime for.",
-        data.map(function(n) { return { name: String(n.code).toLowerCase() === "9mobile" ? "9mobile (T2)" : n.name, code: n.code }; }),
+        networkResult.data.map(function(n) {
+          return {
+            name: String(n.code).toLowerCase() === "9mobile" ? "9mobile (T2)" : n.name,
+            code: n.code
+          };
+        }),
         function(network) {
           sendMessage("I want to buy airtime on " + network.name);
         }
@@ -67,15 +87,18 @@ async function loadQuickAccessServices() {
 
   if (billsButton) {
     billsButton.addEventListener("click", async function() {
-      const { data, error } = await supabase
+      // Bills are service definitions, so read the active non-telecom
+      // services directly. This avoids depending on service_networks.
+      const result = await supabase
         .from("service_definitions")
-        .select("code,name,description,category")
+        .select("id,code,name,description,category")
         .eq("active", true)
         .neq("category", "telecom")
         .order("category")
         .order("name");
 
-      if (error || !data?.length) {
+      if (result.error || !result.data?.length) {
+        console.error("Bills service lookup failed:", result.error);
         sendMessage("I want to pay a bill");
         return;
       }
@@ -83,7 +106,9 @@ async function loadQuickAccessServices() {
       await showServiceSelector(
         "🧾 Bills",
         "Select the bill or service you want to pay.",
-        data.map(function(s) { return { name: s.name, code: s.code }; }),
+        result.data.map(function(s) {
+          return { name: s.name, code: s.code };
+        }),
         function(service) {
           sendMessage("I want to pay for " + service.name);
         }
@@ -118,24 +143,11 @@ function showWebNetworkSelector() {
   messages.scrollTop = messages.scrollHeight;
 }
 
-document
-  .getElementById("loginButton")
-  .addEventListener("click", loginUser);
-document
-  .getElementById("googleButton")
-  .addEventListener("click", loginWithGoogle);
-
-document
-  .getElementById("registerButton")
-  .addEventListener("click", registerUser);
-
-document
-  .getElementById("showRegisterButton")
-  .addEventListener("click", showRegisterForm);
-
-document
-  .getElementById("showLoginButton")
-  .addEventListener("click", showLoginForm);
+document.getElementById("loginButton").addEventListener("click", loginUser);
+document.getElementById("googleButton").addEventListener("click", loginWithGoogle);
+document.getElementById("registerButton").addEventListener("click", registerUser);
+document.getElementById("showRegisterButton").addEventListener("click", showRegisterForm);
+document.getElementById("showLoginButton").addEventListener("click", showLoginForm);
 
 const registerForm = document.getElementById("registerForm");
 if (registerForm && !document.getElementById("googleRegisterButton")) {
@@ -149,19 +161,10 @@ if (registerForm && !document.getElementById("googleRegisterButton")) {
   registerForm.insertBefore(googleRegisterButton, backButton);
 }
 
-document
-  .getElementById("completeProfileButton")
-  .addEventListener("click", completeProfile);
+document.getElementById("completeProfileButton").addEventListener("click", completeProfile);
+document.getElementById("profileBackButton").addEventListener("click", showLoginForm);
+document.getElementById("logoutButton").addEventListener("click", logoutUser);
 
-document
-  .getElementById("profileBackButton")
-  .addEventListener("click", showLoginForm);
-
-document
-  .getElementById("logoutButton")
-  .addEventListener("click", logoutUser);
-
-// Customer profile drawer
 const profileButton = document.getElementById("profileButton");
 const profileCloseButton = document.getElementById("profileCloseButton");
 const profileModal = document.getElementById("profileModal");
@@ -173,56 +176,24 @@ if (profileModal) {
   });
 }
 
-document
-  .getElementById("newChatButton")
-  .addEventListener("click", startNewConversation);
-
-document
-  .getElementById("chatHistoryButton")
-  .addEventListener("click", toggleConversationHistory);
-
-document
-  .getElementById("conversationHistoryRefresh")
-  .addEventListener("click", loadConversationList);
-
-document
-  .getElementById("telegramLinkButton")
-  .addEventListener("click", createTelegramLinkCode);
-
-document
-  .getElementById("adminSearchButton")
-  .addEventListener("click", searchAdminCustomers);
-
-document
-  .getElementById("adminCustomerSearch")
-  .addEventListener("keydown", function(event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      searchAdminCustomers();
-    }
-  });
-
-document
-  .getElementById("adminFundButton")
-  .addEventListener("click", fundAdminCustomer);
-
-document
-  .getElementById("adminResetButton")
-  .addEventListener("click", resetAdminCustomerPassword);
-
-document
-  .getElementById("manualFundingSettingsSave")
-  .addEventListener("click", saveManualFundingSettings);
-
-document
-  .getElementById("manualFundingRefresh")
-  .addEventListener("click", loadManualFundingRequests);
-
-document
-  .getElementById("loginPassword")
-  .addEventListener("keydown", function(event) {
-    if (event.key === "Enter") loginUser();
-  });
+document.getElementById("newChatButton").addEventListener("click", startNewConversation);
+document.getElementById("chatHistoryButton").addEventListener("click", toggleConversationHistory);
+document.getElementById("conversationHistoryRefresh").addEventListener("click", loadConversationList);
+document.getElementById("telegramLinkButton").addEventListener("click", createTelegramLinkCode);
+document.getElementById("adminSearchButton").addEventListener("click", searchAdminCustomers);
+document.getElementById("adminCustomerSearch").addEventListener("keydown", function(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    searchAdminCustomers();
+  }
+});
+document.getElementById("adminFundButton").addEventListener("click", fundAdminCustomer);
+document.getElementById("adminResetButton").addEventListener("click", resetAdminCustomerPassword);
+document.getElementById("manualFundingSettingsSave").addEventListener("click", saveManualFundingSettings);
+document.getElementById("manualFundingRefresh").addEventListener("click", loadManualFundingRequests);
+document.getElementById("loginPassword").addEventListener("keydown", function(event) {
+  if (event.key === "Enter") loginUser();
+});
 
 document.querySelectorAll("[data-action-message]").forEach(function(button) {
   if (button.getAttribute("data-action-message") === "I want to buy airtime" || button.getAttribute("data-action-message") === "I want to pay a bill") return;
@@ -241,13 +212,9 @@ document.querySelectorAll("[data-action-message]").forEach(function(button) {
   });
 });
 
-document
-  .getElementById("messageInput")
-  .addEventListener("keydown", function(event) {
-    if (event.key === "Enter") {
-      sendMessage();
-    }
-  });
+document.getElementById("messageInput").addEventListener("keydown", function(event) {
+  if (event.key === "Enter") sendMessage();
+});
 
 loadQuickAccessServices();
 resetCustomerOrderState();
