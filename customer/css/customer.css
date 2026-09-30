@@ -1643,7 +1643,85 @@ body{
   .profile-header-actions .profile-close-button{width:34px;flex:0 0 34px;}
 }
 
-/* AI SERVICES — compact floating swipe menu */
+/* AI SERVICES — compact horizontal menu inside conversation area */
+#messages{
+  position:relative;
+  padding-bottom:70px;
+}
+
+.services-conversation{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:8px;
+  z-index:20;
+  padding:0 10px;
+  pointer-events:none;
+}
+
+.services-conversation-track{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:100%;
+  overflow-x:auto;
+  padding:5px 2px 6px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  pointer-events:auto;
+  overscroll-behavior-x:contain;
+}
+.services-conversation-track::-webkit-scrollbar{display:none}
+
+.services-conversation .service-item{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  width:auto;
+  min-width:64px;
+  min-height:31px;
+  padding:5px 9px;
+  border:1px solid rgba(205,222,214,.96);
+  border-radius:999px;
+  background:rgba(255,255,255,.96);
+  color:#214238;
+  box-shadow:0 4px 13px rgba(20,55,43,.12);
+  backdrop-filter:blur(8px);
+  font-size:10px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.services-conversation .service-item:hover{
+  background:#f1f8f4;
+  border-color:#a9cdbd;
+}
+.services-conversation .service-icon{
+  font-size:12px;
+  line-height:1;
+}
+
+@media(max-width:760px){
+  #messages{padding-bottom:62px}
+  .services-conversation{
+    left:0;
+    right:0;
+    bottom:5px;
+    padding:0 7px;
+  }
+  .services-conversation-track{
+    gap:5px;
+    padding:4px 1px 5px;
+  }
+  .services-conversation .service-item{
+    min-width:60px;
+    min-height:29px;
+    padding:5px 8px;
+    font-size:9px;
+  }
+  .services-conversation .service-icon{font-size:11px}
+}
 #customerInterface{
   position:relative;
 }
