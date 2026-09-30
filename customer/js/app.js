@@ -2,9 +2,6 @@
 
 // Dynamic Quick Access selectors
 async function loadQuickAccessServices() {
-  const supabase = window.supabaseClient || window.sb || null;
-  if (!supabase || typeof supabase.from !== "function") return;
-
   const airtimeButton = document.querySelector('[data-action-message="I want to buy airtime"]');
   const billsButton = document.querySelector('[data-action-message="I want to pay a bill"]');
 
@@ -39,45 +36,29 @@ async function loadQuickAccessServices() {
     messages.scrollTop = messages.scrollHeight;
   }
 
+  // These are the active Bindawasub catalog entries. The selector UI is
+  // intentionally independent of PostgREST/RLS so it cannot disappear
+  // because a browser session has not finished initializing.
+  const airtimeNetworks = [
+    { name: "MTN", code: "mtn" },
+    { name: "Airtel", code: "airtel" },
+    { name: "Glo", code: "glo" },
+    { name: "9mobile (T2)", code: "9mobile" }
+  ];
+
+  const billServices = [
+    { name: "Electricity", code: "electricity" },
+    { name: "NECO PIN", code: "neco" },
+    { name: "TV Subscription", code: "tv" },
+    { name: "WAEC PIN", code: "waec" }
+  ];
+
   if (airtimeButton) {
     airtimeButton.addEventListener("click", async function() {
-      // Do not use a nested PostgREST relationship here. Fetch the
-      // Airtime service first, then its active networks directly.
-      const serviceResult = await supabase
-        .from("service_definitions")
-        .select("id,code,name,active")
-        .eq("code", "airtime")
-        .eq("active", true)
-        .maybeSingle();
-
-      if (serviceResult.error || !serviceResult.data) {
-        console.error("Airtime service lookup failed:", serviceResult.error);
-        sendMessage("I want to buy airtime");
-        return;
-      }
-
-      const networkResult = await supabase
-        .from("service_networks")
-        .select("id,code,name,active")
-        .eq("service_id", serviceResult.data.id)
-        .eq("active", true)
-        .order("name");
-
-      if (networkResult.error || !networkResult.data?.length) {
-        console.error("Airtime network lookup failed:", networkResult.error);
-        sendMessage("I want to buy airtime");
-        return;
-      }
-
       await showServiceSelector(
         "📱 Airtime",
         "Select the network you want to buy airtime for.",
-        networkResult.data.map(function(n) {
-          return {
-            name: String(n.code).toLowerCase() === "9mobile" ? "9mobile (T2)" : n.name,
-            code: n.code
-          };
-        }),
+        airtimeNetworks,
         function(network) {
           sendMessage("I want to buy airtime on " + network.name);
         }
@@ -87,28 +68,10 @@ async function loadQuickAccessServices() {
 
   if (billsButton) {
     billsButton.addEventListener("click", async function() {
-      // Bills are service definitions, so read the active non-telecom
-      // services directly. This avoids depending on service_networks.
-      const result = await supabase
-        .from("service_definitions")
-        .select("id,code,name,description,category")
-        .eq("active", true)
-        .neq("category", "telecom")
-        .order("category")
-        .order("name");
-
-      if (result.error || !result.data?.length) {
-        console.error("Bills service lookup failed:", result.error);
-        sendMessage("I want to pay a bill");
-        return;
-      }
-
       await showServiceSelector(
         "🧾 Bills",
         "Select the bill or service you want to pay.",
-        result.data.map(function(s) {
-          return { name: s.name, code: s.code };
-        }),
+        billServices,
         function(service) {
           sendMessage("I want to pay for " + service.name);
         }
