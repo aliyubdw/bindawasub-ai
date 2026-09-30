@@ -187,6 +187,9 @@ document.getElementById("completeProfileButton").addEventListener("click", compl
 document.getElementById("profileBackButton").addEventListener("click", showLoginForm);
 document.getElementById("logoutButton").addEventListener("click", logoutUser);
 
+const bottomProfileButton = document.getElementById("bottomProfileButton");
+if (bottomProfileButton) bottomProfileButton.addEventListener("click", openCustomerProfile);
+
 const profileButton = document.getElementById("profileButton");
 const profileCloseButton = document.getElementById("profileCloseButton");
 const profileModal = document.getElementById("profileModal");
@@ -238,7 +241,20 @@ document.getElementById("messageInput").addEventListener("keydown", function(eve
   if (event.key === "Enter") sendMessage();
 });
 
+async function refreshCustomerWalletCard(){
+  const el=document.getElementById("customerWalletBalance");
+  if(!el || typeof getProfileStatus!=="function") return;
+  try{
+    const result=await getProfileStatus();
+    const balance=Number(result?.profile?.wallet?.balance ?? result?.wallet?.balance ?? 0);
+    if(Number.isFinite(balance)){
+      el.textContent="₦"+balance.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+    }
+  }catch(error){ console.warn("Wallet card refresh failed:",error); }
+}
+
 loadQuickAccessServices();
+refreshCustomerWalletCard();
 resetCustomerOrderState();
 BindawasubCustomerState.activeConversationId = null;
 BindawasubCustomerState.historyOpen = false;
