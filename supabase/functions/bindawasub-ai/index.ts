@@ -892,7 +892,9 @@ Deno.serve(async (req) => {
         await supabase
           .from("ai_conversations")
           .update({ last_message_at: new Date().toISOString() })
-          .eq("id", conversationId);
+          .eq("id", conversationId)
+        .eq("user_id", userId)
+        .eq("channel", channel);
 
         await logAiMessage("user", originalMessage);
         await logAiActivity(
@@ -1905,7 +1907,10 @@ if (body.action === "manual_fund") {
       const {data:pendingConversation,error:pendingError}=await supabase
         .from("ai_conversations")
         .select("pending_product_id,pending_phone_number,pending_at,pending_service_type,pending_airtime_amount,pending_network,pending_idempotency_key,pending_customer_input")
-        .eq("id",conversationId).maybeSingle();
+        .eq("id",conversationId)
+        .eq("user_id",userId)
+        .eq("channel",channel)
+        .maybeSingle();
 
       if(pendingError) console.error("Pending purchase lookup error:",pendingError);
 
@@ -1926,7 +1931,9 @@ if (body.action === "manual_fund") {
         const clearPending=async()=>{await supabase.from("ai_conversations").update({
         pending_product_id:null,pending_phone_number:null,pending_at:null,pending_service_type:null,
         pending_airtime_amount:null,pending_network:null,pending_idempotency_key:null,pending_customer_input:{}
-      }).eq("id",conversationId);};
+      }).eq("id",conversationId)
+        .eq("user_id",userId)
+        .eq("channel",channel);};
 
       if(negativeConfirmation){
         if(pendingIsFresh) await clearPending();
@@ -2774,7 +2781,9 @@ if (body.action === "manual_fund") {
           pending_service_type: "airtime",
           pending_airtime_amount: amount,
           pending_network: preAirtimeNetwork
-        }).eq("id", conversationId);
+        }).eq("id", conversationId)
+          .eq("user_id", userId)
+          .eq("channel", channel);
 
         const names:any = {mtn:"MTN",airtel:"Airtel",glo:"Glo","9mobile":"9mobile (T2)"};
         const answer = `You selected ${names[preAirtimeNetwork]} airtime worth ₦${amount.toLocaleString("en-NG")}. Please provide the recipient phone number.`;
@@ -2840,7 +2849,9 @@ if (body.action === "manual_fund") {
         pending_airtime_amount: storedAirtimeAmount,
         pending_network: storedAirtimeNetwork,
         pending_idempotency_key: pendingIdempotencyKey
-      }).eq("id", conversationId);
+      }).eq("id", conversationId)
+        .eq("user_id", userId)
+        .eq("channel", channel);
 
       const networkNames:any = {
         mtn: "MTN",
@@ -3005,7 +3016,9 @@ if (body.action === "manual_fund") {
         await supabase
           .from("ai_conversations")
           .update({ language: ai.language, last_message_at: new Date().toISOString() })
-          .eq("id", conversationId);
+          .eq("id", conversationId)
+        .eq("user_id", userId)
+        .eq("channel", channel);
       }
       if (conversationId) {
         const nextContext = {
@@ -3032,7 +3045,9 @@ if (body.action === "manual_fund") {
             conversation_context: nextContext,
             last_message_at: new Date().toISOString()
           })
-          .eq("id", conversationId);
+          .eq("id", conversationId)
+        .eq("user_id", userId)
+        .eq("channel", channel);
       }
 
       const supportedIntents = new Set([
@@ -3230,7 +3245,9 @@ if (body.action === "manual_fund") {
             pending_airtime_amount: amount,
             pending_network: network,
             pending_idempotency_key: newPendingIdempotencyKey,
-          }).eq("id", conversationId);
+          }).eq("id", conversationId)
+          .eq("user_id", userId)
+          .eq("channel", channel);
         }
 
         return new Response(JSON.stringify({
@@ -3385,7 +3402,9 @@ if (body.action === "manual_fund") {
           conversationContext = txContext;
           await supabase.from("ai_conversations")
             .update({ conversation_context: txContext, last_message_at: new Date().toISOString() })
-            .eq("id", conversationId);
+            .eq("id", conversationId)
+        .eq("user_id", userId)
+        .eq("channel", channel);
         }
 
         let answer =
