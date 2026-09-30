@@ -91,7 +91,9 @@ async function loadQuickAccessServices() {
         "Select the network you want to buy airtime for.",
         airtimeNetworks,
         function(network) {
-          sendMessage("I want to buy airtime on " + network.name);
+          // Start Airtime through a deterministic backend action so Gemini
+          // cannot interpret the selected network as a Data request.
+          sendMessage("", "start_airtime");
         }
       );
     });
