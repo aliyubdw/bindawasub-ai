@@ -1,4 +1,29 @@
 // Bindawasub AI — page event wiring and bootstrap
+// Web Buy Data network selector
+function showWebNetworkSelector() {
+  const welcome = document.getElementById("welcomeCard");
+  if (welcome) welcome.remove();
+  const messages = document.getElementById("messages");
+  if (!messages) return;
+  const wrapper = document.createElement("div");
+  wrapper.className = "message bot";
+  wrapper.innerHTML = "<div style=\"font-weight:800;margin-bottom:8px;\">📦 Buy Data</div><div style=\"margin-bottom:10px;\">Which network do you want?</div><div class=\"web-network-grid\" style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;\"></div>";
+  const grid = wrapper.querySelector(".web-network-grid");
+  ["MTN","Airtel","Glo","T2"].forEach(function(network) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = network;
+    button.style.cssText = "padding:10px;border:1px solid #d8e3de;border-radius:10px;background:#f4faf7;font-weight:800;cursor:pointer;";
+    button.addEventListener("click", function() {
+      grid.querySelectorAll("button").forEach(function(item) { item.disabled = true; });
+      addMessage(network, "user");
+      sendMessage("Show " + network + " data plans");
+    });
+    grid.appendChild(button);
+  });
+  messages.appendChild(wrapper);
+  messages.scrollTop = messages.scrollHeight;
+}
 
 document
   .getElementById("loginButton")
@@ -112,6 +137,12 @@ document.querySelectorAll("[data-action-message]").forEach(function(button) {
     const action = button.getAttribute("data-action-action");
     const welcome = document.getElementById("welcomeCard");
     if (welcome) welcome.remove();
+
+    if (String(message || "").toLowerCase().includes("buy data")) {
+      showWebNetworkSelector();
+      return;
+    }
+
     sendMessage(message, action);
   });
 });
