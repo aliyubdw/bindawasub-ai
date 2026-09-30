@@ -118,22 +118,7 @@
       </div>
       <div id="conversationHistoryList"></div>
     </div>
-    <!-- Persistent service menu: kept outside #messages so conversation history cannot remove it. -->
-    <div class="services-float" aria-label="Bindawasub services">
-      <div class="services-float-track">
-        <button class="service-item" type="button" data-action-message="I want to buy data"><span class="service-icon">📶</span><span>Data</span></button>
-        <button class="service-item" type="button" data-action-message="I want to buy airtime"><span class="service-icon">📞</span><span>Airtime</span></button>
-        <button class="service-item" type="button" data-action-message="I want to pay my TV subscription"><span class="service-icon">📺</span><span>TV</span></button>
-        <button class="service-item" type="button" data-action-message="I want to pay my electricity bill"><span class="service-icon">💡</span><span>Electricity</span></button>
-        <button class="service-item" type="button" data-action-message="I want to buy a WAEC or NECO PIN"><span class="service-icon">🎓</span><span>WAEC/NECO</span></button>
-        <button class="service-item" type="button" data-action-message="Show me all available Bindawasub services"><span class="service-icon">＋</span><span>More</span></button>
-      </div>
-    </div>
-
-/div>
-
     <div id="messages">
-
       <div class="welcome-card" id="welcomeCard">
         <div class="welcome-icon">✦</div>
         <h3>Sannu! Barka da zuwa Bindawasub AI</h3>
@@ -146,6 +131,15 @@
         </div>
       </div>
 
+      <div class="services-conversation" aria-label="Bindawasub services">
+        <div class="services-conversation-track" id="servicesConversationTrack">
+          <button class="service-item" type="button" data-action-message="I want to buy data"><span class="service-icon">📶</span><span>Data</span></button>
+          <button class="service-item" type="button" data-action-message="I want to buy airtime"><span class="service-icon">📞</span><span>Airtime</span></button>
+          <button class="service-item" type="button" data-action-message="I want to pay my TV subscription"><span class="service-icon">📺</span><span>TV</span></button>
+          <button class="service-item" type="button" data-action-message="I want to pay my electricity bill"><span class="service-icon">💡</span><span>Electricity</span></button>
+          <button class="service-item" type="button" data-action-message="I want to buy a WAEC or NECO PIN"><span class="service-icon">🎓</span><span>WAEC/NECO</span></button>
+        </div>
+      </div>
     </div>
 
     <div class="input-area">
