@@ -6,7 +6,7 @@
   <title>Bindawasub AI</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./customer/css/customer.css?v=20261001-2">
+  <link rel="stylesheet" href="./customer/css/customer.css?v=20261001-3">
 </head>
 
 <body>
@@ -119,23 +119,18 @@
       <div id="conversationHistoryList"></div>
     </div>
     <!-- Persistent service menu: kept outside #messages so conversation history cannot remove it. -->
-        <div class="services-card" aria-label="Bindawasub services">
-          <div class="services-card-header">
-            <div>
-              <span class="services-kicker">SERVICES</span>
-              <strong>What do you need?</strong>
-            </div>
-            <span class="services-ai-label">AI assisted</span>
-          </div>
-          <div class="services-grid">
-            <button class="service-item" type="button" data-action-message="I want to buy data"><span class="service-icon">📶</span><span>Data</span></button>
-            <button class="service-item" type="button" data-action-message="I want to buy airtime"><span class="service-icon">📞</span><span>Airtime</span></button>
-            <button class="service-item" type="button" data-action-message="I want to pay my TV subscription"><span class="service-icon">📺</span><span>TV</span></button>
-            <button class="service-item" type="button" data-action-message="I want to pay my electricity bill"><span class="service-icon">💡</span><span>Electricity</span></button>
-            <button class="service-item" type="button" data-action-message="I want to buy a WAEC or NECO PIN"><span class="service-icon">🎓</span><span>WAEC/NECO</span></button>
-            <button class="service-item" type="button" data-action-message="Show me all available Bindawasub services"><span class="service-icon">＋</span><span>More</span></button>
-          </div>
-        </div>
+    <div class="services-float" aria-label="Bindawasub services">
+      <div class="services-float-track">
+        <button class="service-item" type="button" data-action-message="I want to buy data"><span class="service-icon">📶</span><span>Data</span></button>
+        <button class="service-item" type="button" data-action-message="I want to buy airtime"><span class="service-icon">📞</span><span>Airtime</span></button>
+        <button class="service-item" type="button" data-action-message="I want to pay my TV subscription"><span class="service-icon">📺</span><span>TV</span></button>
+        <button class="service-item" type="button" data-action-message="I want to pay my electricity bill"><span class="service-icon">💡</span><span>Electricity</span></button>
+        <button class="service-item" type="button" data-action-message="I want to buy a WAEC or NECO PIN"><span class="service-icon">🎓</span><span>WAEC/NECO</span></button>
+        <button class="service-item" type="button" data-action-message="Show me all available Bindawasub services"><span class="service-icon">＋</span><span>More</span></button>
+      </div>
+    </div>
+
+/div>
 
     <div id="messages">
 
