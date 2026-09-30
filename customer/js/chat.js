@@ -217,14 +217,35 @@ async function loadConversationList() {
   }
 }
 async function showChatScreen() {
-  document.getElementById("loginScreen").style.display = "none";
-  document.getElementById("chatScreen").style.display = "flex";
+  // Supabase authentication has already succeeded before this function runs.
+  // Optional customer-data initialization must never make a valid login look
+  // like an authentication failure.
+  const loginScreen = document.getElementById("loginScreen");
+  const chatScreen = document.getElementById("chatScreen");
 
-  if (!isAdminUser) {
+  if (loginScreen) loginScreen.style.display = "none";
+  if (chatScreen) chatScreen.style.display = "flex";
+
+  if (isAdminUser) return;
+
+  try {
     await loadConversationHistory();
-    startFundingStatusNotifications();
-    document.getElementById("messageInput").focus();
+  } catch (error) {
+    console.error("Initial conversation history load failed:", error);
+    const messages = document.getElementById("messages");
+    if (messages && !messages.children.length) {
+      addMessage("Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?", "bot");
+    }
   }
+
+  try {
+    startFundingStatusNotifications();
+  } catch (error) {
+    console.error("Funding notification startup failed:", error);
+  }
+
+  const input = document.getElementById("messageInput");
+  if (input) input.focus();
 }
 
 function addMessage(text, type) {
