@@ -752,6 +752,48 @@ Deno.serve(async (req) => {
       ? "telegram"
       : String(body.channel || "web").toLowerCase();
 
+    // Deterministic Airtime follow-up state is handled before Gemini.
+    // This prevents a numeric amount such as "500" from being reinterpreted
+    // as a request missing network/amount/phone.
+    const preAirtime = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
+    const preAirtimeNetwork = String(conversationContext?.network || "").trim().toLowerCase();
+    const preNumericAmount = String(originalMessage || "").trim().match(/^(?:₦\\s*|NGN\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)$/i);
+    if (preAirtime && preNumericAmount && ["mtn","airtel","glo","9mobile"].includes(preAirtimeNetwork)) {
+      const amount = Number(preNumericAmount[1].replace(/,/g, ""));
+      if (Number.isFinite(amount) && amount > 0) {
+        const nextContext = {
+          ...(conversationContext || {}),
+          service_type: "airtime",
+          last_intent: "airtime_purchase",
+          network: preAirtimeNetwork,
+          airtime_amount: amount,
+          updated_at: new Date().toISOString()
+        };
+        conversationContext = nextContext;
+        await supabase.from("ai_conversations").update({
+          conversation_context: nextContext,
+          last_message_at: new Date().toISOString(),
+          pending_service_type: "airtime",
+          pending_airtime_amount: amount,
+          pending_network: preAirtimeNetwork
+        }).eq("id", conversationId);
+
+        const names:any = {mtn:"MTN",airtel:"Airtel",glo:"Glo","9mobile":"9mobile (T2)"};
+        const answer = `You selected ${names[preAirtimeNetwork]} airtime worth ₦${amount.toLocaleString("en-NG")}. Please provide the recipient phone number.`;
+        await persistAssistantMessage(answer, "airtime_purchase", "backend");
+        return new Response(JSON.stringify({
+          success:true,
+          intent:"airtime_purchase",
+          service_type:"airtime",
+          network:preAirtimeNetwork,
+          amount,
+          answer,
+          ai_powered:false,
+          quick_action:true
+        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }
+    }
+
     // Load live AI controls before processing customer requests.
     const { data: aiConfig, error: aiConfigError } = await supabase
       .from("ai_settings")
