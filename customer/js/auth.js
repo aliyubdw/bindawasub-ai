@@ -242,7 +242,8 @@ async function loginUser() {
     // Start the same bootstrap job used by the auth-state listener.
     // The shared job prevents duplicate initialization without silently
     // dropping a login attempt.
-    await applyAuthenticatedSession(data.session);\n  } catch (error) {
+    await applyAuthenticatedSession(data.session);
+  } catch (error) {
     // Do not sign the customer out here. If Supabase successfully created a
     // session but a later UI/bootstrap step fails, destroying the valid
     // session makes the app look like it logged the customer out immediately.
