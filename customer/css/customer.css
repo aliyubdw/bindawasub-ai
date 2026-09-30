@@ -1391,127 +1391,116 @@ body{
 }
 
 
-/* CUSTOMER QUICK ACCESS — compact, chat-first */
+/* CUSTOMER UI — match supplied reference: compact chips, wallet card, bottom nav */
 .customer-quick-access{
   flex:0 0 auto;
-  position:relative;
-  z-index:20;
-  padding:7px 12px;
-  background:rgba(255,255,255,.96);
+  padding:7px 14px 8px;
+  background:#fff;
+  border-top:1px solid var(--border);
   border-bottom:1px solid var(--border);
+  overflow:hidden;
 }
-.quick-access-bar{
+.quick-chip-row{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:8px;
-}
-.services-toggle{
-  width:auto;
-  min-height:36px;
-  display:inline-flex;
-  align-items:center;
   gap:7px;
-  padding:6px 10px 6px 7px;
-  border:1px solid #cfe1d9;
-  border-radius:999px;
-  background:#f8fcfa;
-  color:var(--brand-dark);
-  font-size:11px;
-  font-weight:800;
-  box-shadow:none;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
-.services-toggle-icon{
-  width:24px;
-  height:24px;
-  display:grid;
-  place-items:center;
-  border-radius:50%;
-  background:var(--brand);
-  color:#fff;
-  font-size:18px;
-  line-height:1;
-}
-.services-toggle-count{
-  min-width:18px;
-  height:18px;
-  display:grid;
-  place-items:center;
-  padding:0 5px;
-  border-radius:999px;
-  background:#e5f5ee;
-  color:var(--brand-dark);
-  font-size:9px;
-}
-.services-toggle[aria-expanded="true"] .services-toggle-icon{
-  transform:rotate(45deg);
-}
-.quick-access-ai{
+.quick-chip-row::-webkit-scrollbar{display:none}
+.quick-chip{
+  flex:0 0 auto;
   width:auto;
   min-height:34px;
   padding:7px 12px;
   border-radius:999px;
+  border:1px solid #d5e3dd;
+  background:#f8fbfa;
+  color:var(--brand-dark);
   font-size:11px;
   font-weight:800;
-  background:var(--brand-soft);
-  color:var(--brand-dark);
-  border:1px solid #c9e2d8;
+  white-space:nowrap;
+  box-shadow:none;
 }
-.quick-access-menu{
-  position:absolute;
-  left:10px;
-  right:10px;
-  bottom:calc(100% + 8px);
-  padding:9px;
-  background:rgba(255,255,255,.98);
-  border:1px solid var(--border);
+.quick-chip.primary{
+  background:var(--brand);
+  border-color:var(--brand);
+  color:#fff;
+}
+.customer-wallet-card{
+  margin:10px 14px 4px;
+  padding:13px 14px;
   border-radius:16px;
-  box-shadow:0 16px 38px rgba(20,55,43,.16);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  background:linear-gradient(135deg,#087f5b,#056044);
+  color:#fff;
+  box-shadow:0 8px 20px rgba(8,127,91,.16);
 }
-.quick-access-menu[hidden]{display:none}
-.quick-access-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:7px;
-}
-.quick-access-card{
-  min-width:0;
-  min-height:52px;
-  padding:8px 9px;
-  text-align:left;
-  border:1px solid var(--border);
-  border-radius:11px;
-  background:var(--surface-soft);
-  color:var(--text);
-  transition:.15s;
-}
-.quick-access-card:hover{
-  background:var(--brand-soft);
-  border-color:#9ecdbb;
-}
-.quick-access-card b{
+.customer-wallet-card span{
   display:block;
-  font-size:11px;
-  line-height:1.2;
+  font-size:9px;
+  letter-spacing:.9px;
+  font-weight:800;
+  color:rgba(255,255,255,.72);
 }
-.quick-access-card small{
+.customer-wallet-card strong{
   display:block;
   margin-top:3px;
-  color:var(--muted);
-  font-size:8.5px;
-  line-height:1.2;
+  font-size:21px;
+  letter-spacing:-.3px;
 }
-.quick-access-card.featured{
-  background:linear-gradient(145deg,#effaf5,#fff);
-  border-color:#b9ddd0;
+.customer-wallet-card button{
+  width:auto;
+  min-height:34px;
+  padding:7px 11px;
+  border-radius:9px;
+  background:#fff;
+  color:var(--brand-dark);
+  font-size:10px;
+  font-weight:800;
 }
-@media(max-width:430px){
-  .customer-quick-access{padding:6px 9px}
-  .quick-access-menu{left:7px;right:7px;padding:8px}
-  .quick-access-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .quick-access-card{min-height:50px}
+.customer-bottom-nav{
+  flex:0 0 58px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--border);
+  background:#fff;
+  padding-bottom:env(safe-area-inset-bottom);
 }
-
+.customer-bottom-nav button{
+  width:100%;
+  min-height:58px;
+  padding:5px 2px;
+  border-radius:0;
+  background:#fff;
+  color:#7b8984;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  font-size:17px;
+}
+.customer-bottom-nav button.active,
+.customer-bottom-nav button:hover{color:var(--brand);background:#f5faf7}
+.customer-bottom-nav small{font-size:9px;font-weight:800}
+@media(max-width:520px){
+  .chat{
+    width:100%;
+    height:100dvh;
+    max-width:none;
+    border-radius:0;
+    box-shadow:none;
+    border:0;
+  }
+  .header{padding:14px 14px 12px}
+  .customer-wallet-card{margin:8px 10px 3px}
+  .customer-quick-access{padding:6px 10px 7px}
+}
 /* HEADER SERVICE MENU — overlays chat instead of consuming chat space */
 .header { z-index: 50; }
 .chat-header-actions { z-index: 60; }
