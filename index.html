@@ -6,7 +6,7 @@
   <title>Bindawasub AI</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./customer/css/customer.css?v=20260930-8">
+  <link rel="stylesheet" href="./customer/css/customer.css?v=20260930-10">
 </head>
 
 <body>
@@ -123,27 +123,13 @@
   </div>
 
   <div id="customerInterface">
-    <div class="customer-quick-access" id="customerQuickAccess" hidden>
-      <div class="quick-access-bar">
-        <button id="servicesToggle" class="services-toggle" type="button" aria-expanded="false" aria-controls="quickAccessMenu">
-          <span class="services-toggle-icon">＋</span>
-          <span>Services</span>
-          <span class="services-toggle-count">6</span>
-        </button>
-        <button class="quick-access-ai" type="button" data-action-message="Hello">Ask AI</button>
-      </div>
-      <div class="quick-access-menu" id="quickAccessMenu" hidden>
-        <div class="quick-access-grid">
-          <button class="quick-access-card featured" type="button" data-action-message="I want to buy data"><b>Buy Data</b><small>Choose a plan</small></button>
-          <button class="quick-access-card" type="button" data-action-message="I want to buy airtime"><b>Airtime</b><small>Buy instantly</small></button>
-          <button class="quick-access-card" type="button" data-action-message="I want to pay a bill"><b>Bills</b><small>Pay bills</small></button>
-          <button class="quick-access-card featured" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet"><b>Fund Wallet</b><small>Add money</small></button>
-          <button class="quick-access-card" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance"><b>Wallet</b><small>Check balance</small></button>
-          <button class="quick-access-card" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history"><b>Transactions</b><small>View activity</small></button>
-          <button class="quick-access-card" type="button" id="telegramLinkButton"><b>Telegram</b><small>Connect account</small></button>
-          <button class="quick-access-card" type="button" id="chatHistoryButton"><b>Chat History</b><small>Saved chats</small></button>
-          <button class="quick-access-card" type="button" id="profileButton"><b>Profile</b><small>Manage account</small></button>
-        </div>
+    <div class="customer-quick-access" id="customerQuickAccess">
+      <div class="quick-chip-row" aria-label="Quick services">
+        <button class="quick-chip primary" type="button" data-action-message="I want to buy data">Buy Data</button>
+        <button class="quick-chip" type="button" data-action-message="I want to buy airtime">Airtime</button>
+        <button class="quick-chip" type="button" data-action-message="I want to pay a bill">Bills</button>
+        <button class="quick-chip" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button>
+        <button class="quick-chip" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button>
       </div>
     </div>
 
@@ -157,6 +143,14 @@
       </div>
       <div id="conversationHistoryList"></div>
     </div>
+    <div class="customer-wallet-card" id="customerWalletCard">
+      <div>
+        <span>WALLET BALANCE</span>
+        <strong id="customerWalletBalance">₦0.00</strong>
+      </div>
+      <button type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button>
+    </div>
+
     <div id="messages">
 
       <div class="welcome-card" id="welcomeCard">
@@ -191,6 +185,12 @@
 
     </div>
     <div class="chat-helper">Secure account session • Your conversations are saved</div>
+    <div class="customer-bottom-nav" aria-label="Customer navigation">
+      <button class="active" type="button"><span>⌂</span><small>Chat</small></button>
+      <button type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history"><span>▤</span><small>Activity</small></button>
+      <button type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet"><span>＋</span><small>Fund</small></button>
+      <button type="button" id="bottomProfileButton"><span>◯</span><small>Profile</small></button>
+    </div>
   </div>
 
   <div id="profileModal" class="profile-modal" hidden>
