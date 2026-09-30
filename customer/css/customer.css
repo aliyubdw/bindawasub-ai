@@ -1699,8 +1699,8 @@ body{
 }
 .services-conversation-track::-webkit-scrollbar{display:none}
 .services-conversation .service-item{
-  flex:0 0 auto;
-  min-width:64px;
+  flex:1 0 0;
+  min-width:78px;
   min-height:30px;
   width:auto;
   display:inline-flex;
