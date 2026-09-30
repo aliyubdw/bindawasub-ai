@@ -2768,7 +2768,7 @@ if (body.action === "manual_fund") {
       conversationContext?.airtime_amount ?? existingConversation?.pending_airtime_amount ?? 0
     );
     const rawRecipient = String(originalMessage || "").trim().replace(/[\\s-]/g, "");
-    const phoneMatch = rawRecipient.match(/^(?:0\\d{10}|234\\d{10})$/);
+    const phoneMatch = rawRecipient.match(/^(?:0\d{10}|234\d{10})$/);
 
     if (
       airtimeContextActive &&
