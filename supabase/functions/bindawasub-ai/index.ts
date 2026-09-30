@@ -975,84 +975,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Deterministic Airtime recipient follow-up. Once network + amount are stored,
-    // a Nigerian phone number must complete the Airtime flow without Gemini.
-    const airtimeContextActive =
-      String(conversationContext?.service_type || existingConversation?.pending_service_type || "").toLowerCase() === "airtime";
-    const storedAirtimeNetwork = String(
-      conversationContext?.network || existingConversation?.pending_network || ""
-    ).trim().toLowerCase();
-    const storedAirtimeAmount = Number(
-      conversationContext?.airtime_amount ?? existingConversation?.pending_airtime_amount ?? 0
-    );
-    const rawRecipient = String(originalMessage || "").trim().replace(/[\\s-]/g, "");
-    const phoneMatch = rawRecipient.match(/^(?:0\\d{10}|234\\d{10})$/);
-
-    if (
-      airtimeContextActive &&
-      phoneMatch &&
-      ["mtn", "airtel", "glo", "9mobile"].includes(storedAirtimeNetwork) &&
-      Number.isFinite(storedAirtimeAmount) &&
-      storedAirtimeAmount > 0 &&
-      conversationId
-    ) {
-      const phoneNumber = rawRecipient.startsWith("234")
-        ? "0" + rawRecipient.slice(3)
-        : rawRecipient;
-      const nextContext = {
-        ...(conversationContext || {}),
-        last_intent: "airtime_purchase",
-        service_type: "airtime",
-        network: storedAirtimeNetwork,
-        airtime_amount: storedAirtimeAmount,
-        phone_number: phoneNumber,
-        updated_at: new Date().toISOString()
-      };
-
-      conversationContext = nextContext;
-      const pendingIdempotencyKey =
-        `AI-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-      await supabase.from("ai_conversations").update({
-        conversation_context: nextContext,
-        last_message_at: new Date().toISOString(),
-        pending_product_id: null,
-        pending_phone_number: phoneNumber,
-        pending_at: new Date().toISOString(),
-        pending_service_type: "airtime",
-        pending_airtime_amount: storedAirtimeAmount,
-        pending_network: storedAirtimeNetwork,
-        pending_idempotency_key: pendingIdempotencyKey
-      }).eq("id", conversationId);
-
-      const networkNames:any = {
-        mtn: "MTN",
-        airtel: "Airtel",
-        glo: "Glo",
-        "9mobile": "9mobile (T2)"
-      };
-      const networkName = networkNames[storedAirtimeNetwork] || storedAirtimeNetwork;
-      const answer = `You want to buy ${networkName} airtime worth ₦${storedAirtimeAmount.toLocaleString("en-NG")} for ${phoneNumber}. Please confirm to proceed with your purchase.`;
-
-      await persistAssistantMessage(answer, "airtime_purchase", "backend");
-      return new Response(JSON.stringify({
-        success: true,
-        intent: "airtime_purchase",
-        service_type: "airtime",
-        network: storedAirtimeNetwork,
-        amount: storedAirtimeAmount,
-        phone_number: phoneNumber,
-        answer,
-        ai_powered: false,
-        requires_confirmation: true,
-        airtime: {
-          network: storedAirtimeNetwork,
-          amount: storedAirtimeAmount,
-          phone_number: phoneNumber
-        }
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
     async function executeViaProviderExecution(transactionId: string) {
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -2834,6 +2756,85 @@ if (body.action === "manual_fund") {
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
     }
+
+    // Deterministic Airtime recipient follow-up. Once network + amount are stored,
+    // a Nigerian phone number must complete the Airtime flow without Gemini.
+    const airtimeContextActive =
+      String(conversationContext?.service_type || existingConversation?.pending_service_type || "").toLowerCase() === "airtime";
+    const storedAirtimeNetwork = String(
+      conversationContext?.network || existingConversation?.pending_network || ""
+    ).trim().toLowerCase();
+    const storedAirtimeAmount = Number(
+      conversationContext?.airtime_amount ?? existingConversation?.pending_airtime_amount ?? 0
+    );
+    const rawRecipient = String(originalMessage || "").trim().replace(/[\\s-]/g, "");
+    const phoneMatch = rawRecipient.match(/^(?:0\\d{10}|234\\d{10})$/);
+
+    if (
+      airtimeContextActive &&
+      phoneMatch &&
+      ["mtn", "airtel", "glo", "9mobile"].includes(storedAirtimeNetwork) &&
+      Number.isFinite(storedAirtimeAmount) &&
+      storedAirtimeAmount > 0 &&
+      conversationId
+    ) {
+      const phoneNumber = rawRecipient.startsWith("234")
+        ? "0" + rawRecipient.slice(3)
+        : rawRecipient;
+      const nextContext = {
+        ...(conversationContext || {}),
+        last_intent: "airtime_purchase",
+        service_type: "airtime",
+        network: storedAirtimeNetwork,
+        airtime_amount: storedAirtimeAmount,
+        phone_number: phoneNumber,
+        updated_at: new Date().toISOString()
+      };
+
+      conversationContext = nextContext;
+      const pendingIdempotencyKey =
+        `AI-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      await supabase.from("ai_conversations").update({
+        conversation_context: nextContext,
+        last_message_at: new Date().toISOString(),
+        pending_product_id: null,
+        pending_phone_number: phoneNumber,
+        pending_at: new Date().toISOString(),
+        pending_service_type: "airtime",
+        pending_airtime_amount: storedAirtimeAmount,
+        pending_network: storedAirtimeNetwork,
+        pending_idempotency_key: pendingIdempotencyKey
+      }).eq("id", conversationId);
+
+      const networkNames:any = {
+        mtn: "MTN",
+        airtel: "Airtel",
+        glo: "Glo",
+        "9mobile": "9mobile (T2)"
+      };
+      const networkName = networkNames[storedAirtimeNetwork] || storedAirtimeNetwork;
+      const answer = `You want to buy ${networkName} airtime worth ₦${storedAirtimeAmount.toLocaleString("en-NG")} for ${phoneNumber}. Please confirm to proceed with your purchase.`;
+
+      await persistAssistantMessage(answer, "airtime_purchase", "backend");
+      return new Response(JSON.stringify({
+        success: true,
+        intent: "airtime_purchase",
+        service_type: "airtime",
+        network: storedAirtimeNetwork,
+        amount: storedAirtimeAmount,
+        phone_number: phoneNumber,
+        answer,
+        ai_powered: false,
+        requires_confirmation: true,
+        airtime: {
+          network: storedAirtimeNetwork,
+          amount: storedAirtimeAmount,
+          phone_number: phoneNumber
+        }
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
 
     // GEMINI AI FALLBACK
     // Natural English, Hausa, and mixed-language understanding.
