@@ -654,7 +654,7 @@ Deno.serve(async (req) => {
       let requestedNetwork = String(body.network || "").trim().toLowerCase();
       if (!requestedNetwork) {
         const messageNetworkMatch = String(originalMessage || "").match(
-          /\\b(mtn|airtel|glo|9mobile|t2)\\b/i
+          /\b(mtn|airtel|glo|9mobile|t2)\b/i
         );
         if (messageNetworkMatch) {
           requestedNetwork = messageNetworkMatch[1].toLowerCase();
