@@ -108,7 +108,29 @@
   </div>
 
   <div id="customerInterface">
-    <div class="customer-quick-access" id="customerQuickAccess"><div class="quick-access-head"><div><span>QUICK ACCESS</span><strong>What do you need?</strong></div><button class="quick-access-ai" type="button" data-action-message="Hello">Ask AI</button></div><div class="quick-access-grid"><button class="quick-access-card featured" type="button" data-action-message="I want to buy data"><b>Buy Data</b><small>Choose a data plan</small></button><button class="quick-access-card" type="button" data-action-message="I want to buy airtime"><b>Airtime</b><small>Buy airtime instantly</small></button><button class="quick-access-card" type="button" data-action-message="I want to pay a bill"><b>Bills</b><small>Pay your bills</small></button><button class="quick-access-card featured" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet"><b>Fund Wallet</b><small>Add money to your wallet</small></button><button class="quick-access-card" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance"><b>Wallet</b><small>Check your balance</small></button><button class="quick-access-card" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history"><b>Transactions</b><small>View your activity</small></button><button class="quick-access-card" type="button" id="telegramLinkButton"><b>Telegram</b><small>Connect your account</small></button><button class="quick-access-card" type="button" id="chatHistoryButton"><b>Chat History</b><small>Open saved chats</small></button><button class="quick-access-card" type="button" id="profileButton"><b>Profile</b><small>Manage your account</small></button></div></div>
+    <div class="customer-quick-access" id="customerQuickAccess">
+      <div class="quick-access-bar">
+        <button id="servicesToggle" class="services-toggle" type="button" aria-expanded="false" aria-controls="quickAccessMenu">
+          <span class="services-toggle-icon">＋</span>
+          <span>Services</span>
+          <span class="services-toggle-count">6</span>
+        </button>
+        <button class="quick-access-ai" type="button" data-action-message="Hello">Ask AI</button>
+      </div>
+      <div class="quick-access-menu" id="quickAccessMenu" hidden>
+        <div class="quick-access-grid">
+          <button class="quick-access-card featured" type="button" data-action-message="I want to buy data"><b>Buy Data</b><small>Choose a plan</small></button>
+          <button class="quick-access-card" type="button" data-action-message="I want to buy airtime"><b>Airtime</b><small>Buy instantly</small></button>
+          <button class="quick-access-card" type="button" data-action-message="I want to pay a bill"><b>Bills</b><small>Pay bills</small></button>
+          <button class="quick-access-card featured" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet"><b>Fund Wallet</b><small>Add money</small></button>
+          <button class="quick-access-card" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance"><b>Wallet</b><small>Check balance</small></button>
+          <button class="quick-access-card" type="button" data-action-message="Show my recent transactions" data-action-action="transaction_history"><b>Transactions</b><small>View activity</small></button>
+          <button class="quick-access-card" type="button" id="telegramLinkButton"><b>Telegram</b><small>Connect account</small></button>
+          <button class="quick-access-card" type="button" id="chatHistoryButton"><b>Chat History</b><small>Saved chats</small></button>
+          <button class="quick-access-card" type="button" id="profileButton"><b>Profile</b><small>Manage account</small></button>
+        </div>
+      </div>
+    </div>
 
     <div id="conversationHistoryPanel" class="conversation-history-panel" hidden>
       <div class="conversation-history-header">
