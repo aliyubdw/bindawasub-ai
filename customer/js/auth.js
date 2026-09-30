@@ -353,9 +353,12 @@ async function applyAuthenticatedSession(session) {
   authBootstrapUserId = authenticatedUserId;
 
   const bootstrapJob = (async () => {
+    // Load the profile once. The profile response already contains the
+    // account role, so normal customer login does not need a second admin
+    // verification request. This removes the extra wait during login.
     const profile = await withAuthTimeout(
       getProfileStatus(),
-      20000
+      12000
     );
 
     if (!profile?.profile_complete) {
@@ -365,18 +368,25 @@ async function applyAuthenticatedSession(session) {
       return;
     }
 
+    const profileRole = String(
+      profile?.user?.role || profile?.role || ""
+    ).toLowerCase();
+
+    // Only fall back to the admin check when the profile endpoint did not
+    // provide a role. Keep that fallback short so it cannot make customer
+    // login feel frozen.
     const isAdmin =
-      profile.user?.role === "admin" || await withAuthTimeout(
-        verifyAdminMode(),
-        20000
-      );
+      profileRole === "admin" ||
+      (!profileRole && await withAuthTimeout(verifyAdminMode(), 5000));
 
     if (isAdmin) {
       window.location.replace("./admin/");
       return;
     }
 
-    await withAuthTimeout(showChatScreen(), 20000);
+    // showChatScreen itself renders the customer shell immediately and loads
+    // conversation history in the background.
+    await showChatScreen();
 
     const customerInterface = document.getElementById("customerInterface");
     if (customerInterface) {
