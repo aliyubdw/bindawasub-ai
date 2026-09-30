@@ -3102,6 +3102,17 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "fund_wallet") {
+        const { data: currentWallet, error: currentWalletError } = await supabase
+          .from("wallets")
+          .select("balance, currency")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (currentWalletError) throw currentWalletError;
+
+        const currentBalance = Number(currentWallet?.balance ?? 0);
+        const currentCurrency = currentWallet?.currency || "NGN";
+
         const amountMatch = String(originalMessage || "").match(/(?:₦|ngn|naira|fund(?:\s+my)?(?:\s+wallet)?\s*(?:with|by|of)?\s*)([0-9,]+(?:\.\d+)?)/i);
         const parsedAmount = amountMatch ? Number(String(amountMatch[1]).replace(/,/g, "")) : 0;
 
@@ -3125,8 +3136,8 @@ if (body.action === "manual_fund") {
             bank_account:funding.bank_account,
             instructions:funding.instructions,
             answer:funding.bank_account
-              ? `Funding request created for ₦${parsedAmount.toLocaleString("en-NG")}. Transfer the exact amount to the account shown, then send your transfer reference.`
-              : `Funding request ${funding.request.reference} created for ₦${parsedAmount.toLocaleString("en-NG")}. Bank transfer details are not configured yet.`,
+              ? `Funding request created for ₦${parsedAmount.toLocaleString("en-NG")}. Your current wallet balance is ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${currentBalance.toLocaleString("en-NG")}. If approved, your balance will become ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${(currentBalance + parsedAmount).toLocaleString("en-NG")}. Transfer the exact amount to the account shown, then send your transfer reference.`
+              : `Funding request ${funding.request.reference} created for ₦${parsedAmount.toLocaleString("en-NG")}. Your current wallet balance is ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${currentBalance.toLocaleString("en-NG")}. Bank transfer details are not configured yet.`,
             ai_powered:true
           }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
         }
@@ -3136,7 +3147,7 @@ if (body.action === "manual_fund") {
           intent:"fund_wallet",
           funding_mode:"manual",
           requires_amount:true,
-          answer:"Sure. How much would you like to add to your wallet? For example: Fund my wallet with ₦5,000.",
+          answer:`Sure. Your current wallet balance is ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${currentBalance.toLocaleString("en-NG")}. How much would you like to add to your wallet? For example: Fund my wallet with ₦5,000.`,
           ai_powered:true
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
