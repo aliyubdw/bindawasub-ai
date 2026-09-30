@@ -653,6 +653,7 @@ Deno.serve(async (req) => {
     // can persist messages and update the selected conversation immediately.
     let conversationId: string | null = String(body.conversation_id || "").trim() || null;
     let conversationContext: any = {};
+    let existingConversation: any = null;
 
     // Explicit Airtime selector start: bypass Gemini completely.
     if (body.action === "start_airtime") {
@@ -781,7 +782,6 @@ Deno.serve(async (req) => {
     {
       const requestedConversationId = String(body.conversation_id || "").trim();
 
-      let existingConversation:any = null;
       let conversationLookupError:any = null;
 
       if (requestedConversationId) {
