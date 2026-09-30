@@ -26,7 +26,7 @@ async function loadQuickAccessServices() {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = item.name;
-      button.style.cssText = "padding:11px;border:1px solid #d8e3de;border-radius:10px;background:#f4faf7;font-weight:800;cursor:pointer;";
+      button.style.cssText = "padding:11px;border:1px solid #d8e3de;border-radius:10px;background:#f4faf7;color:#087f5b;font-weight:800;cursor:pointer;";
       button.addEventListener("click", function() {
         grid.querySelectorAll("button").forEach(function(b) { b.disabled = true; });
         addMessage(item.name, "user");
@@ -106,7 +106,7 @@ function showWebNetworkSelector() {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = network;
-    button.style.cssText = "padding:10px;border:1px solid #d8e3de;border-radius:10px;background:#f4faf7;font-weight:800;cursor:pointer;";
+    button.style.cssText = "padding:10px;border:1px solid #d8e3de;border-radius:10px;background:#f4faf7;color:#087f5b;font-weight:800;cursor:pointer;";
     button.addEventListener("click", function() {
       grid.querySelectorAll("button").forEach(function(item) { item.disabled = true; });
       addMessage(network, "user");
