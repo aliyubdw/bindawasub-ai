@@ -105,24 +105,19 @@ async function loadConversationHistory() {
     }
 
     BindawasubCustomerState.activeConversationId = data.conversation_id || null;
-    messages.innerHTML = "";
 
+    // Keep the welcome card when there are no saved messages.
+    // The welcome card contains the Services menu.
     if (Array.isArray(data.messages) && data.messages.length > 0) {
+      messages.innerHTML = "";
       data.messages.forEach(item => {
         const role = item.role === "user" ? "user" : "bot";
         addMessage(item.message || "", role);
       });
-    } else {
-      addMessage("Hello! Welcome to Bindawasub. How can I help you today?", "bot");
+      messages.scrollTop = messages.scrollHeight;
     }
-
-    messages.scrollTop = messages.scrollHeight;
   } catch (error) {
     console.error("Conversation history load failed:", error);
-
-    if (!messages.children.length) {
-      addMessage("Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?", "bot");
-    }
   }
 }
 
@@ -217,9 +212,8 @@ async function loadConversationList() {
   }
 }
 async function showChatScreen() {
-  // Supabase authentication has already succeeded before this function runs.
-  // Optional customer-data initialization must never make a valid login look
-  // like an authentication failure.
+  // Show the customer interface immediately. Conversation history loads
+  // in the background so a slow history request cannot delay login.
   const loginScreen = document.getElementById("loginScreen");
   const chatScreen = document.getElementById("chatScreen");
 
@@ -228,15 +222,9 @@ async function showChatScreen() {
 
   if (isAdminUser) return;
 
-  try {
-    await loadConversationHistory();
-  } catch (error) {
+  loadConversationHistory().catch(error => {
     console.error("Initial conversation history load failed:", error);
-    const messages = document.getElementById("messages");
-    if (messages && !messages.children.length) {
-      addMessage("Sannu! Barka da zuwa Bindawasub. Ta yaya zan taimaka maka yau?", "bot");
-    }
-  }
+  });
 
   try {
     startFundingStatusNotifications();
