@@ -2,7 +2,7 @@
 
 // Dynamic Quick Access selectors
 async function loadQuickAccessServices() {
-  const supabase = window.supabaseClient || window.sb || window.supabase;
+  const supabase = window.supabaseClient || window.sb || null;
   if (!supabase || typeof supabase.from !== "function") return;
 
   const airtimeButton = document.querySelector('[data-action-message="I want to buy airtime"]');
@@ -57,7 +57,7 @@ async function loadQuickAccessServices() {
       await showServiceSelector(
         "📱 Airtime",
         "Select the network you want to buy airtime for.",
-        data.map(function(n) { return { name: n.name, code: n.code }; }),
+        data.map(function(n) { return { name: String(n.code).toLowerCase() === "9mobile" ? "9mobile (T2)" : n.name, code: n.code }; }),
         function(network) {
           sendMessage("I want to buy airtime on " + network.name);
         }
@@ -102,7 +102,7 @@ function showWebNetworkSelector() {
   wrapper.className = "message bot";
   wrapper.innerHTML = "<div style=\"font-weight:800;margin-bottom:8px;\">📦 Buy Data</div><div style=\"margin-bottom:10px;\">Which network do you want?</div><div class=\"web-network-grid\" style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;\"></div>";
   const grid = wrapper.querySelector(".web-network-grid");
-  ["MTN","Airtel","Glo","T2"].forEach(function(network) {
+  ["MTN","Airtel","Glo","9mobile (T2)"].forEach(function(network) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = network;
