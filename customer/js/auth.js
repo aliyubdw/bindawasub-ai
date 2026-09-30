@@ -239,12 +239,18 @@ async function loginUser() {
       throw new Error(error?.message || "Login failed.");
     }
 
-    // Boot the authenticated account immediately. The auth-state listener\n    // may also receive SIGNED_IN, but applyAuthenticatedSession() has a\n    // transition lock so the two paths cannot initialize the account twice.\n    // This keeps the login flow tied to the real profile bootstrap result.\n    await applyAuthenticatedSession(data.session);\n  } catch (error) {
+    // Start the same bootstrap job used by the auth-state listener.
+    // The shared job prevents duplicate initialization without silently
+    // dropping a login attempt.
+    await applyAuthenticatedSession(data.session);\n  } catch (error) {
     // Do not sign the customer out here. If Supabase successfully created a
     // session but a later UI/bootstrap step fails, destroying the valid
     // session makes the app look like it logged the customer out immediately.
     console.error("Login failed:", error);
-    errorBox.textContent = error?.message || "An kasa shiga. Sake gwadawa.";
+    errorBox.textContent = getErrorMessage(
+      error,
+      "Login failed. Please try again."
+    );
   } finally {
     loginButton.disabled = false;
     loginButton.textContent = "Login";
@@ -268,8 +274,38 @@ async function logoutUser() {
 }
 
 let authBooted = false;
-let authTransitionRunning = false;
+let authBootstrapPromise = null;
+let authBootstrapUserId = null;
 let lastAuthenticatedUserId = null;
+
+function getErrorMessage(error, fallback) {
+  if (error?.message) return String(error.message);
+  if (error?.error_description) return String(error.error_description);
+  if (typeof error === "string" && error.trim()) return error.trim();
+
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized && serialized !== "{}") return serialized;
+  } catch (_) {}
+
+  return fallback;
+}
+
+function withAuthTimeout(promise, timeoutMs = 20000) {
+  let timerId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      reject(new Error(
+        "Login timed out while loading your Bindawasub account. Please try again."
+      ));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timerId);
+  });
+}
 
 function resetCustomerSessionState() {
   // Never allow conversation state from one authenticated account
@@ -293,56 +329,91 @@ function resetCustomerSessionState() {
 }
 
 async function applyAuthenticatedSession(session) {
-  if (!session || authTransitionRunning) return;
+  if (!session) return;
 
   const authenticatedUserId = String(session.user?.id || "").trim();
   if (!authenticatedUserId) {
-    console.error("Authenticated session has no user id.");
-    return;
+    throw new Error("Authenticated session has no user ID.");
   }
 
-  // Detect account changes even when Supabase changes the session
-  // without a full page reload (for example, account A -> account B).
+  // If the exact same authenticated account is already bootstrapping,
+  // return that same Promise instead of starting another request.
+  if (authBootstrapPromise && authBootstrapUserId === authenticatedUserId) {
+    return authBootstrapPromise;
+  }
+
+  // A different account must never inherit the previous account's UI state.
   if (lastAuthenticatedUserId && lastAuthenticatedUserId !== authenticatedUserId) {
     resetCustomerSessionState();
     hideAdminMode();
   }
 
   lastAuthenticatedUserId = authenticatedUserId;
-  authTransitionRunning = true;
+  authBootstrapUserId = authenticatedUserId;
 
-  try {
-    const profile = await getProfileStatus();
+  const bootstrapJob = (async () => {
+    const profile = await withAuthTimeout(
+      getProfileStatus(),
+      20000
+    );
 
-    if (!profile.profile_complete) {
-      showProfileCompletionForm(session?.user?.email || profile.email || "");
+    if (!profile?.profile_complete) {
+      showProfileCompletionForm(
+        session?.user?.email || profile?.email || ""
+      );
       return;
     }
 
-    const isAdmin = profile.user?.role === "admin" || await verifyAdminMode();
+    const isAdmin =
+      profile.user?.role === "admin" || await withAuthTimeout(
+        verifyAdminMode(),
+        20000
+      );
 
     if (isAdmin) {
       window.location.replace("./admin/");
       return;
     }
 
-    await showChatScreen();
-    document.getElementById("customerInterface").classList.remove("admin-hidden");
+    await withAuthTimeout(showChatScreen(), 20000);
+
+    const customerInterface = document.getElementById("customerInterface");
+    if (customerInterface) {
+      customerInterface.classList.remove("admin-hidden");
+    }
+  })();
+
+  authBootstrapPromise = bootstrapJob;
+
+  try {
+    await bootstrapJob;
   } catch (error) {
     console.error("Session setup failed:", error);
 
-    // Do not sign out or destroy the authenticated session when the profile
-    // service has a temporary/database error. Show the error while keeping
-    // the login session available for a retry.
+    const message = getErrorMessage(
+      error,
+      "Login succeeded, but Bindawasub could not load your account."
+    );
+
     const loginError = document.getElementById("loginError");
     if (loginError) {
-      loginError.textContent =
-        error?.message || "Login succeeded, but Bindawasub could not load your account. Please try again.";
+      loginError.className = "login-error";
+      loginError.textContent = message;
     }
-    document.getElementById("chatScreen").style.display = "none";
-    document.getElementById("loginScreen").style.display = "block";
+
+    const chatScreen = document.getElementById("chatScreen");
+    const loginScreen = document.getElementById("loginScreen");
+
+    if (chatScreen) chatScreen.style.display = "none";
+    if (loginScreen) loginScreen.style.display = "block";
+
+    throw error;
   } finally {
-    authTransitionRunning = false;
+    // Only clear the shared job if it is still this account's job.
+    if (authBootstrapPromise === bootstrapJob) {
+      authBootstrapPromise = null;
+      authBootstrapUserId = null;
+    }
   }
 }
 
