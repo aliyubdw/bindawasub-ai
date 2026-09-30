@@ -2726,6 +2726,37 @@ if (body.action === "manual_fund") {
         ai.volume = null;
       } else {
         ai.intent = String(ai.intent || "unknown").trim().toLowerCase();
+
+        // Deterministic routing for an explicitly selected bill/service.
+        // The Bills selector sends the live service code in parentheses, so
+        // adding a new active bill service automatically gets its own route.
+        const explicitBillMatch = String(originalMessage || "").match(
+          /(?:pay for|pay|buy)\\s+(.+?)\\s*\\(([^)]+)\\)/i
+        );
+        if (explicitBillMatch) {
+          const requestedServiceCode = String(explicitBillMatch[2] || "").trim().toLowerCase();
+          const selectedService = serviceCatalog.find((service:any) =>
+            String(service.code || "").trim().toLowerCase() === requestedServiceCode &&
+            String(service.category || "").trim().toLowerCase() !== "telecom"
+          );
+
+          if (selectedService) {
+            ai.intent = "service_enquiry";
+            ai.service_type = selectedService.code;
+            ai.product_id = null;
+            ai.product_name = null;
+            ai.volume = null;
+            ai.customer_input = {};
+
+            const requiredFields = (selectedService.fields || [])
+              .filter((field:any) => field.required)
+              .map((field:any) => field.label || field.key);
+
+            ai.reply = requiredFields.length
+              ? "You selected " + selectedService.name + ". Please provide: " + requiredFields.join(", ") + "."
+              : "You selected " + selectedService.name + ". Tell me the details you want to pay for.";
+          }
+        }
       }
       ai.language = String(ai.language || "english").trim().toLowerCase();
       if (!["english", "hausa"].includes(ai.language)) ai.language = "english";
