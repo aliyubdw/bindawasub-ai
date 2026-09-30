@@ -2715,7 +2715,12 @@ if (body.action === "manual_fund") {
     // At this point conversationContext has already been loaded.
     const preAirtime = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
     const preAirtimeNetwork = String(conversationContext?.network || "").trim().toLowerCase();
-    const preNumericAmount = String(originalMessage || "").trim().match(/^(?:₦\s*|NGN\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)$/i);
+    const rawAirtimeFollowUp = String(originalMessage || "").trim();
+    // An 11-digit Nigerian phone number is a recipient, never an Airtime amount.
+    const looksLikeNigerianPhone = /^(?:0\d{10}|234\d{10})$/.test(rawAirtimeFollowUp.replace(/[\s-]/g, ""));
+    const preNumericAmount = !looksLikeNigerianPhone
+      ? rawAirtimeFollowUp.match(/^(?:₦\s*|NGN\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)$/i)
+      : null;
     if (preAirtime && preNumericAmount && ["mtn","airtel","glo","9mobile"].includes(preAirtimeNetwork)) {
       const amount = Number(preNumericAmount[1].replace(/,/g, ""));
       if (Number.isFinite(amount) && amount > 0) {
