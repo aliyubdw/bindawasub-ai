@@ -2710,7 +2710,23 @@ if (body.action === "manual_fund") {
         recentTransactionsForAI
       );
 
-      ai.intent = String(ai.intent || "unknown").trim().toLowerCase();
+      // Deterministic routing for explicit Airtime requests.
+      // Airtime must never fall through to the Data product catalog.
+      const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
+      if (explicitAirtimeRequest) {
+        const airtimeNetworkMatch = String(originalMessage || "").match(/\b(mtn|airtel|glo|9mobile|9mobile\s*\(\s*t2\s*\)|t2)\b/i);
+        if (airtimeNetworkMatch) {
+          const rawNetwork = airtimeNetworkMatch[1].toLowerCase().replace(/\s+/g, "");
+          ai.network = rawNetwork === "t2" || rawNetwork.startsWith("9mobile") ? "9mobile" : rawNetwork;
+        }
+        ai.intent = "airtime_purchase";
+        ai.service_type = "airtime";
+        ai.product_id = null;
+        ai.product_name = null;
+        ai.volume = null;
+      } else {
+        ai.intent = String(ai.intent || "unknown").trim().toLowerCase();
+      }
       ai.language = String(ai.language || "english").trim().toLowerCase();
       if (!["english", "hausa"].includes(ai.language)) ai.language = "english";
       if (conversationId) {
