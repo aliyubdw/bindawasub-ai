@@ -142,24 +142,24 @@ function showWebNetworkSelector() {
 }
 
 const servicesToggle = document.getElementById("servicesToggle");
-const quickAccessMenu = document.getElementById("quickAccessMenu");
+const headerServicesMenu = document.getElementById("headerServicesMenu");
 
-if (servicesToggle && quickAccessMenu) {
+if (servicesToggle && headerServicesMenu) {
   servicesToggle.addEventListener("click", function(event) {
     event.stopPropagation();
-    const isOpen = !quickAccessMenu.hasAttribute("hidden");
+    const isOpen = !headerServicesMenu.hasAttribute("hidden");
     if (isOpen) {
-      quickAccessMenu.setAttribute("hidden", "");
+      headerServicesMenu.setAttribute("hidden", "");
       servicesToggle.setAttribute("aria-expanded", "false");
     } else {
-      quickAccessMenu.removeAttribute("hidden");
+      headerServicesMenu.removeAttribute("hidden");
       servicesToggle.setAttribute("aria-expanded", "true");
     }
   });
 
   document.addEventListener("click", function(event) {
-    if (!quickAccessMenu.contains(event.target) && !servicesToggle.contains(event.target)) {
-      quickAccessMenu.setAttribute("hidden", "");
+    if (!headerServicesMenu.contains(event.target) && !servicesToggle.contains(event.target)) {
+      headerServicesMenu.setAttribute("hidden", "");
       servicesToggle.setAttribute("aria-expanded", "false");
     }
   });
