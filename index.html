@@ -58,6 +58,10 @@
         <span class="online-status"><span class="online-dot"></span> Online</span>
       </div>
     </div>
+    <div class="chat-header-actions" aria-label="Chat actions">
+      <button id="newChatButton" class="header-action new-chat-button" type="button" aria-label="Start new chat">＋ New</button>
+      <button id="chatHistoryButton" class="header-action chat-history-button" type="button" aria-label="Open saved conversations">☷ History</button>
+    </div>
     <div id="adminBadge" class="admin-badge" style="display:none;">ADMIN MODE</div>
   </div>
 
@@ -171,7 +175,11 @@
           <span class="profile-modal-kicker">ACCOUNT</span>
           <h2 id="profileModalTitle">My Profile</h2>
         </div>
-        <button id="profileCloseButton" class="profile-close-button" type="button" aria-label="Close profile">×</button>
+        <div class="profile-header-actions">
+          <button id="telegramLinkButton" class="profile-header-action" type="button">Connect Telegram</button>
+          <button id="logoutButton" class="profile-header-action profile-logout-button" type="button">Logout</button>
+          <button id="profileCloseButton" class="profile-close-button" type="button" aria-label="Close profile">×</button>
+        </div>
       </div>
       <div id="profileModalBody"></div>
     </aside>
