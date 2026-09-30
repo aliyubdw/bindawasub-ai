@@ -6,7 +6,7 @@
   <title>Bindawasub AI</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./customer/css/customer.css?v=20260930-10">
+  <link rel="stylesheet" href="./customer/css/customer.css?v=20260930-11">
 </head>
 
 <body>
@@ -51,24 +51,6 @@
 
   <div class="header">
     <div class="chat-header-actions">
-      <button id="servicesToggle" class="header-action services-header-button" type="button" aria-expanded="false" aria-controls="headerServicesMenu">Services</button>
-      <button id="newChatButton" class="header-action new-chat-button" type="button">＋ New chat</button>
-      <button id="logoutButton" class="header-action" type="button">Logout</button>
-    </div>
-    <div class="header-services-menu" id="headerServicesMenu" hidden>
-      <div class="header-services-title">What do you need?</div>
-      <div class="header-services-grid">
-        <button type="button" class="quick-access-card featured" data-action-message="I want to buy data"><b>Buy Data</b><small>Choose a plan</small></button>
-        <button type="button" class="quick-access-card" data-action-message="I want to buy airtime"><b>Airtime</b><small>Buy instantly</small></button>
-        <button type="button" class="quick-access-card" data-action-message="I want to pay a bill"><b>Bills</b><small>Pay bills</small></button>
-        <button type="button" class="quick-access-card featured" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet"><b>Fund Wallet</b><small>Add money</small></button>
-        <button type="button" class="quick-access-card" data-action-message="Check my wallet balance" data-action-action="wallet_balance"><b>Wallet</b><small>Check balance</small></button>
-        <button type="button" class="quick-access-card" data-action-message="Show my recent transactions" data-action-action="transaction_history"><b>Transactions</b><small>View activity</small></button>
-        <button type="button" class="quick-access-card" id="telegramLinkButton"><b>Telegram</b><small>Connect account</small></button>
-        <button type="button" class="quick-access-card" id="chatHistoryButton"><b>History</b><small>Saved chats</small></button>
-        <button type="button" class="quick-access-card" id="profileButton"><b>Profile</b><small>Manage account</small></button>
-      </div>
-    </div>
     <div class="header-brand">
       <div class="brand-mark">🤖</div>
       <div class="header-copy">
@@ -123,14 +105,12 @@
   </div>
 
   <div id="customerInterface">
-    <div class="customer-quick-access" id="customerQuickAccess">
-      <div class="quick-chip-row" aria-label="Quick services">
-        <button class="quick-chip primary" type="button" data-action-message="I want to buy data">Buy Data</button>
-        <button class="quick-chip" type="button" data-action-message="I want to buy airtime">Airtime</button>
-        <button class="quick-chip" type="button" data-action-message="I want to pay a bill">Bills</button>
-        <button class="quick-chip" type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button>
-        <button class="quick-chip" type="button" data-action-message="Check my wallet balance" data-action-action="wallet_balance">Wallet</button>
+    <div class="customer-wallet-card customer-wallet-top" id="customerWalletCard">
+      <div>
+        <span>WALLET BALANCE</span>
+        <strong id="customerWalletBalance">₦0.00</strong>
       </div>
+      <button type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button>
     </div>
 
     <div id="conversationHistoryPanel" class="conversation-history-panel" hidden>
@@ -143,14 +123,6 @@
       </div>
       <div id="conversationHistoryList"></div>
     </div>
-    <div class="customer-wallet-card" id="customerWalletCard">
-      <div>
-        <span>WALLET BALANCE</span>
-        <strong id="customerWalletBalance">₦0.00</strong>
-      </div>
-      <button type="button" data-action-message="How can I fund my wallet?" data-action-action="fund_wallet">Fund Wallet</button>
-    </div>
-
     <div id="messages">
 
       <div class="welcome-card" id="welcomeCard">
@@ -218,7 +190,7 @@
 <script src="./customer/js/chat.js?v=20260929-3"></script>
 <script src="./customer/js/admin.js?v=20260929"></script>
 <script src="./customer/js/auth.js?v=20260929-3"></script>
-<script src="./customer/js/app.js?v=20260930-8"></script>
+<script src="./customer/js/app.js?v=20260930-9"></script>
 <script>
   window.addEventListener("load", function () {
     const googleButton = document.getElementById("googleButton");
