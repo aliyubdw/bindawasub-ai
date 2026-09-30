@@ -688,8 +688,35 @@ Deno.serve(async (req) => {
       const networkName = networkNames[normalizedNetwork];
 
       if (conversationId) {
+        // SECURITY: never trust a client-supplied conversation UUID.
+        // Verify ownership and channel before changing conversation state.
+        const { data: ownedConversation, error: ownedConversationError } = await supabase
+          .from("ai_conversations")
+          .select("id, conversation_context")
+          .eq("id", conversationId)
+          .eq("user_id", userId)
+          .eq("channel", channel)
+          .maybeSingle();
+
+        if (ownedConversationError) throw ownedConversationError;
+
+        if (!ownedConversation) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: "Conversation not found."
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        conversationContext = ownedConversation.conversation_context &&
+          typeof ownedConversation.conversation_context === "object"
+          ? ownedConversation.conversation_context
+          : {};
+
         const nextContext = {
-          ...(conversationContext || {}),
+          ...conversationContext,
           last_intent: "airtime_purchase",
           service_type: "airtime",
           network: normalizedNetwork,
@@ -698,10 +725,18 @@ Deno.serve(async (req) => {
           product_name: null,
           updated_at: new Date().toISOString()
         };
-        await supabase.from("ai_conversations").update({
-          conversation_context: nextContext,
-          last_message_at: new Date().toISOString()
-        }).eq("id", conversationId);
+
+        const { error: updateConversationError } = await supabase
+          .from("ai_conversations")
+          .update({
+            conversation_context: nextContext,
+            last_message_at: new Date().toISOString()
+          })
+          .eq("id", conversationId)
+          .eq("user_id", userId)
+          .eq("channel", channel);
+
+        if (updateConversationError) throw updateConversationError;
       }
 
       const answer = `You selected ${networkName} airtime. How much airtime do you want to buy?`;
