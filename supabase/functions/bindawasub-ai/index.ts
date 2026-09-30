@@ -649,6 +649,60 @@ Deno.serve(async (req) => {
     const originalMessage = body.message || "";
     const message = originalMessage.toLowerCase();
 
+    // Explicit Airtime selector start: bypass Gemini completely.
+    if (body.action === "start_airtime") {
+      const requestedNetwork = String(body.network || "").trim().toLowerCase();
+      const normalizedNetwork =
+        requestedNetwork === "t2" || requestedNetwork.startsWith("9mobile")
+          ? "9mobile"
+          : requestedNetwork;
+
+      if (!["mtn", "airtel", "glo", "9mobile"].includes(normalizedNetwork)) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Unsupported airtime network."
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const networkNames:any = {
+        mtn: "MTN",
+        airtel: "Airtel",
+        glo: "Glo",
+        "9mobile": "9mobile (T2)"
+      };
+      const networkName = networkNames[normalizedNetwork];
+
+      if (conversationId) {
+        const nextContext = {
+          ...(conversationContext || {}),
+          last_intent: "airtime_purchase",
+          service_type: "airtime",
+          network: normalizedNetwork,
+          volume: null,
+          product_id: null,
+          product_name: null,
+          updated_at: new Date().toISOString()
+        };
+        await supabase.from("ai_conversations").update({
+          conversation_context: nextContext,
+          last_message_at: new Date().toISOString()
+        }).eq("id", conversationId);
+      }
+
+      const answer = `You selected ${networkName} airtime. How much airtime do you want to buy?`;
+      await persistAssistantMessage(answer, "airtime_purchase", "backend");
+
+      return new Response(JSON.stringify({
+        success: true,
+        intent: "airtime_purchase",
+        service_type: "airtime",
+        network: normalizedNetwork,
+        answer,
+        ai_powered: false,
+        quick_action: true
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // ==========================================
     // ADMIN STATUS
     // ==========================================
@@ -2710,13 +2764,21 @@ if (body.action === "manual_fund") {
         recentTransactionsForAI
       );
 
-      // Deterministic routing for explicit Airtime requests.
-      // Airtime must never fall through to the Data product catalog.
-      const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
-      if (explicitAirtimeRequest) {
-        const airtimeNetworkMatch = String(originalMessage || "").match(/\b(mtn|airtel|glo|9mobile|9mobile\s*\(\s*t2\s*\)|t2)\b/i);
+      // Deterministic routing for Airtime. Once an Airtime task has started,
+      // keep numeric/phone follow-ups in the Airtime flow instead of Data.
+      const activeAirtimeContext = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
+      const explicitAirtimeRequest = /\\bairtime\\b|\\btalktime\\b/i.test(String(originalMessage || ""));
+      if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {
+        ai.intent = "airtime_purchase";
+        ai.service_type = "airtime";
+        ai.network = ai.network || conversationContext?.network || null;
+        ai.product_id = null;
+        ai.product_name = null;
+        ai.volume = null;
+      } else if (explicitAirtimeRequest) {
+        const airtimeNetworkMatch = String(originalMessage || "").match(/\\b(mtn|airtel|glo|9mobile|9mobile\\s*\\(\\s*t2\\s*\\)|t2)\\b/i);
         if (airtimeNetworkMatch) {
-          const rawNetwork = airtimeNetworkMatch[1].toLowerCase().replace(/\s+/g, "");
+          const rawNetwork = airtimeNetworkMatch[1].toLowerCase().replace(/\\s+/g, "");
           ai.network = rawNetwork === "t2" || rawNetwork.startsWith("9mobile") ? "9mobile" : rawNetwork;
         }
         ai.intent = "airtime_purchase";
@@ -2725,6 +2787,7 @@ if (body.action === "manual_fund") {
         ai.product_name = null;
         ai.volume = null;
       } else {
+      {
         ai.intent = String(ai.intent || "unknown").trim().toLowerCase();
 
         // Deterministic routing for an explicitly selected bill/service.
