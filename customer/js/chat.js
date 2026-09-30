@@ -1,5 +1,38 @@
 // Bindawasub AI — conversations and AI chat
 
+function ensureConversationServices() {
+  const messages = document.getElementById("messages");
+  if (!messages || document.getElementById("servicesConversationTrack")) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "services-conversation";
+  wrapper.setAttribute("aria-label", "Bindawasub services");
+
+  const track = document.createElement("div");
+  track.className = "services-conversation-track";
+  track.id = "servicesConversationTrack";
+
+  const services = [
+    ["📶", "Data", "I want to buy data"],
+    ["📞", "Airtime", "I want to buy airtime"],
+    ["📺", "TV", "I want to pay my TV subscription"],
+    ["💡", "Electricity", "I want to pay my electricity bill"],
+    ["🎓", "WAEC/NECO", "I want to buy a WAEC or NECO PIN"]
+  ];
+
+  services.forEach(function(service) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "service-item";
+    button.setAttribute("data-action-message", service[2]);
+    button.innerHTML = '<span class="service-icon">' + service[0] + '</span><span>' + service[1] + '</span>';
+    track.appendChild(button);
+  });
+
+  wrapper.appendChild(track);
+  messages.appendChild(wrapper);
+}
+
 async function startNewConversation() {
   const button = document.getElementById("newChatButton");
   if (button) button.disabled = true;
@@ -27,6 +60,7 @@ async function startNewConversation() {
 
     const messages = document.getElementById("messages");
     messages.innerHTML = "";
+    ensureConversationServices();
 
     addMessage("Hello! A new conversation has started. How can I help you today?", "bot");
 
@@ -50,6 +84,7 @@ async function loadConversationMessages(conversationId) {
 
   const messages = document.getElementById("messages");
   if (!messages) return;
+  ensureConversationServices();
 
   try {
     const response = await callEdgeFunction({
@@ -68,6 +103,7 @@ async function loadConversationMessages(conversationId) {
     resetCustomerOrderState();
     resetCustomerFundingState();
     messages.innerHTML = "";
+    ensureConversationServices();
 
     if (Array.isArray(data.messages) && data.messages.length > 0) {
       data.messages.forEach(item => {
@@ -110,6 +146,7 @@ async function loadConversationHistory() {
     // The welcome card contains the Services menu.
     if (Array.isArray(data.messages) && data.messages.length > 0) {
       messages.innerHTML = "";
+      ensureConversationServices();
       data.messages.forEach(item => {
         const role = item.role === "user" ? "user" : "bot";
         addMessage(item.message || "", role);
