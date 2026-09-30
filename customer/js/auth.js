@@ -239,11 +239,7 @@ async function loginUser() {
       throw new Error(error?.message || "Login failed.");
     }
 
-    // Do not initialize the account here.
-    // The single SIGNED_IN/INITIAL_SESSION handler below owns session boot.
-    // This prevents loginUser() and onAuthStateChange() from racing and
-    // loading two different account states in the same browser.
-  } catch (error) {
+    // Boot the authenticated account immediately. The auth-state listener\n    // may also receive SIGNED_IN, but applyAuthenticatedSession() has a\n    // transition lock so the two paths cannot initialize the account twice.\n    // This keeps the login flow tied to the real profile bootstrap result.\n    await applyAuthenticatedSession(data.session);\n  } catch (error) {
     // Do not sign the customer out here. If Supabase successfully created a
     // session but a later UI/bootstrap step fails, destroying the valid
     // session makes the app look like it logged the customer out immediately.
