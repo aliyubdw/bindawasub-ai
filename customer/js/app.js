@@ -141,6 +141,30 @@ function showWebNetworkSelector() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+const servicesToggle = document.getElementById("servicesToggle");
+const quickAccessMenu = document.getElementById("quickAccessMenu");
+
+if (servicesToggle && quickAccessMenu) {
+  servicesToggle.addEventListener("click", function(event) {
+    event.stopPropagation();
+    const isOpen = !quickAccessMenu.hasAttribute("hidden");
+    if (isOpen) {
+      quickAccessMenu.setAttribute("hidden", "");
+      servicesToggle.setAttribute("aria-expanded", "false");
+    } else {
+      quickAccessMenu.removeAttribute("hidden");
+      servicesToggle.setAttribute("aria-expanded", "true");
+    }
+  });
+
+  document.addEventListener("click", function(event) {
+    if (!quickAccessMenu.contains(event.target) && !servicesToggle.contains(event.target)) {
+      quickAccessMenu.setAttribute("hidden", "");
+      servicesToggle.setAttribute("aria-expanded", "false");
+    }
+  });
+}
+
 document.getElementById("loginButton").addEventListener("click", loginUser);
 document.getElementById("googleButton").addEventListener("click", loginWithGoogle);
 document.getElementById("registerButton").addEventListener("click", registerUser);
