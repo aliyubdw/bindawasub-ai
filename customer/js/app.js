@@ -225,6 +225,7 @@ document
   });
 
 document.querySelectorAll("[data-action-message]").forEach(function(button) {
+  if (button.getAttribute("data-action-message") === "I want to buy airtime" || button.getAttribute("data-action-message") === "I want to pay a bill") return;
   button.addEventListener("click", function() {
     const message = button.getAttribute("data-action-message");
     const action = button.getAttribute("data-action-action");
