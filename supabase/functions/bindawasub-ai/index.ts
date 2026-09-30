@@ -649,6 +649,11 @@ Deno.serve(async (req) => {
     const originalMessage = body.message || "";
     const message = originalMessage.toLowerCase();
 
+    // Initialize conversation state before quick actions, because quick actions
+    // can persist messages and update the selected conversation immediately.
+    let conversationId: string | null = String(body.conversation_id || "").trim() || null;
+    let conversationContext: any = {};
+
     // Explicit Airtime selector start: bypass Gemini completely.
     if (body.action === "start_airtime") {
       let requestedNetwork = String(body.network || "").trim().toLowerCase();
@@ -772,9 +777,6 @@ Deno.serve(async (req) => {
         error: "This AI channel is currently disabled."
       }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
-    let conversationId: string | null = null;
-    let conversationContext: any = {};
 
     {
       const requestedConversationId = String(body.conversation_id || "").trim();
