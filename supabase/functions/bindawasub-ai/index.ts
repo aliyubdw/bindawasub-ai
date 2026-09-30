@@ -2499,6 +2499,14 @@ if (body.action === "manual_fund") {
         message.includes("mtn")
       )
     ) {
+      const normalizedNetworkMessage = String(message || "").toLowerCase();
+      const requestedNetwork =
+        /\\b(mtn)\\b/i.test(normalizedNetworkMessage) ? "mtn" :
+        /\\b(airtel)\\b/i.test(normalizedNetworkMessage) ? "airtel" :
+        /\\b(glo)\\b/i.test(normalizedNetworkMessage) ? "glo" :
+        /\\b(9mobile|t2)\\b/i.test(normalizedNetworkMessage) ? "9mobile" :
+        null;
+
       const { data: products, error } =
         await supabase
           .from("products")
@@ -2514,13 +2522,33 @@ if (body.action === "manual_fund") {
         throw error;
       }
 
+      const filteredProducts = requestedNetwork
+        ? (products || []).filter((product:any) => {
+            const network = Array.isArray(product.service_networks)
+              ? product.service_networks[0]
+              : product.service_networks;
+            return String(network?.code || "").toLowerCase() === requestedNetwork;
+          })
+        : (products || []);
+
+      const networkLabel = requestedNetwork === "9mobile"
+        ? "9mobile (T2)"
+        : requestedNetwork
+          ? requestedNetwork.toUpperCase()
+          : null;
+
       return new Response(
         JSON.stringify({
           success: true,
           intent: "product_enquiry",
-          products,
-          answer:
-            "Here are the available Bindawasub services and products.",
+          network: requestedNetwork,
+          network_name: networkLabel,
+          products: filteredProducts,
+          answer: requestedNetwork
+            ? (filteredProducts.length
+                ? "Here are the available " + networkLabel + " data plans."
+                : "There are currently no active data plans for " + networkLabel + ".")
+            : "Here are the available Bindawasub services and products.",
         }),
         {
           status: 200,
