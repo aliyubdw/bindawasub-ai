@@ -1,12 +1,20 @@
 // Bindawasub Admin — persistent admin session management
 (function(){
   function showApp(){
-    document.getElementById("loginView")?.classList.add("hidden");
-    document.getElementById("app")?.classList.remove("hidden");
+    const login=document.getElementById("loginView");
+    const app=document.getElementById("app");
+    login?.classList.add("hidden");
+    login?.setAttribute("aria-hidden","true");
+    app?.classList.remove("hidden");
+    app?.setAttribute("aria-hidden","false");
   }
   function showLogin(){
-    document.getElementById("loginView")?.classList.remove("hidden");
-    document.getElementById("app")?.classList.add("hidden");
+    const login=document.getElementById("loginView");
+    const app=document.getElementById("app");
+    login?.classList.remove("hidden");
+    login?.setAttribute("aria-hidden","false");
+    app?.classList.add("hidden");
+    app?.setAttribute("aria-hidden","true");
   }
   async function verify(session){
     const r=await fetch(ADMIN_URL,{
