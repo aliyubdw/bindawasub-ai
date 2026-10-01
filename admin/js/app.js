@@ -42,6 +42,9 @@ function startFundingPolling(){
 
 document.addEventListener("DOMContentLoaded",()=>{
   bindAdminModalClose();
+  document.querySelectorAll("[data-catalog-mode]").forEach(button=>{
+    button.addEventListener("click",()=>setCatalogMode(button.dataset.catalogMode||"network"));
+  });
   const toggle=document.getElementById("sidebarToggle");
   const sidebar=document.getElementById("adminSidebar");
   const backdrop=document.getElementById("sidebarBackdrop");
