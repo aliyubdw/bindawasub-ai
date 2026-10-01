@@ -259,7 +259,7 @@ async function populateProductDimensions(networkId="",variantId=""){
 }
 
 async function populateProductVariants(serviceId,networkId="",variantId=""){
-  const vs=variants.filter(v=>v.service_id===serviceId && (!networkId||v.network_id===networkId));
+  const vs=variants.filter(v=>v.active!==false && v.service_id===serviceId && (!networkId||v.network_id===networkId));
   $("xVariant").innerHTML='<option value="">— select data type —</option>'+vs.map(v=>'<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>').join("");
   $("xVariant").value=variantId||"";
 }
@@ -303,9 +303,11 @@ async function openNetwork(n){
   $("saveNetwork").onclick=async()=>{try{await admin({action:"save_service_network",id:n?.id,service_id:$("nService").value,name:$("nName").value,code:$("nCode").value,active:$("nActive").checked});$("modal").classList.add("hidden");await loadCatalogDimensions()}catch(e){msg($("modalMsg"),e.message,"error")}};
 }
 
+window.toggleDataType=async function(id,active){try{const v=variants.find(x=>x.id===id);if(!v)return;await admin({action:"save_service_variant",id:v.id,service_id:v.service_id,network_id:v.network_id||null,name:v.name,code:v.code,description:v.description||"",active:Boolean(active)});await loadCatalogDimensions();}catch(e){msg($("variantMsg"),e.message,"error")}};
+
 async function openVariant(v){
-  $("modalTitle").textContent=v?"Edit Variant / Channel":"Add Variant / Channel";
-  $("modalBody").innerHTML='<div class="field"><label>Service *</label><select id="vService">'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("")+'</select></div><div class="field"><label>Network</label><select id="vNetwork"><option value="">All networks for this service</option></select></div><div class="grid2"><div class="field"><label>Data Type / Variant name *</label><input id="vName" placeholder="SME Data"></div><div class="field"><label>Code *</label><input id="vCode" placeholder="sme"></div></div><div class="field"><label>Description</label><textarea id="vDescription"></textarea></div><div class="field"><label><input id="vActive" type="checkbox" style="width:auto"> Active</label></div><button id="saveVariant">Save Variant</button>';
+  $("modalTitle").textContent=v?"Edit Data Type":"Add Data Type";
+  $("modalBody").innerHTML='<div class="field"><label>Service *</label><select id="vService">'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("")+'</select></div><div class="field"><label>Network</label><select id="vNetwork"><option value="">All networks for this service</option></select></div><div class="grid2"><div class="field"><label>Data Type name *</label><input id="vName" placeholder="SME Data"></div><div class="field"><label>Code *</label><input id="vCode" placeholder="sme"></div></div><div class="field"><label>Description</label><textarea id="vDescription"></textarea></div><div class="field"><label><input id="vActive" type="checkbox" style="width:auto"> Active</label></div><button id="saveVariant">Save Variant</button>';
   $("vService").value=v?.service_id||services[0]?.id||"";
   const fill=()=>{$("vNetwork").innerHTML='<option value="">All networks for this service</option>'+networks.filter(n=>n.service_id===$("vService").value).map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");$("vNetwork").value=v?.network_id||""};
   fill();$("vService").onchange=fill;
