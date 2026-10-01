@@ -51,7 +51,10 @@ function setCatalogMode(mode){
 
 function renderServicesForCatalog(){
   const rows=services.filter(s=>catalogMode==="network"?isNetworkService(s):!isNetworkService(s));
-  $("serviceRows").innerHTML=rows.map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\\''+s.id+'\\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No '+(catalogMode==="network"?"network":"other")+' services configured.</td></tr>';
+  $("serviceRows").innerHTML=rows.map(s=>`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td>${escapeHtml(s.code)}</td><td>${escapeHtml(s.category||"—")}</td><td><span class="badge ${s.active?"on":"off"}">${s.active?"Active":"Inactive"}</span></td><td><button class="secondary" data-edit-service="${s.id}">Edit</button></td></tr>`).join("")||`<tr><td colspan="5" class="muted">No ${catalogMode==="network"?"network":"other"} services configured.</td></tr>`;
+  document.querySelectorAll("[data-edit-service]").forEach(button=>{
+    button.addEventListener("click",()=>window.editService(button.dataset.editService));
+  });
 }
 
 async function openService(s){
