@@ -9,6 +9,7 @@ async function loadServices(){
     await loadProviderServiceOperations();
     await loadServiceFields();
     await loadCatalogDimensions();
+    setCatalogMode(catalogMode);
   }catch(e){msg($("serviceMsg"),e.message,"error")}
 }
 
