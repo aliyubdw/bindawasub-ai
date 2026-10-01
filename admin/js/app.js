@@ -62,4 +62,41 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
 
   startFundingPolling();
+
+  // Catalog management actions
+  // These handlers were missing, so the Add buttons opened nothing and the
+  // inline Edit actions could not resolve their functions.
+  document.getElementById("newService")?.addEventListener("click",()=>openService());
+  document.getElementById("newNetwork")?.addEventListener("click",()=>openNetwork());
+  document.getElementById("newVariant")?.addEventListener("click",()=>openVariant());
+  document.getElementById("newProduct")?.addEventListener("click",()=>openProduct());
+
+  document.getElementById("networkService")?.addEventListener("change",()=>renderNetworks());
+  document.getElementById("variantService")?.addEventListener("change",()=>{
+    const serviceId=document.getElementById("variantService")?.value||"";
+    const select=document.getElementById("variantNetwork");
+    if(!select)return;
+    const ns=networks.filter(n=>!serviceId||n.service_id===serviceId);
+    select.innerHTML='<option value="">All networks</option>'+ns.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");
+    renderVariants();
+  });
+  document.getElementById("variantNetwork")?.addEventListener("change",()=>renderVariants());
 });
+
+// Keep the legacy inline Edit buttons working.
+window.editService=(id)=>{
+  const item=services.find(x=>x.id===id);
+  if(item) return openService(item);
+};
+window.editNetwork=(id)=>{
+  const item=networks.find(x=>x.id===id);
+  if(item) return openNetwork(item);
+};
+window.editVariant=(id)=>{
+  const item=variants.find(x=>x.id===id);
+  if(item) return openVariant(item);
+};
+window.editProduct=(id)=>{
+  const item=products.find(x=>x.id===id);
+  if(item) return openProduct(item);
+};
