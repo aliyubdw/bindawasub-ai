@@ -39,6 +39,7 @@
       box.innerHTML='<div class="msg error">Email and password are required.</div>';
       return false;
     }
+    loginInProgress=true;
     btn.disabled=true;
     btn.textContent="Signing in…";
     box.innerHTML='<div class="msg info">Authenticating…</div>';
@@ -55,6 +56,7 @@
       console.error("ADMIN_LOGIN_ERROR",err);
       box.innerHTML='<div class="msg error">'+escapeHtml(err.message||"Login failed.")+'</div>';
     }finally{
+      loginInProgress=false;
       btn.disabled=false;
       btn.textContent="Login";
     }
@@ -68,10 +70,12 @@
     window.location.replace("../");
   }
   let restoring=false;
+  let loginInProgress=false;
   async function restore(){
-    if(restoring)return;
+    if(restoring||loginInProgress)return;
     restoring=true;
     try{
+      if(loginInProgress)return;
       const {data,error}=await sb.auth.getSession();
       if(error)throw error;
       if(!data.session){
