@@ -28,7 +28,21 @@ function setCatalogMode(mode){
   document.querySelectorAll("#services .card").forEach(card=>{
     const heading=card.querySelector(".section-title h2")?.textContent?.trim()||"";
     const networkOnly=heading==="Networks" || heading==="Service Variants / Channels";
+    const routingCard=heading==="Provider Service Routing" || heading==="Provider Service Capabilities";
     card.style.display=(catalogMode==="other" && networkOnly)?"none":"";
+    if(routingCard){
+      const tableBody=card.querySelector("tbody");
+      if(tableBody){
+        const rows=Array.from(tableBody.querySelectorAll("tr"));
+        rows.forEach(row=>{
+          const serviceText=(row.children[1]?.textContent||"").trim().toLowerCase();
+          const show=catalogMode==="network"
+            ? (serviceText==="data"||serviceText==="airtime")
+            : (serviceText!== "data" && serviceText!=="airtime");
+          row.style.display=show?"":"none";
+        });
+      }
+    }
   });
   renderServicesForCatalog();
   if(typeof renderProducts==="function") renderProducts();
