@@ -52,7 +52,7 @@
       box.innerHTML="";
       if(window.loadAll) await window.loadAll();
     }catch(err){
-      await sb.auth.signOut({scope:"local"}).catch(()=>{});
+      console.error("ADMIN_LOGIN_ERROR",err);
       box.innerHTML='<div class="msg error">'+escapeHtml(err.message||"Login failed.")+'</div>';
     }finally{
       btn.disabled=false;
@@ -81,8 +81,10 @@
       try{
         await verify(data.session);
       }catch(err){
-        await sb.auth.signOut({scope:"local"}).catch(()=>{});
+        console.error("ADMIN_RESTORE_VERIFY_ERROR",err);
         showLogin();
+        const box=document.getElementById("loginMsg");
+        if(box) box.innerHTML='<div class="msg error">'+escapeHtml(err.message||"Admin verification failed.")+'</div>';
         return;
       }
       showApp();
