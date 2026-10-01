@@ -43,7 +43,7 @@ function startFundingPolling(){
 document.addEventListener("DOMContentLoaded",()=>{
   bindAdminModalClose();
   document.querySelectorAll("[data-catalog-mode]").forEach(button=>{
-    button.addEventListener("click",()=>setCatalogMode(button.dataset.catalogMode||"network"));
+    button.addEventListener("click",()=>setCatalogMode(button.dataset.catalogMode||"network",button.dataset.catalogScope||"services"));
   });
   const toggle=document.getElementById("sidebarToggle");
   const sidebar=document.getElementById("adminSidebar");
