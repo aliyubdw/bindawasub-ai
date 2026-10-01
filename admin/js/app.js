@@ -41,6 +41,7 @@ function startFundingPolling(){
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
+  bindAdminModalClose();
   const toggle=document.getElementById("sidebarToggle");
   const sidebar=document.getElementById("adminSidebar");
   const backdrop=document.getElementById("sidebarBackdrop");
