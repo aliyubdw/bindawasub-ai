@@ -8,6 +8,7 @@ let variants=[];
 let services=[];
 let providerServices=[];
 let providerServiceOperations=[];
+let catalogMode="network"; // network = Data/Airtime, other = all non-telecom services
 
 const $=id=>document.getElementById(id);
 const money=n=>"₦"+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
