@@ -100,3 +100,71 @@ window.editProduct=(id)=>{
   const item=products.find(x=>x.id===id);
   if(item) return openProduct(item);
 };
+
+
+// Modal close / unsaved-change protection for catalog forms.
+// The same modal is reused by Service, Network, Variant and Product forms.
+let adminModalBaseline="";
+let adminModalClosing=false;
+
+function captureAdminModalState(){
+  const modal=document.getElementById("modal");
+  if(!modal||modal.classList.contains("hidden")) return "";
+  return Array.from(modal.querySelectorAll("input,select,textarea")).map(el=>{
+    const type=(el.getAttribute("type")||"").toLowerCase();
+    return type==="checkbox"||type==="radio"
+      ? type+":"+el.checked
+      : el.value;
+  }).join("\\u001f");
+}
+
+function adminModalHasChanges(){
+  const current=captureAdminModalState();
+  return Boolean(adminModalBaseline && current!==adminModalBaseline);
+}
+
+function closeAdminModal(force=false){
+  const modal=document.getElementById("modal");
+  if(!modal) return true;
+  if(!force && adminModalHasChanges()){
+    const discard=window.confirm("You have unsaved changes. Discard them and close?");
+    if(!discard) return false;
+  }
+  adminModalClosing=true;
+  modal.classList.add("hidden");
+  adminModalBaseline="";
+  setTimeout(()=>{adminModalClosing=false;},0);
+  return true;
+}
+
+window.closeAdminModal=closeAdminModal;
+
+function bindAdminModalClose(){
+  const modal=document.getElementById("modal");
+  const closeButton=document.getElementById("closeModal");
+  if(!modal) return;
+
+  closeButton?.addEventListener("click",()=>closeAdminModal(false));
+  modal.addEventListener("click",event=>{
+    if(event.target===modal) closeAdminModal(false);
+  });
+  document.addEventListener("keydown",event=>{
+    if(event.key==="Escape" && !modal.classList.contains("hidden")){
+      closeAdminModal(false);
+    }
+  });
+
+  const observer=new MutationObserver(()=>{
+    if(!modal.classList.contains("hidden") && !adminModalClosing){
+      // Form controls are populated immediately after the modal is opened.
+      // Capture the completed initial state on the next microtask.
+      queueMicrotask(()=>{
+        if(!modal.classList.contains("hidden")){
+          adminModalBaseline=captureAdminModalState();
+        }
+      });
+    }
+  });
+  observer.observe(modal,{attributes:true,attributeFilter:["class"]});
+}
+
