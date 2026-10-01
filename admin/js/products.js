@@ -1,8 +1,40 @@
 // Bindawasub Admin — products
 
-async function loadProducts(){try{const d=await admin({action:"list_products"});products=d.products||[];refreshMappingProductOptions();renderProducts()}catch(e){msg($("productMsg"),e.message,"error")}}
+let providerMappings=[];
 
-function renderProducts(){const networkFilter=$("dataPlanNetworkFilter")?.value||"";const visibleProducts=products.filter(p=>{const networkService=isNetworkService({code:p.service_type,name:p.service_type});if(productsCatalogMode==="network"&&!networkService)return false;if(productsCatalogMode==="other"&&networkService)return false;if(productsCatalogMode==="network"&&String(p.service_type||"").toLowerCase()!=="data")return false;if(networkFilter&&p.network_id!==networkFilter)return false;return true;});$("productRows").innerHTML=visibleProducts.map(p=>{const network=p.service_networks||{};const variant=p.service_variants||{};const validity=[p.validity_value,p.validity_unit].filter(Boolean).join(" ")||"—";return '<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(network.name||"—")+'</td><td><code>'+escapeHtml(network.id||p.network_id||"—")+'</code></td><td>'+escapeHtml(variant.name||"—")+'</td><td><code>'+escapeHtml(p.id||"—")+'</code></td><td>'+escapeHtml(p.volume||"—")+'</td><td>'+escapeHtml(validity)+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>';}).join("")||'<tr><td colspan="11" class="muted">No data plans configured for this network.</td></tr>';}
+async function loadProducts(){try{
+  const [d,m]=await Promise.all([
+    admin({action:"list_products"}),
+    admin({action:"list_mappings"})
+  ]);
+  products=d.products||[];
+  providerMappings=m.mappings||[];
+  refreshMappingProductOptions();
+  renderProducts();
+}catch(e){msg($("productMsg"),e.message,"error")}}
+
+function renderProducts(){
+  const networkFilter=$("dataPlanNetworkFilter")?.value||"";
+  const visibleProducts=products.filter(p=>{
+    const networkService=isNetworkService({code:p.service_type,name:p.service_type});
+    if(productsCatalogMode==="network"&&!networkService)return false;
+    if(productsCatalogMode==="other"&&networkService)return false;
+    if(productsCatalogMode==="network"&&String(p.service_type||"").toLowerCase()!=="data")return false;
+    if(networkFilter&&p.network_id!==networkFilter)return false;
+    return true;
+  });
+  $("productRows").innerHTML=visibleProducts.map(p=>{
+    const network=p.service_networks||{};
+    const variant=p.service_variants||{};
+    const validity=[p.validity_value,p.validity_unit].filter(Boolean).join(" ")||"—";
+    const mappings=providerMappings.filter(m=>m.product_id===p.id&&m.active);
+    const providerText=mappings.length
+      ? mappings.map(m=>escapeHtml((m.api_providers?.name||m.api_providers?.code||"Provider")+": "+(m.provider_plan_id||"—"))).join("<br>")
+      : '<span class="muted">Not mapped</span>';
+    return '<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(network.name||"—")+'</td><td><code>'+escapeHtml(network.id||p.network_id||"—")+'</code></td><td>'+escapeHtml(variant.name||"—")+'</td><td><code>'+escapeHtml(p.id||"—")+'</code></td><td>'+escapeHtml(p.volume||"—")+'</td><td>'+escapeHtml(validity)+'</td><td>'+providerText+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>';
+  }).join("")||'<tr><td colspan="12" class="muted">No data plans configured for this network.</td></tr>';
+}
+
 function refreshDataPlanNetworkOptions(){const select=$("dataPlanNetworkFilter");if(!select)return;const dataService=services.find(s=>String(s.code||"").toLowerCase()==="data"||String(s.name||"").toLowerCase()==="data");const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);const current=select.value;select.innerHTML='<option value="">All networks</option>'+dataNetworks.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+' — '+escapeHtml(n.id)+'</option>').join("");if(dataNetworks.some(n=>n.id===current))select.value=current;}
 
 async function openProduct(p){
