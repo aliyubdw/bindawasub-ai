@@ -151,9 +151,12 @@ async function openProduct(p){
       }
     };
     row.querySelector(".pm-remove").onclick=()=>{
-      const active=row.querySelector(".pm-active");
-      if(active){active.value="false";}
-      row.remove();
+      if(row.dataset.mappingId){
+        row.dataset.removed="true";
+        row.style.display="none";
+      }else{
+        row.remove();
+      }
     };
     endpointSelect.disabled=!mapping?.provider_id;
     $("providerMappingRows").appendChild(row);
@@ -165,7 +168,7 @@ async function openProduct(p){
       if(p?.id){
         try{
           const d=await admin({action:"list_mappings",product_id:p.id});
-          const mappings=d.mappings||[];
+          const mappings=(d.mappings||[]).filter(m=>m.active);
           mappings.forEach(m=>addProviderMappingRow(m));
           if(!mappings.length) addProviderMappingRow();
         }catch{
@@ -216,6 +219,12 @@ async function openProduct(p){
         for(const row of rows){
           const providerId=row.querySelector(".pm-provider")?.value||"";
           const planId=row.querySelector(".pm-plan-id")?.value.trim()||"";
+          if(row.dataset.removed==="true"){
+            if(row.dataset.mappingId){
+              await admin({action:"save_mapping",id:row.dataset.mappingId,product_id:productId,provider_id:providerId,provider_plan_id:planId||"removed",provider_plan_name:$("xName").value,provider_cost:row.querySelector(".pm-cost")?.value||"",priority:row.querySelector(".pm-priority")?.value||100,provider_status:"inactive",active:false,metadata:{source:"data_plan_catalog"}});
+            }
+            continue;
+          }
           if(!providerId&&!planId) continue;
           if(!providerId||!planId) throw new Error("Every provider mapping must have both a provider and Provider Plan ID.");
           await admin({
