@@ -2,7 +2,8 @@
 
 async function loadProducts(){try{const d=await admin({action:"list_products"});products=d.products||[];refreshMappingProductOptions();renderProducts()}catch(e){msg($("productMsg"),e.message,"error")}}
 
-function renderProducts(){const visibleProducts=products.filter(p=>productsCatalogMode==="network"?isNetworkService({code:p.service_type,name:p.service_type}):!isNetworkService({code:p.service_type,name:p.service_type}));$("productRows").innerHTML=visibleProducts.map(p=>'<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(p.service_type)+'</td><td>'+escapeHtml(p.service_networks?.name||"—")+(p.service_variants?.name?' / '+escapeHtml(p.service_variants.name):"")+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td>'+"Configured in mappings"+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="8" class="muted">No products/plans.</td></tr>'}
+function renderProducts(){const networkFilter=$("dataPlanNetworkFilter")?.value||"";const visibleProducts=products.filter(p=>{const networkService=isNetworkService({code:p.service_type,name:p.service_type});if(productsCatalogMode==="network"&&!networkService)return false;if(productsCatalogMode==="other"&&networkService)return false;if(productsCatalogMode==="network"&&String(p.service_type||"").toLowerCase()!=="data")return false;if(networkFilter&&p.network_id!==networkFilter)return false;return true;});$("productRows").innerHTML=visibleProducts.map(p=>{const network=p.service_networks||{};const validity=[p.validity_value,p.validity_unit].filter(Boolean).join(" ")||"—";return '<tr><td><strong>'+escapeHtml(p.product_name)+'</strong><br><span class="muted">'+escapeHtml(p.sku||"")+'</span></td><td>'+escapeHtml(network.name||"—")+'</td><td><code>'+escapeHtml(network.id||p.network_id||"—")+'</code></td><td><code>'+escapeHtml(p.id||"—")+'</code></td><td>'+escapeHtml(p.volume||"—")+'</td><td>'+escapeHtml(validity)+'</td><td>'+money(p.selling_price)+'</td><td>'+money(p.cost_price)+'</td><td><span class="badge '+(p.active?"on":"off")+'">'+(p.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editProduct(\''+p.id+'\')">Edit</button></td></tr>';}).join("")||'<tr><td colspan="10" class="muted">No data plans configured for this network.</td></tr>';}
+function refreshDataPlanNetworkOptions(){const select=$("dataPlanNetworkFilter");if(!select)return;const dataService=services.find(s=>String(s.code||"").toLowerCase()==="data"||String(s.name||"").toLowerCase()==="data");const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);const current=select.value;select.innerHTML='<option value="">All networks</option>'+dataNetworks.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+' — '+escapeHtml(n.id)+'</option>').join("");if(dataNetworks.some(n=>n.id===current))select.value=current;}
 
 async function openProduct(p){
   const opts=providers.map(x=>'<option value="'+x.id+'" '+(p?.provider_id===x.id?"selected":"")+'>'+escapeHtml(x.name)+'</option>').join("");
@@ -35,10 +36,13 @@ async function loadCatalogDimensions(){
     const n=await admin({action:"list_service_networks"}); networks=n.networks||[];
     const v=await admin({action:"list_service_variants"}); variants=v.variants||[];
     refreshCatalogServiceOptions();
+    refreshDataPlanNetworkOptions();
     renderNetworks();
     renderVariants();
   }catch(e){msg($("networkMsg"),e.message,"error");msg($("variantMsg"),e.message,"error")}
 }
+
+document.getElementById("dataPlanNetworkFilter")?.addEventListener("change",renderProducts);
 
 function refreshCatalogServiceOptions(){
   const opts='<option value="">All services</option>'+services.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("");
