@@ -86,8 +86,8 @@
 
 <section id="services" class="panel">
 <div class="catalog-switcher" role="tablist" aria-label="Service configuration">
-  <button type="button" class="catalog-mode active" data-catalog-mode="network"><span>📶</span><span><strong>Network Services</strong><small>Data & Airtime</small></span></button>
-  <button type="button" class="catalog-mode" data-catalog-mode="other"><span>◈</span><span><strong>Other Services</strong><small>TV, Electricity, WAEC, NECO & more</small></span></button>
+  <button type="button" class="catalog-mode active" data-catalog-scope="services" data-catalog-mode="network"><span>📶</span><span><strong>Network Services</strong><small>Data & Airtime</small></span></button>
+  <button type="button" class="catalog-mode" data-catalog-scope="services" data-catalog-mode="other"><span>◈</span><span><strong>Other Services</strong><small>TV, Electricity, WAEC, NECO & more</small></span></button>
 </div>
 <div class="card"><div class="section-title"><h2>Services</h2><button id="newService">+ Add Service</button></div><div id="serviceMsg"></div><div class="table-wrap"><table><thead><tr><th>Service</th><th>Code</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody id="serviceRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>Provider Service Routing</h2><button id="newProviderService">+ Add Provider Service</button></div><div id="providerServiceMsg"></div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Service</th><th>Purchase Endpoint</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody id="providerServiceRows"></tbody></table></div><p class="muted">This controls which providers are allowed to serve each Bindawasub service. It does not expose API credentials.</p></div>
@@ -105,8 +105,8 @@
 
 <section id="products" class="panel">
 <div class="catalog-switcher" role="tablist" aria-label="Product configuration">
-  <button type="button" class="catalog-mode active" data-catalog-mode="network"><span>📶</span><span><strong>Network Products</strong><small>Data & Airtime</small></span></button>
-  <button type="button" class="catalog-mode" data-catalog-mode="other"><span>◈</span><span><strong>Other Products</strong><small>TV, Electricity, WAEC, NECO & more</small></span></button>
+  <button type="button" class="catalog-mode active" data-catalog-scope="products" data-catalog-mode="network"><span>📶</span><span><strong>Network Products</strong><small>Data & Airtime</small></span></button>
+  <button type="button" class="catalog-mode" data-catalog-scope="products" data-catalog-mode="other"><span>◈</span><span><strong>Other Products</strong><small>TV, Electricity, WAEC, NECO & more</small></span></button>
 </div>
 <div class="card"><div class="section-title"><h2>Products & Plans</h2><button id="newProduct">+ Add Product / Plan</button></div><div id="productMsg"></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Service</th><th>Network</th><th>Sell</th><th>Cost</th><th>Routing</th><th>Status</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>Provider Plan IDs</h2><button id="newMapping">+ Add Provider Plan ID</button></div><div id="mappingMsg"></div><div class="field"><label>Filter by internal product</label><select id="mappingProduct"></select></div><div class="table-wrap"><table><thead><tr><th>Internal Plan</th><th>Provider</th><th>Provider Plan ID</th><th>Provider Cost</th><th>Priority</th><th>Status</th><th>Active</th><th>Action</th></tr></thead><tbody id="mappingRows"></tbody></table></div><p class="muted">The internal Bindawasub product ID and the provider's own Plan ID are stored separately. One internal plan can have multiple provider mappings for routing and failover.</p></div>
@@ -196,5 +196,5 @@
 <script src="./js/reliability.js"></script>
 <script src="./js/funding.js"></script>
 <script src="./js/ai-management.js"></script>
-<script src="./js/app.js?v=20261001-3"></script>
+<script src="./js/app.js?v=20261001-4"></script>
 <script src="./js/auth.js"></script></body></html>
