@@ -127,3 +127,60 @@ html,body{max-width:100%;overflow-x:hidden}
   .overview-chart{height:160px}
   .crm-stats{grid-template-columns:1fr 1fr}
 }
+
+
+/* Catalog separation: telecom network services vs other services */
+.catalog-switcher{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 14px;
+}
+.catalog-mode{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-height:58px;
+  padding:10px 13px;
+  border:1px solid #dfe8e3;
+  border-radius:12px;
+  background:#fff;
+  color:#53665f;
+  text-align:left;
+  cursor:pointer;
+}
+.catalog-mode>span:first-child{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  flex:0 0 34px;
+  border-radius:10px;
+  background:#f2f7f5;
+  font-size:17px;
+}
+.catalog-mode strong{
+  display:block;
+  color:#29463c;
+  font-size:11px;
+}
+.catalog-mode small{
+  display:block;
+  margin-top:3px;
+  color:#8a9994;
+  font-size:9px;
+}
+.catalog-mode.active{
+  border-color:#9bcab8;
+  background:#f2faf6;
+  box-shadow:0 0 0 2px rgba(8,127,91,.06);
+}
+.catalog-mode.active>span:first-child{
+  background:#dff3ea;
+  color:#087f5b;
+}
+@media(max-width:520px){
+  .catalog-switcher{grid-template-columns:1fr;gap:7px}
+  .catalog-mode{min-height:52px;padding:9px 11px}
+}
