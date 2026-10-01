@@ -108,7 +108,7 @@
   <button type="button" class="catalog-mode active" data-catalog-scope="products" data-catalog-mode="network"><span>📶</span><span><strong>Network Products</strong><small>Data & Airtime</small></span></button>
   <button type="button" class="catalog-mode" data-catalog-scope="products" data-catalog-mode="other"><span>◈</span><span><strong>Other Products</strong><small>TV, Electricity, WAEC, NECO & more</small></span></button>
 </div>
-<div class="card"><div class="section-title"><div><h2>Data Plans</h2><p class="muted">Every available network has its own network ID, plan record and provider plan mapping.</p></div><button id="newProduct">+ Add Data Plan</button></div><div class="grid2"><div class="field"><label>Network</label><select id="dataPlanNetworkFilter"><option value="">All networks</option></select></div><div><span class="muted">A data plan belongs to one network. MTN, Airtel, Glo and 9mobile are stored as separate network records with separate IDs.</span></div></div><div id="productMsg"></div><div class="table-wrap"><table><thead><tr><th>Plan</th><th>Network</th><th>Network ID</th><th>Data Type</th><th>Internal Plan ID</th><th>Volume</th><th>Validity</th><th>Sell</th><th>Cost</th><th>Status</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
+<div class="card"><div class="section-title"><div><h2>Data Plans</h2><p class="muted">Every available network has its own network ID, plan record and provider plan mapping.</p></div><button id="newProduct">+ Add Data Plan</button></div><div class="grid2"><div class="field"><label>Network</label><select id="dataPlanNetworkFilter"><option value="">All networks</option></select></div><div><span class="muted">A data plan belongs to one network. MTN, Airtel, Glo and 9mobile are stored as separate network records with separate IDs.</span></div></div><div id="productMsg"></div><div class="table-wrap"><table><thead><tr><th>Plan</th><th>Network</th><th>Network ID</th><th>Data Type</th><th>Internal Plan ID</th><th>Volume</th><th>Validity</th><th>Provider Plan IDs</th><th>Sell</th><th>Cost</th><th>Status</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
 <div class="card"><div class="section-title"><h2>Provider Plan IDs</h2><button id="newMapping">+ Add Provider Plan ID</button></div><div id="mappingMsg"></div><div class="field"><label>Filter by internal product</label><select id="mappingProduct"></select></div><div class="table-wrap"><table><thead><tr><th>Internal Plan</th><th>Provider</th><th>Provider Plan ID</th><th>Provider Cost</th><th>Priority</th><th>Status</th><th>Active</th><th>Action</th></tr></thead><tbody id="mappingRows"></tbody></table></div><p class="muted">The internal Bindawasub product ID and the provider's own Plan ID are stored separately. One internal plan can have multiple provider mappings for routing and failover.</p></div>
 </section>
 
@@ -186,7 +186,7 @@
 <script src="./js/overview.js?v=20260929-4"></script>
 <script src="./js/services.js"></script>
 <script src="./js/providers.js"></script>
-<script src="./js/products.js?v=20261001-1"></script>
+<script src="./js/products.js?v=20261001-3?v=20261001-1"></script>
 <script src="./js/endpoints.js"></script>
 <script src="./js/mappings.js"></script>
 <script src="./js/transactions.js"></script>
