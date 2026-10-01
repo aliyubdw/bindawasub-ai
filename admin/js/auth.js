@@ -66,14 +66,14 @@
       const {data,error}=await sb.auth.getSession();
       if(error)throw error;
       if(!data.session){
-        window.location.replace("../");
+        showLogin();
         return;
       }
       try{
         await verify(data.session);
       }catch(err){
         await sb.auth.signOut({scope:"local"}).catch(()=>{});
-        window.location.replace("../");
+        showLogin();
         return;
       }
       showApp();
