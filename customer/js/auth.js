@@ -12,29 +12,61 @@ function normalizeRegistrationPhone(phone) {
   return /^0[789][0-9]{9}$/.test(number) ? number : null;
 }
 
+function setAuthScreen(mode, options = {}) {
+  const loginScreen = document.getElementById("loginScreen");
+  const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
+  const profileForm = document.getElementById("profileCompletionForm");
+  const subtitle = document.getElementById("authSubtitle");
+  const loginError = document.getElementById("loginError");
+  const registerMessage = document.getElementById("registerMessage");
+
+  const states = { login: loginForm, register: registerForm, profile: profileForm };
+  Object.entries(states).forEach(([name, element]) => {
+    if (!element) return;
+    const active = name === mode;
+    element.hidden = !active;
+    element.style.display = active ? "block" : "none";
+    element.setAttribute("aria-hidden", active ? "false" : "true");
+  });
+
+  if (loginScreen) {
+    loginScreen.hidden = false;
+    loginScreen.style.display = "block";
+    loginScreen.setAttribute("aria-hidden", "false");
+  }
+
+  if (subtitle) {
+    subtitle.textContent =
+      mode === "register"
+        ? "Create your Bindawasub customer account."
+        : mode === "profile"
+          ? "Complete your Bindawasub profile to continue."
+          : "Shiga cikin asusunka domin amfani da Bindawasub.";
+  }
+
+  if (loginError) loginError.textContent = "";
+  if (registerMessage) registerMessage.textContent = "";
+
+  if (mode === "profile") {
+    const email = options.email || "";
+    const emailInput = document.getElementById("profileEmail");
+    const nameInput = document.getElementById("profileName");
+    if (emailInput) emailInput.value = email;
+    if (nameInput) setTimeout(() => nameInput.focus(), 0);
+  }
+}
+
 function showLoginForm() {
-  document.getElementById("loginForm").style.display = "block";
-  document.getElementById("registerForm").style.display = "none";
-  document.getElementById("authSubtitle").textContent =
-    "Shiga cikin asusunka domin amfani da Bindawasub.";
-  document.getElementById("loginError").textContent = "";
-  document.getElementById("registerMessage").textContent = "";
+  setAuthScreen("login");
 }
 
 function showProfileCompletionForm(email = "") {
-  document.getElementById("loginForm").style.display = "none";
-  document.getElementById("registerForm").style.display = "none";
-  document.getElementById("profileCompletionForm").style.display = "block";
-  document.getElementById("authSubtitle").textContent =
-    "Complete your Bindawasub profile to continue.";
-  document.getElementById("loginError").textContent = "";
-  document.getElementById("registerMessage").textContent = "";
-  document.getElementById("profileEmail").value = email || "";
-  document.getElementById("profileName").focus();
+  setAuthScreen("profile", { email });
 }
 
 function hideProfileCompletionForm() {
-  document.getElementById("profileCompletionForm").style.display = "none";
+  setAuthScreen("login");
 }
 
 async function completeProfile() {
@@ -87,12 +119,7 @@ async function completeProfile() {
 }
 
 function showRegisterForm() {
-  document.getElementById("loginForm").style.display = "none";
-  document.getElementById("registerForm").style.display = "block";
-  document.getElementById("authSubtitle").textContent =
-    "Create your Bindawasub customer account.";
-  document.getElementById("loginError").textContent = "";
-  document.getElementById("registerMessage").textContent = "";
+  setAuthScreen("register");
 }
 
 async function registerUser() {
