@@ -23,7 +23,6 @@
   }
   async function login(e){
     e?.preventDefault();e?.stopPropagation();
-    window.location.replace("../");
     const email=document.getElementById("email")?.value.trim();
     const password=document.getElementById("password")?.value||"";
     const btn=document.getElementById("loginBtn");
