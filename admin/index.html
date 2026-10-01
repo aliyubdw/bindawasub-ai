@@ -97,10 +97,10 @@
 <div class="card"><div class="section-title"><h2>Networks</h2><button id="newNetwork">+ Add Network</button></div>
 <div class="grid2"><div class="field"><label>Filter by Service</label><select id="networkService"></select></div><div><span class="muted">Networks belong to a service. Example: Data → MTN, Airtel, Glo, 9mobile.</span></div></div>
 <div id="networkMsg"></div><div class="table-wrap"><table><thead><tr><th>Network</th><th>Code</th><th>Service</th><th>Status</th><th>Action</th></tr></thead><tbody id="networkRows"></tbody></table></div></div>
-<div class="card"><div class="section-title"><h2>Service Variants / Channels</h2><button id="newVariant">+ Add Variant</button></div>
+<div class="card"><div class="section-title"><div><h2>Data Types</h2><p class="muted">Create, edit and enable/disable data types for each network service. A data type can be network-specific or available to all networks within its service.</p></div><button id="newVariant">+ Add Data Type</button></div>
 <div class="grid2"><div class="field"><label>Service</label><select id="variantService"></select></div><div class="field"><label>Network</label><select id="variantNetwork"></select></div></div>
-<div id="variantMsg"></div><div class="table-wrap"><table><thead><tr><th>Variant</th><th>Code</th><th>Network</th><th>Service</th><th>Status</th><th>Action</th></tr></thead><tbody id="variantRows"></tbody></table></div>
-<p class="muted">Examples: SME, Gifting, CG, Promo. Variants remain configurable so new provider-specific channels do not require a schema redesign.</p></div>
+<div id="variantMsg"></div><div class="table-wrap"><table><thead><tr><th>Data Type</th><th>Code</th><th>Network</th><th>Service</th><th>Status</th><th>Action</th></tr></thead><tbody id="variantRows"></tbody></table></div>
+<p class="muted">Examples: SME Data, Gifting, Corporate Gifting, Direct, Night Data. Disabled data types cannot be assigned to new data plans.</p></div>
 </section>
 
 <section id="products" class="panel">
@@ -186,7 +186,7 @@
 <script src="./js/overview.js?v=20260929-4"></script>
 <script src="./js/services.js"></script>
 <script src="./js/providers.js"></script>
-<script src="./js/products.js?v=20261001-3?v=20261001-1"></script>
+<script src="./js/products.js?v=20261001-4"></script>
 <script src="./js/endpoints.js"></script>
 <script src="./js/mappings.js"></script>
 <script src="./js/transactions.js"></script>
