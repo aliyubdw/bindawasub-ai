@@ -3,13 +3,40 @@
 async function loadServices(){
   try{
     const d=await admin({action:"list_services"}); services=d.services||[];
-    $("serviceRows").innerHTML=services.map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\''+s.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No services configured.</td></tr>';
+    $("serviceRows").innerHTML=services.filter(s=>catalogMode==="network"?isNetworkService(s):!isNetworkService(s)).map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\''+s.id+'\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No services configured.</td></tr>';
     refreshServiceFieldServiceOptions();
     await loadProviderServices();
     await loadProviderServiceOperations();
     await loadServiceFields();
     await loadCatalogDimensions();
   }catch(e){msg($("serviceMsg"),e.message,"error")}
+}
+
+function isNetworkService(service){
+  const code=String(service?.code||"").trim().toLowerCase();
+  const name=String(service?.name||"").trim().toLowerCase();
+  return code==="data" || code==="airtime" || name==="data" || name==="airtime" || code.includes("data") || code.includes("airtime");
+}
+
+function setCatalogMode(mode){
+  catalogMode=mode==="other"?"other":"network";
+  document.querySelectorAll("[data-catalog-mode]").forEach(button=>{
+    const active=button.dataset.catalogMode===catalogMode;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-selected",active?"true":"false");
+  });
+  document.querySelectorAll("#services .card").forEach(card=>{
+    const heading=card.querySelector(".section-title h2")?.textContent?.trim()||"";
+    const networkOnly=heading==="Networks" || heading==="Service Variants / Channels";
+    card.style.display=(catalogMode==="other" && networkOnly)?"none":"";
+  });
+  renderServicesForCatalog();
+  if(typeof renderProducts==="function") renderProducts();
+}
+
+function renderServicesForCatalog(){
+  const rows=services.filter(s=>catalogMode==="network"?isNetworkService(s):!isNetworkService(s));
+  $("serviceRows").innerHTML=rows.map(s=>'<tr><td><strong>'+escapeHtml(s.name)+'</strong></td><td>'+escapeHtml(s.code)+'</td><td>'+escapeHtml(s.category||"—")+'</td><td><span class="badge '+(s.active?"on":"off")+'">'+(s.active?"Active":"Inactive")+'</span></td><td><button class="secondary" onclick="editService(\\''+s.id+'\\')">Edit</button></td></tr>').join("")||'<tr><td colspan="5" class="muted">No '+(catalogMode==="network"?"network":"other")+' services configured.</td></tr>';
 }
 
 async function openService(s){
