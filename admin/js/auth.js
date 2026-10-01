@@ -41,7 +41,8 @@
       box.innerHTML='<div class="msg info">Verifying admin access…</div>';
       await verify(data.session);
       showApp();
-      if(window.loadAll)await window.loadAll();
+      box.innerHTML="";
+      if(window.loadAll) await window.loadAll();
     }catch(err){
       await sb.auth.signOut({scope:"local"}).catch(()=>{});
       box.innerHTML='<div class="msg error">'+escapeHtml(err.message||"Login failed.")+'</div>';
@@ -91,7 +92,6 @@
     const btn=document.getElementById("loginBtn");
     const logoutBtn=document.getElementById("logout");
     form?.addEventListener("submit",login,true);
-    btn?.addEventListener("click",login,true);
     logoutBtn?.addEventListener("click",logout,true);
     document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.addEventListener("click",function(){
       document.querySelectorAll(".nav button[data-tab]").forEach(x=>x.classList.remove("active"));
