@@ -38,218 +38,141 @@ function renderProducts(){
 function refreshDataPlanNetworkOptions(){const select=$("dataPlanNetworkFilter");if(!select)return;const dataService=services.find(s=>String(s.code||"").toLowerCase()==="data"||String(s.name||"").toLowerCase()==="data");const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);const current=select.value;select.innerHTML='<option value="">All networks</option>'+dataNetworks.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+' — '+escapeHtml(n.id)+'</option>').join("");if(dataNetworks.some(n=>n.id===current))select.value=current;}
 
 async function openProduct(p){
-  $("modalTitle").textContent=p?"Edit Product / Plan":"Add Product / Plan";
-  $("modalBody").innerHTML=`
+  $("modalTitle").textContent=p?"Edit Data Plan":"Add Data Plan";
+  $("modalBody").innerHTML=\`
     <div class="grid2">
-      <div class="field"><label>Product name</label><input id="xName"></div>
-      <div class="field"><label>SKU</label><input id="xSku"></div>
+      <div class="field"><label>Network *</label><select id="xNetwork"><option value="">— select network —</option></select></div>
+      <div class="field"><label>Data Type *</label><select id="xVariant"><option value="">— select data type —</option></select></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Service type</label><select id="xService">${services.map(s=>'<option value="'+s.code+'">'+escapeHtml(s.name)+'</option>').join("")}</select></div>
-      <div class="field"><label>Network</label><select id="xNetwork"><option value="">— none —</option></select></div>
+      <div class="field"><label>Plan Size *</label><input id="xPlanSize" type="number" min="0" step="0.01" placeholder="e.g. 1"></div>
+      <div class="field"><label>Plan Volume *</label><select id="xPlanVolume"><option value="MB">MB</option><option value="GB">GB</option></select></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Data Type</label><select id="xVariant"><option value="">— select data type —</option></select></div>
-      <div class="field"><label>Volume / amount</label><input id="xVolume" placeholder="e.g. 1 GB or ₦1000"></div>
+      <div class="field"><label>Plan Validity *</label><input id="xValidity" placeholder="e.g. 30 Days"></div>
+      <div class="field"><label>Amount (Price) ₦ *</label><input id="xSell" type="number" min="0" step=".01"></div>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Validity type</label><select id="xValidityType"><option value="fixed">Fixed</option><option value="none">Not applicable</option><option value="unlimited">Unlimited</option><option value="dynamic">Dynamic</option></select></div>
-      <div class="field"><label>Validity value</label><input id="xValidityValue" type="number" min="0" step="0.01" placeholder="e.g. 30"></div>
-    </div>
-    <div class="field"><label>Validity unit</label><input id="xValidityUnit" placeholder="days, hours, months, years"></div>
-    <div class="grid2">
-      <div class="field"><label>Display order</label><input id="xOrder" type="number"></div><div></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Selling price (₦)</label><input id="xSell" type="number" min="0" step=".01"></div>
-      <div class="field"><label>Cost price (₦)</label><input id="xCost" type="number" min="0" step=".01"></div>
-    </div>
-    <div class="field"><label><input id="xActive" type="checkbox" style="width:auto"> Active</label></div>
-
+    <div class="field"><label>Purchase Price ₦ *</label><input id="xCost" type="number" min="0" step=".01"></div>
     <div id="providerMappingSection" class="field" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
-        <div>
-          <strong>Provider Plan IDs</strong>
-          <div class="muted">Choose the connected provider API and the exact plan ID supplied by that provider.</div>
-        </div>
+        <div><strong>Providers</strong><div class="muted">Select a connected provider and enter its exact Data Plan ID.</div></div>
         <button type="button" id="addProviderMapping" class="secondary">+ Add Provider</button>
       </div>
       <div id="providerMappingRows"></div>
       <div id="providerMappingMsg" class="muted"></div>
     </div>
+    <div class="field"><label><input id="xActive" type="checkbox" style="width:auto"> Active</label></div>
+    <button id="saveProduct">Save Data Plan</button>
+  \`;
 
-    <button id="saveProduct">Save Product / Plan</button>
-  `;
+  const dataService=services.find(s=>String(s.code||"").toLowerCase()==="data"||String(s.name||"").toLowerCase()==="data");
+  const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);
+  const existingSize=p?.product_name ? String(p.product_name).match(/^\\s*([\\d.]+)/)?.[1] : "";
+  const existingUnit=String(p?.volume||"").match(/(MB|GB)\\b/i)?.[1]?.toUpperCase() || String(p?.product_name||"").match(/(MB|GB)\\b/i)?.[1]?.toUpperCase() || "GB";
+  const existingValidity=[p?.validity_value,p?.validity_unit].filter(Boolean).join(" ");
 
-  $("xName").value=p?.product_name||"";
-  $("xSku").value=p?.sku||"";
-  $("xService").value=p?.service_type||services[0]?.code||"";
-  $("xVolume").value=p?.volume||"";
-  $("xValidityType").value=p?.validity_type||"fixed";
-  $("xValidityValue").value=p?.validity_value??"";
-  $("xValidityUnit").value=p?.validity_unit||"";
+  $("xNetwork").innerHTML='<option value="">— select network —</option>'+dataNetworks.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");
+  $("xNetwork").value=p?.network_id||"";
+  $("xPlanSize").value=existingSize||"";
+  $("xPlanVolume").value=existingUnit;
+  $("xValidity").value=existingValidity;
   $("xSell").value=p?.selling_price??"";
   $("xCost").value=p?.cost_price??"";
-  $("xOrder").value=p?.display_order??100;
   $("xActive").checked=p?.active!==false;
 
   let providerCatalog=[];
-
   async function loadProviderCatalog(){
-    providerCatalog=[];
-    const activeProviders=providers.filter(provider=>provider.status==="active");
-    const results=await Promise.all(activeProviders.map(async provider=>{
-      try{
-        const d=await admin({action:"list_endpoints",provider_id:provider.id});
-        const endpoints=(d.endpoints||[]).filter(e=>
-          e.active &&
-          String(e.operation||"").toLowerCase()==="purchase" &&
-          String(e.service_type||"").toLowerCase()==="data"
-        );
-        return endpoints.length?{provider,endpoints}:null;
-      }catch{return null}
-    }));
-    providerCatalog=results.filter(Boolean);
+    try{
+      const d=await admin({action:"list_providers"});
+      providerCatalog=(d.providers||[]).filter(provider=>provider.status==="active");
+    }catch{
+      providerCatalog=providers.filter(provider=>provider.status==="active");
+    }
   }
-
   await loadProviderCatalog();
 
   function providerOptions(selected=""){
     return '<option value="">— select provider —</option>'+
-      providerCatalog.map(x=>'<option value="'+x.provider.id+'" '+(selected===x.provider.id?"selected":"")+'>'+escapeHtml(x.provider.name)+' ('+escapeHtml(x.provider.code||"") +')</option>').join("");
-  }
-
-  function endpointOptions(providerId,selected=""){
-    const item=providerCatalog.find(x=>x.provider.id===providerId);
-    const endpoints=item?.endpoints||[];
-    return '<option value="">Automatic purchase endpoint</option>'+
-      endpoints.map(e=>'<option value="'+e.id+'" '+(selected===e.id?"selected":"")+'>'+escapeHtml(e.method||"POST")+' '+escapeHtml(e.path||"")+'</option>').join("");
+      providerCatalog.map(provider=>'<option value="'+provider.id+'" '+(selected===provider.id?"selected":"")+'>'+escapeHtml(provider.name)+' ('+escapeHtml(provider.code||"") +')</option>').join("");
   }
 
   function addProviderMappingRow(mapping=null){
     const row=document.createElement("div");
     row.className="provider-mapping-row";
-    row.style.cssText="display:grid;grid-template-columns:minmax(150px,1fr) minmax(150px,1fr) minmax(120px,.8fr) 90px 34px;gap:7px;align-items:end;margin-bottom:8px";
+    row.style.cssText="display:grid;grid-template-columns:minmax(160px,1fr) minmax(160px,1fr) 34px;gap:8px;align-items:end;margin-bottom:8px";
     row.dataset.mappingId=mapping?.id||"";
-    row.innerHTML=`
-      <div class="field"><label>Provider</label><select class="pm-provider">${providerOptions(mapping?.provider_id||"")}</select></div>
-      <div class="field"><label>Provider Plan ID</label><input class="pm-plan-id" placeholder="e.g. provider's exact plan ID" value="${escapeHtml(mapping?.provider_plan_id||"")}"></div>
-      <div class="field"><label>Provider cost</label><input class="pm-cost" type="number" min="0" step=".01" value="${mapping?.provider_cost??""}"></div>
-      <div class="field"><label>Priority</label><input class="pm-priority" type="number" min="0" value="${mapping?.priority??100}"></div>
-      <button type="button" class="secondary pm-remove" aria-label="Remove provider mapping">×</button>
-      <div class="field pm-endpoint-wrap" style="grid-column:1/-1"><label>Purchase endpoint</label><select class="pm-endpoint">${endpointOptions(mapping?.provider_id||"",mapping?.endpoint_id||"")}</select></div>
-    `;
-    const providerSelect=row.querySelector(".pm-provider");
-    const endpointSelect=row.querySelector(".pm-endpoint");
-    providerSelect.onchange=()=>{
-      endpointSelect.innerHTML=endpointOptions(providerSelect.value,"");
-      if(!providerSelect.value){
-        endpointSelect.disabled=true;
-        endpointSelect.value="";
-      }else{
-        endpointSelect.disabled=false;
-      }
-    };
+    row.innerHTML=\`
+      <div class="field"><label>Provider</label><select class="pm-provider">\${providerOptions(mapping?.provider_id||"")}</select></div>
+      <div class="field"><label>Plan ID</label><input class="pm-plan-id" placeholder="e.g. 424" value="\${escapeHtml(mapping?.provider_plan_id||"")}"></div>
+      <button type="button" class="secondary pm-remove" aria-label="Remove provider">×</button>
+    \`;
     row.querySelector(".pm-remove").onclick=()=>{
-      if(row.dataset.mappingId){
-        row.dataset.removed="true";
-        row.style.display="none";
-      }else{
-        row.remove();
-      }
+      if(row.dataset.mappingId){ row.dataset.removed="true"; row.style.display="none"; }
+      else row.remove();
     };
-    endpointSelect.disabled=!mapping?.provider_id;
     $("providerMappingRows").appendChild(row);
   }
 
-  if($("xService").value.toLowerCase()==="data"){
-    $("providerMappingSection").style.display="block";
-    if(providerCatalog.length){
-      if(p?.id){
-        try{
-          const d=await admin({action:"list_mappings",product_id:p.id});
-          const mappings=(d.mappings||[]).filter(m=>m.active);
-          mappings.forEach(m=>addProviderMappingRow(m));
-          if(!mappings.length) addProviderMappingRow();
-        }catch{
-          addProviderMappingRow();
-          $("providerMappingMsg").textContent="Existing provider mappings could not be loaded.";
-        }
-      }else{
-        addProviderMappingRow();
-      }
-    }else{
-      $("providerMappingRows").innerHTML='<div class="muted">No active provider has a Data purchase API endpoint configured yet. Add a provider and Data purchase endpoint first.</div>';
+  if(p?.id){
+    try{
+      const d=await admin({action:"list_mappings",product_id:p.id});
+      const mappings=(d.mappings||[]).filter(m=>m.active);
+      mappings.forEach(m=>addProviderMappingRow(m));
+      if(!mappings.length) addProviderMappingRow();
+    }catch{
+      addProviderMappingRow();
+      $("providerMappingMsg").textContent="Existing provider mappings could not be loaded.";
     }
-  }else{
-    $("providerMappingSection").style.display="none";
-  }
+  }else addProviderMappingRow();
 
-  $("addProviderMapping").onclick=()=>{if(providerCatalog.length)addProviderMappingRow();};
-
-  await populateProductDimensions(p?.network_id||"",p?.variant_id||"");
-  $("xService").onchange=async()=>{
-    await populateProductDimensions("","");
-    if($("xService").value.toLowerCase()==="data"){
-      await loadProviderCatalog();
-      $("providerMappingSection").style.display="block";
-      $("providerMappingRows").innerHTML="";
-      if(providerCatalog.length) addProviderMappingRow();
-      else $("providerMappingRows").innerHTML='<div class="muted">No active provider has a Data purchase API endpoint configured yet. Add a provider and Data purchase endpoint first.</div>';
-    }else{
-      $("providerMappingSection").style.display="none";
-    }
-  };
-  $("xNetwork").onchange=()=>populateProductVariants($("xService").value,$("xNetwork").value,"");
+  $("addProviderMapping").onclick=()=>addProviderMappingRow();
+  await populateProductVariants("data",$("xNetwork").value,p?.variant_id||"");
+  $("xNetwork").onchange=()=>populateProductVariants("data",$("xNetwork").value,"");
   $("modal").classList.remove("hidden");
 
   $("saveProduct").onclick=async()=>{
     try{
+      const size=String($("xPlanSize").value||"").trim();
+      const unit=String($("xPlanVolume").value||"").trim().toUpperCase();
+      const validity=String($("xValidity").value||"").trim();
+      const validityMatch=validity.match(/^(\\d+(?:\\.\\d+)?)\\s*([A-Za-z]+)$/);
+      if(!size||!Number.isFinite(Number(size))||Number(size)<0) throw new Error("Plan Size is required and must be a number.");
+      if(!["MB","GB"].includes(unit)) throw new Error("Plan Volume must be MB or GB.");
+      if(!validityMatch) throw new Error("Plan Validity must be entered like 30 Days.");
+      if(!$("xNetwork").value) throw new Error("Network is required.");
+      if(!$("xVariant").value) throw new Error("Data Type is required.");
+
+      const planName=size+" "+unit;
+      const networkName=String($("xNetwork").selectedOptions[0]?.textContent||"NETWORK").split(" — ")[0];
+      const sku="DATA-"+networkName.replace(/[^A-Za-z0-9]+/g,"-").toUpperCase()+"-"+size+"-"+unit;
+
       const saved=await admin({
-        action:"save_product",id:p?.id,product_name:$("xName").value,sku:$("xSku").value,
-        service_type:$("xService").value,network_id:$("xNetwork").value||null,variant_id:$("xVariant").value||null,
-        volume:$("xVolume").value,validity_type:$("xValidityType").value,validity_value:$("xValidityValue").value,
-        validity_unit:$("xValidityUnit").value,selling_price:$("xSell").value,cost_price:$("xCost").value,
-        display_order:$("xOrder").value,active:$("xActive").checked
+        action:"save_product",id:p?.id,product_name:planName,sku,service_type:"data",
+        network_id:$("xNetwork").value,variant_id:$("xVariant").value,volume:unit,
+        validity_type:"fixed",validity_value:validityMatch[1],validity_unit:validityMatch[2].toLowerCase(),
+        selling_price:$("xSell").value,cost_price:$("xCost").value,display_order:p?.display_order??100,active:$("xActive").checked
       });
 
       const productId=saved?.product?.id||p?.id;
-      if($("xService").value.toLowerCase()==="data"&&productId&&providerCatalog.length){
+      if(productId){
         const rows=Array.from(document.querySelectorAll("#providerMappingRows .provider-mapping-row"));
         for(const row of rows){
           const providerId=row.querySelector(".pm-provider")?.value||"";
           const planId=row.querySelector(".pm-plan-id")?.value.trim()||"";
           if(row.dataset.removed==="true"){
-            if(row.dataset.mappingId){
-              await admin({action:"save_mapping",id:row.dataset.mappingId,product_id:productId,provider_id:providerId,provider_plan_id:planId||"removed",provider_plan_name:$("xName").value,provider_cost:row.querySelector(".pm-cost")?.value||"",priority:row.querySelector(".pm-priority")?.value||100,provider_status:"inactive",active:false,metadata:{source:"data_plan_catalog"}});
-            }
+            if(row.dataset.mappingId) await admin({action:"save_mapping",id:row.dataset.mappingId,product_id:productId,provider_id:providerId,provider_plan_id:planId||"removed",provider_plan_name:planName,provider_cost:$("xCost").value||"",priority:100,provider_status:"inactive",active:false,metadata:{source:"data_plan_catalog"}});
             continue;
           }
           if(!providerId&&!planId) continue;
-          if(!providerId||!planId) throw new Error("Every provider mapping must have both a provider and Provider Plan ID.");
-          await admin({
-            action:"save_mapping",
-            id:row.dataset.mappingId||undefined,
-            product_id:productId,
-            provider_id:providerId,
-            endpoint_id:row.querySelector(".pm-endpoint")?.value||null,
-            provider_plan_id:planId,
-            provider_plan_name:$("xName").value,
-            provider_cost:row.querySelector(".pm-cost")?.value||"",
-            priority:row.querySelector(".pm-priority")?.value||100,
-            provider_status:"active",
-            active:true,
-            metadata:{source:"data_plan_catalog"}
-          });
+          if(!providerId||!planId) throw new Error("Each provider entry needs a provider and its Plan ID.");
+          await admin({action:"save_mapping",id:row.dataset.mappingId||undefined,product_id:productId,provider_id:providerId,endpoint_id:null,provider_plan_id:planId,provider_plan_name:planName,provider_cost:$("xCost").value||"",priority:100,provider_status:"active",active:true,metadata:{source:"data_plan_catalog"}});
         }
       }
-
       $("modal").classList.add("hidden");
       await loadProducts();
     }catch(e){msg($("modalMsg"),e.message,"error")}
   };
 }
-
 async function populateProductDimensions(networkId="",variantId=""){
   const sid=$("xService").value;
   const ns=networks.filter(n=>n.service_id===sid);
