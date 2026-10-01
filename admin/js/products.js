@@ -260,24 +260,17 @@ async function populateProductDimensions(networkId="",variantId=""){
 
 async function populateProductVariants(serviceId,networkId="",variantId=""){
   const selectedVariant=variants.find(v=>v.id===variantId);
-  const vs=variants.filter(v=>{
-    if(v.active===false || v.service_id!==serviceId) return false;
-    // A service-wide Data Type (network_id = null) is available to every
-    // network in that service. A network-specific Data Type is available
-    // only for its assigned network.
-    return !v.network_id || !networkId || v.network_id===networkId;
-  });
+  const vs=variants.filter(v=>
+    v.active!==false &&
+    v.service_id===serviceId &&
+    Boolean(v.network_id) &&
+    Boolean(networkId) &&
+    v.network_id===networkId
+  );
 
   $("xVariant").innerHTML='<option value="">— select data type —</option>'+
-    vs.map(v=>{
-      const scope=v.network_id
-        ? (v.service_networks?.name||"Selected network")
-        : "All networks";
-      return '<option value="'+v.id+'">'+escapeHtml(v.name)+' — '+escapeHtml(scope)+'</option>';
-    }).join("");
+    vs.map(v=>'<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>').join("");
 
-  // Never keep a Data Type selected if it is not valid for the current
-  // service/network combination.
   const validSelected=selectedVariant && vs.some(v=>v.id===selectedVariant.id);
   $("xVariant").value=validSelected ? selectedVariant.id : "";
 }
