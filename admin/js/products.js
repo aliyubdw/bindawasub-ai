@@ -62,18 +62,25 @@ async function openProduct(p){
   $("xActive").checked=p?.active!==false;
 
   let providerCatalog=[];
-  const activeProviders=providers.filter(provider=>provider.status==="active");
 
-  if(String($("xService").value).toLowerCase()==="data"){
+  async function loadProviderCatalog(){
+    providerCatalog=[];
+    const activeProviders=providers.filter(provider=>provider.status==="active");
     const results=await Promise.all(activeProviders.map(async provider=>{
       try{
         const d=await admin({action:"list_endpoints",provider_id:provider.id});
-        const endpoints=(d.endpoints||[]).filter(e=>e.active&&String(e.operation||"").toLowerCase()==="purchase"&&String(e.service_type||"").toLowerCase()==="data");
+        const endpoints=(d.endpoints||[]).filter(e=>
+          e.active &&
+          String(e.operation||"").toLowerCase()==="purchase" &&
+          String(e.service_type||"").toLowerCase()==="data"
+        );
         return endpoints.length?{provider,endpoints}:null;
       }catch{return null}
     }));
     providerCatalog=results.filter(Boolean);
   }
+
+  await loadProviderCatalog();
 
   function providerOptions(selected=""){
     return '<option value="">— select provider —</option>'+
@@ -149,8 +156,11 @@ async function openProduct(p){
   $("xService").onchange=async()=>{
     await populateProductDimensions("","");
     if($("xService").value.toLowerCase()==="data"){
+      await loadProviderCatalog();
       $("providerMappingSection").style.display="block";
-      if(providerCatalog.length&&!$("providerMappingRows").children.length) addProviderMappingRow();
+      $("providerMappingRows").innerHTML="";
+      if(providerCatalog.length) addProviderMappingRow();
+      else $("providerMappingRows").innerHTML='<div class="muted">No active provider has a Data purchase API endpoint configured yet. Add a provider and Data purchase endpoint first.</div>';
     }else{
       $("providerMappingSection").style.display="none";
     }
