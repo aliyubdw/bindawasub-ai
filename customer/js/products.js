@@ -1,96 +1,63 @@
 // Bindawasub AI — products, recipient validation and order confirmation
 
 function showProducts(products) {
+  const messages = document.getElementById("messages");
+  if (!messages || !Array.isArray(products) || !products.length) return;
 
-  const messages =
-    document.getElementById("messages");
+  const productList = document.createElement("div");
+  productList.className = "product-list";
 
-  const productList =
-    document.createElement("div");
+  const heading = document.createElement("div");
+  heading.className = "product-list-heading";
+  heading.innerHTML = `
+    <span class="product-network-icon">📶</span>
+    <span><strong>MTN Data Plans</strong><small>Choose a package</small></span>
+  `;
+  productList.appendChild(heading);
 
-  productList.className =
-    "product-list";
-
+  const grid = document.createElement("div");
+  grid.className = "product-grid";
 
   products.forEach(product => {
+    const card = document.createElement("button");
+    card.className = "product-card";
+    card.type = "button";
 
-    const card =
-      document.createElement("button");
-
-    card.className =
-      "product-card";
-
-    card.type =
-      "button";
-
+    const name = String(product.product_name || "Data");
+    const duration = String(product.duration || "30 Days");
+    const price = Number(product.selling_price || 0).toLocaleString();
 
     card.innerHTML = `
-
-      <div class="product-name">
-        ${product.product_name}
-      </div>
-
-      <div class="product-details">
-        ${product.duration || ""}
-      </div>
-
-      <div class="product-price">
-        ₦${Number(product.selling_price).toLocaleString()}
-      </div>
-
+      <span class="product-network">MTN</span>
+      <span class="product-name">${name}</span>
+      <span class="product-details">${duration}</span>
+      <span class="product-price">₦${price}</span>
+      <span class="product-select">Select</span>
     `;
 
-
-    /* =========================================
-       PACKAGE CLICK
-    ========================================= */
-
     card.onclick = function() {
-
       BindawasubCustomerState.selectedProduct = product;
-
       BindawasubCustomerState.waitingForPhone = true;
-
       BindawasubCustomerState.waitingForConfirmation = false;
 
-
+      addMessage(`Na zabi ${product.product_name}`, "user");
       addMessage(
-        `Na zabi ${product.product_name}`,
-        "user"
-      );
-
-
-      addMessage(
-        `Ka turo min lambar wayar da za a saka data.
-
-Misali: 08012345678`,
+        `Ka turo min lambar wayar da za a saka data.\\n\\nMisali: 08012345678`,
         "bot"
       );
 
-
-      const input =
-        document.getElementById("messageInput");
-
-      input.placeholder =
-        "Shigar da lambar wayar...";
-
+      const input = document.getElementById("messageInput");
+      input.placeholder = "Shigar da lambar wayar...";
       input.focus();
-
-
       productList.remove();
-
     };
 
-
-    productList.appendChild(card);
-
+    grid.appendChild(card);
   });
 
-
+  productList.appendChild(grid);
   messages.appendChild(productList);
-
-  messages.scrollTop =
-    messages.scrollHeight;
+  messages.scrollTop = messages.scrollHeight;
 }
 
 function validatePhone(phone) {
