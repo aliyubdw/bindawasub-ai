@@ -144,7 +144,17 @@ async function openProduct(p){
 
       const planName=size+" "+unit;
       const networkName=String($("xNetwork").selectedOptions[0]?.textContent||"NETWORK").split(" — ")[0];
-      const sku="DATA-"+networkName.replace(/[^A-Za-z0-9]+/g,"-").toUpperCase()+"-"+size+"-"+unit;
+      const selectedVariantId=String($("xVariant").value||"");
+      const selectedVariant=variants.find(v=>String(v.id)===selectedVariantId);
+      const variantCode=String(selectedVariant?.code||selectedVariant?.name||"DATA")
+        .replace(/[^A-Za-z0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"")
+        .toUpperCase() || "DATA";
+      const networkCode=String(dataNetworks.find(n=>String(n.id)===String($("xNetwork").value))?.code||networkName)
+        .replace(/[^A-Za-z0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"")
+        .toUpperCase() || "NETWORK";
+      const sku="DATA-"+networkCode+"-"+variantCode+"-"+size+"-"+unit;
 
       const saved=await admin({
         action:"save_product",id:p?.id,product_name:planName,sku,service_type:"data",
