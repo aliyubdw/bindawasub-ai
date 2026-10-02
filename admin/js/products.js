@@ -197,6 +197,7 @@ async function openProduct(p){
       const productId=saved?.product?.id||p?.id;
       if(productId){
         const rows=Array.from(document.querySelectorAll("#providerMappingRows .provider-mapping-row"));
+        const submittedKeys=new Set();
         for(const row of rows){
           const providerId=row.querySelector(".pm-provider")?.value||"";
           const planId=row.querySelector(".pm-plan-id")?.value.trim()||"";
@@ -206,6 +207,9 @@ async function openProduct(p){
           }
           if(!providerId&&!planId) continue;
           if(!providerId||!planId) throw new Error("Each provider entry needs a provider and its Plan ID.");
+          const mappingKey=providerId+"::"+planId.toLowerCase();
+          if(submittedKeys.has(mappingKey)) continue;
+          submittedKeys.add(mappingKey);
           await admin({action:"save_mapping",id:row.dataset.mappingId||undefined,product_id:productId,provider_id:providerId,endpoint_id:null,provider_plan_id:planId,provider_plan_name:planName,provider_cost:$("xCost").value||"",priority:100,provider_status:"active",active:true,metadata:{source:"data_plan_catalog"}});
         }
       }
