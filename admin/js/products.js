@@ -13,6 +13,34 @@ async function loadProducts(){try{
   renderProducts();
 }catch(e){msg($("productMsg"),e.message,"error")}}
 
+function formatValidity(value,unit){
+  const normalizedValue=Number(value);
+  const normalizedUnit=String(unit||"").trim().toLowerCase();
+  if(!Number.isFinite(normalizedValue)||!normalizedUnit)return "—";
+
+  const singular={
+    days:"Day",
+    day:"Day",
+    weeks:"Week",
+    week:"Week",
+    months:"Month",
+    month:"Month",
+    years:"Year",
+    year:"Year"
+  };
+  const label=singular[normalizedUnit];
+  if(!label)return String(value)+" "+String(unit);
+
+  if(normalizedValue===1){
+    if(normalizedUnit==="weeks"||normalizedUnit==="week")return "Weekly";
+    if(normalizedUnit==="months"||normalizedUnit==="month")return "Monthly";
+    if(normalizedUnit==="days"||normalizedUnit==="day")return "Daily";
+    if(normalizedUnit==="years"||normalizedUnit==="year")return "Yearly";
+  }
+
+  return String(value)+" "+(normalizedValue===1?label:label+"s");
+}
+
 function renderProducts(){
   const networkFilter=$("dataPlanNetworkFilter")?.value||"";
   const visibleProducts=products.filter(p=>{
@@ -26,7 +54,7 @@ function renderProducts(){
   $("productRows").innerHTML=visibleProducts.map(p=>{
     const network=p.service_networks||{};
     const variant=p.service_variants||{};
-    const validity=[p.validity_value,p.validity_unit].filter(Boolean).join(" ")||"—";
+    const validity=formatValidity(p.validity_value,p.validity_unit);
     const mappings=providerMappings.filter(m=>m.product_id===p.id&&m.active);
     const providerText=mappings.length
       ? mappings.map(m=>escapeHtml((m.api_providers?.name||m.api_providers?.code||"Provider")+": "+(m.provider_plan_id||"—"))).join("<br>")
@@ -69,7 +97,7 @@ async function openProduct(p){
   const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);
   const existingSize=p?.product_name ? String(p.product_name).match(/^\s*([\d.]+)/)?.[1] : "";
   const existingUnit=String(p?.volume||"").match(/(MB|GB)\b/i)?.[1]?.toUpperCase() || String(p?.product_name||"").match(/(MB|GB)\b/i)?.[1]?.toUpperCase() || "GB";
-  const existingValidity=[p?.validity_value,p?.validity_unit].filter(Boolean).join(" ");
+  const existingValidity=formatValidity(p?.validity_value,p?.validity_unit);
 
   $("xNetwork").innerHTML='<option value="">— select network —</option>'+dataNetworks.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");
   $("xNetwork").value=p?.network_id||"";
