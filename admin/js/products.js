@@ -205,14 +205,22 @@ async function openProduct(p){
         .replace(/[^A-Za-z0-9]+/g,"-")
         .replace(/^-+|-+$/g,"")
         .toUpperCase() || "NETWORK";
-      const sku="DATA-"+networkCode+"-"+variantCode+"-"+size+"-"+unit;
+      // Include validity in the SKU so the same data amount can exist
+      // with different validity periods, e.g. 1GB Weekly and 1GB Monthly.
+      // Keep the existing SKU unchanged when editing an existing product.
+      const validitySkuPart = normalizedValidity
+        .replace(/[^a-z0-9]+/gi,"-")
+        .replace(/^-+|-+$/g,"")
+        .toUpperCase();
+      const generatedSku="DATA-"+networkCode+"-"+variantCode+"-"+size+"-"+unit+"-"+validitySkuPart;
+      const sku=p?.id && p?.sku ? String(p.sku) : generatedSku;
 
       const duplicate=products.find(product =>
         String(product.sku||"").toUpperCase()===sku.toUpperCase() &&
         String(product.id||"")!==String(p?.id||"")
       );
       if(duplicate){
-        throw new Error("A "+networkName+" "+planName+" product already exists for this Data Type. Use a different plan size, Data Type, or edit the existing product.");
+        throw new Error("A "+networkName+" "+planName+" product with the same validity already exists for this Data Type. Edit the existing product or use a different validity.");
       }
 
       const saved=await admin({
