@@ -1,112 +1,117 @@
-// Bindawasub Admin — persistent admin session management
+// Bindawasub Admin — single source of truth for the admin session gate.
+//
+// Flow:  main login ("../")  ->  /admin/  ->  getSession  ->  verify role=admin  ->  dashboard
+//
+// This page has NO login form of its own. Anyone who is signed out, or signed in
+// without the admin role, is sent back to the one login at "../". A failure while
+// loading dashboard data never signs the admin out and never shows a login screen.
 (function(){
-  function showApp(){
-    const login=document.getElementById("loginView");
-    const app=document.getElementById("app");
-    login?.classList.add("hidden");
-    login?.setAttribute("aria-hidden","true");
-    app?.classList.remove("hidden");
-    app?.setAttribute("aria-hidden","false");
+  const LOGIN_URL="../";
+  let view="booting";          // booting | dashboard | leaving
+  let started=false;
+
+  class GateError extends Error{ constructor(kind,message){ super(message); this.kind=kind; } }
+
+  const app=()=>document.getElementById("app");
+
+  function hideBanner(){ document.getElementById("adminGateBanner")?.remove(); }
+  function showBanner(text){
+    hideBanner();
+    const box=document.createElement("div");
+    box.id="adminGateBanner";
+    box.setAttribute("role","alert");
+    box.style.cssText="position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;max-width:92vw;background:#fff;border:1px solid #e0b4b4;border-radius:10px;padding:12px 16px;box-shadow:0 6px 24px rgba(0,0,0,.15);font:14px/1.4 system-ui,sans-serif;color:#222;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
+    const span=document.createElement("span"); span.textContent=text;
+    const retry=document.createElement("button"); retry.type="button"; retry.textContent="Retry";
+    retry.onclick=()=>{ hideBanner(); started=false; start(); };
+    const back=document.createElement("a"); back.href=LOGIN_URL; back.textContent="Back to login";
+    box.append(span,retry,back);
+    document.body.appendChild(box);
   }
-  function showLogin(){
-    const login=document.getElementById("loginView");
-    const app=document.getElementById("app");
-    login?.classList.remove("hidden");
-    login?.setAttribute("aria-hidden","false");
-    app?.classList.add("hidden");
-    app?.setAttribute("aria-hidden","true");
+
+  function showDashboard(){
+    if(view==="leaving") return;
+    view="dashboard";
+    hideBanner();
+    app()?.classList.remove("hidden");
   }
-  async function verify(session){
-    const r=await fetch(ADMIN_URL,{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "apikey":KEY,
-        "Authorization":"Bearer "+session.access_token
-      },
-      body:JSON.stringify({action:"dashboard_summary"})
-    });
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||d.success===false)throw Error(d.error||"Admin verification failed.");
+  function leave(){
+    if(view==="leaving") return;
+    view="leaving";
+    app()?.classList.add("hidden");
+    window.location.replace(LOGIN_URL);
   }
-  async function login(e){
-    e?.preventDefault();e?.stopPropagation();
-    const email=document.getElementById("email")?.value.trim();
-    const password=document.getElementById("password")?.value||"";
-    const btn=document.getElementById("loginBtn");
-    const box=document.getElementById("loginMsg");
-    if(!email||!password){
-      box.innerHTML='<div class="msg error">Email and password are required.</div>';
-      return false;
+
+  // Returns normally only for a verified admin. Throws GateError otherwise:
+  //   not_admin -> signed in, but not an admin (e.g. a customer)
+  //   auth      -> session invalid/expired and could not be refreshed
+  //   network / server -> could not decide; the session must be kept
+  async function verifyAdmin(session){
+    let accessToken=session.access_token;
+    for(let attempt=0; attempt<2; attempt++){
+      let r,d;
+      try{
+        r=await fetch(ADMIN_URL,{
+          method:"POST",
+          headers:{"Content-Type":"application/json","apikey":KEY,"Authorization":"Bearer "+accessToken},
+          body:JSON.stringify({action:"dashboard_summary"})
+        });
+        d=await r.json().catch(()=>({}));
+      }catch(e){
+        throw new GateError("network","Network problem while verifying admin access.");
+      }
+      if(r.ok && d.success!==false) return;
+      const msg=String(d.error||"");
+      if(/admin access required/i.test(msg)) throw new GateError("not_admin",msg);
+      if(r.status>=500 || !/session|token|authentication|expired|invalid|unauthor/i.test(msg))
+        throw new GateError("server",msg||"The server could not verify admin access.");
+      if(attempt===0){                      // looks like an expired access token: refresh once
+        const {data,error}=await sb.auth.refreshSession();
+        if(error||!data?.session) throw new GateError("auth","Session expired.");
+        accessToken=data.session.access_token;
+        continue;
+      }
+      throw new GateError("auth",msg||"Admin verification failed.");
     }
-    loginInProgress=true;
-    btn.disabled=true;
-    btn.textContent="Signing in…";
-    box.innerHTML='<div class="msg info">Authenticating…</div>';
+  }
+
+  async function start(){
+    if(started) return;
+    started=true;
     try{
-      const {data,error}=await sb.auth.signInWithPassword({email,password});
-      if(error)throw error;
-      if(!data.session)throw Error("No session was created.");
-      box.innerHTML='<div class="msg info">Verifying admin access…</div>';
-      await verify(data.session);
-      showApp();
-      box.innerHTML="";
+      const {data,error}=await sb.auth.getSession();
+      if(error) throw new GateError("server",error.message||"Unable to read session.");
+      if(!data.session){ leave(); return; }             // signed out -> the one login
+      await verifyAdmin(data.session);
+    }catch(err){
+      const kind=err?.kind;
+      if(kind==="not_admin"){ leave(); return; }        // keep their (customer) session
+      if(kind==="auth"){ await sb.auth.signOut({scope:"local"}).catch(()=>{}); leave(); return; }
+      console.error("Admin gate could not verify access:",err);
+      showBanner((err?.message||"Could not verify admin access.")+" Your session was kept.");
+      return;
+    }
+
+    showDashboard();                                    // verified admin -> dashboard, immediately
+    try{
       if(window.loadAll) await window.loadAll();
     }catch(err){
-      console.error("ADMIN_LOGIN_ERROR",err);
-      box.innerHTML='<div class="msg error">'+escapeHtml(err.message||"Login failed.")+'</div>';
-    }finally{
-      loginInProgress=false;
-      btn.disabled=false;
-      btn.textContent="Login";
+      // Never sign out or show a login screen because a dashboard module failed.
+      console.error("Admin dashboard load failed:",err);
+      showBanner("Some dashboard sections failed to load. Refresh to retry.");
     }
-    return false;
   }
+
   async function logout(e){
-    e?.preventDefault();e?.stopImmediatePropagation();
+    e?.preventDefault(); e?.stopImmediatePropagation();
     const btn=document.getElementById("logout");
-    if(btn){btn.disabled=true;btn.textContent="Logging out…";}
-    try{await sb.auth.signOut({scope:"local"});}catch(err){console.error("Admin logout failed:",err);}
-    window.location.replace("../");
+    if(btn){ btn.disabled=true; btn.textContent="Logging out…"; }
+    try{ await sb.auth.signOut({scope:"local"}); }catch(err){ console.error("Admin logout failed:",err); }
+    leave();
   }
-  let restoring=false;
-  let loginInProgress=false;
-  async function restore(){
-    if(restoring||loginInProgress)return;
-    restoring=true;
-    try{
-      if(loginInProgress)return;
-      const {data,error}=await sb.auth.getSession();
-      if(error)throw error;
-      if(!data.session){
-        showLogin();
-        return;
-      }
-      try{
-        await verify(data.session);
-      }catch(err){
-        console.error("ADMIN_RESTORE_VERIFY_ERROR",err);
-        showLogin();
-        const box=document.getElementById("loginMsg");
-        if(box) box.innerHTML='<div class="msg error">'+escapeHtml(err.message||"Admin verification failed.")+'</div>';
-        return;
-      }
-      showApp();
-      if(window.loadAll)await window.loadAll();
-    }catch(err){
-      console.error("Admin session restore:",err);
-      await sb.auth.signOut({scope:"local"}).catch(()=>{});
-      showLogin();
-    }finally{
-      restoring=false;
-    }
-  }
+
   function bind(){
-    const form=document.getElementById("loginForm");
-    const btn=document.getElementById("loginBtn");
-    const logoutBtn=document.getElementById("logout");
-    form?.addEventListener("submit",login,true);
-    logoutBtn?.addEventListener("click",logout,true);
+    document.getElementById("logout")?.addEventListener("click",logout,true);
     document.querySelectorAll(".nav button[data-tab]").forEach(b=>b.addEventListener("click",function(){
       document.querySelectorAll(".nav button[data-tab]").forEach(x=>x.classList.remove("active"));
       document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
@@ -114,11 +119,15 @@
       document.getElementById(b.dataset.tab)?.classList.add("active");
     },true));
   }
+
   window.addEventListener("error",e=>console.error("ADMIN_RUNTIME_ERROR",e.error||e.message));
   window.addEventListener("unhandledrejection",e=>console.error("ADMIN_UNHANDLED_REJECTION",e.reason));
-  window.BindawasubAuth={login,logout,restore};
+  window.BindawasubAuth={logout,restore:start};
+
   document.addEventListener("DOMContentLoaded",()=>{
     bind();
-    restore();
+    // Signing out anywhere (this tab or another) returns to the single login.
+    sb.auth.onAuthStateChange(event=>{ if(event==="SIGNED_OUT") leave(); });
+    start();
   });
 })();

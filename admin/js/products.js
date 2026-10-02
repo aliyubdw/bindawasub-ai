@@ -39,7 +39,7 @@ function refreshDataPlanNetworkOptions(){const select=$("dataPlanNetworkFilter")
 
 async function openProduct(p){
   $("modalTitle").textContent=p?"Edit Data Plan":"Add Data Plan";
-  $("modalBody").innerHTML=\`
+  $("modalBody").innerHTML=`
     <div class="grid2">
       <div class="field"><label>Network *</label><select id="xNetwork"><option value="">— select network —</option></select></div>
       <div class="field"><label>Data Type *</label><select id="xVariant"><option value="">— select data type —</option></select></div>
@@ -63,7 +63,7 @@ async function openProduct(p){
     </div>
     <div class="field"><label><input id="xActive" type="checkbox" style="width:auto"> Active</label></div>
     <button id="saveProduct">Save Data Plan</button>
-  \`;
+  `;
 
   const dataService=services.find(s=>String(s.code||"").toLowerCase()==="data"||String(s.name||"").toLowerCase()==="data");
   const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);
@@ -101,11 +101,11 @@ async function openProduct(p){
     row.className="provider-mapping-row";
     row.style.cssText="display:grid;grid-template-columns:minmax(160px,1fr) minmax(160px,1fr) 34px;gap:8px;align-items:end;margin-bottom:8px";
     row.dataset.mappingId=mapping?.id||"";
-    row.innerHTML=\`
-      <div class="field"><label>Provider</label><select class="pm-provider">\${providerOptions(mapping?.provider_id||"")}</select></div>
-      <div class="field"><label>Plan ID</label><input class="pm-plan-id" placeholder="e.g. 424" value="\${escapeHtml(mapping?.provider_plan_id||"")}"></div>
+    row.innerHTML=`
+      <div class="field"><label>Provider</label><select class="pm-provider">${providerOptions(mapping?.provider_id||"")}</select></div>
+      <div class="field"><label>Plan ID</label><input class="pm-plan-id" placeholder="e.g. 424" value="${escapeHtml(mapping?.provider_plan_id||"")}"></div>
       <button type="button" class="secondary pm-remove" aria-label="Remove provider">×</button>
-    \`;
+    `;
     row.querySelector(".pm-remove").onclick=()=>{
       if(row.dataset.mappingId){ row.dataset.removed="true"; row.style.display="none"; }
       else row.remove();

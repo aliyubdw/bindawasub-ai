@@ -23,7 +23,7 @@ const supabaseClient = window.supabase.createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storage: window.localStorage,
-      storageKey: "bindawasub-customer-auth"
+      storageKey: "bindawasub-auth"
     }
   }
 );
