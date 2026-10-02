@@ -182,20 +182,42 @@ async function populateProductDimensions(networkId="",variantId=""){
 }
 
 async function populateProductVariants(serviceId,networkId="",variantId=""){
-  const selectedVariant=variants.find(v=>v.id===variantId);
-  const vs=variants.filter(v=>
-    v.active!==false &&
-    v.service_id===serviceId &&
-    Boolean(v.network_id) &&
-    Boolean(networkId) &&
-    v.network_id===networkId
-  );
+  const select=$("xVariant");
+  if(!select)return;
 
-  $("xVariant").innerHTML='<option value="">— select data type —</option>'+
+  const normalizedServiceId=String(serviceId||"");
+  const normalizedNetworkId=String(networkId||"");
+
+  // Data Types are catalog variants. Prefer variants assigned to the
+  // selected network, but also allow service-level variants (network_id
+  // is null) so a valid Data Type can always be selected when configured
+  // at service level.
+  const selectedVariant=variants.find(v=>String(v.id)===String(variantId||""));
+
+  const vs=variants.filter(v=>{
+    if(v.active===false)return false;
+    if(String(v.service_id||"")!==normalizedServiceId)return false;
+
+    const variantNetworkId=String(v.network_id||"");
+    return !variantNetworkId
+      ? Boolean(normalizedNetworkId)
+      : variantNetworkId===normalizedNetworkId;
+  });
+
+  select.innerHTML='<option value="">— select data type —</option>'+
     vs.map(v=>'<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>').join("");
 
-  const validSelected=selectedVariant && vs.some(v=>v.id===selectedVariant.id);
-  $("xVariant").value=validSelected ? selectedVariant.id : "";
+  const validSelected=selectedVariant && vs.some(v=>String(v.id)===String(selectedVariant.id));
+  select.value=validSelected ? selectedVariant.id : "";
+
+  // Keep the field usable and make the reason visible when no type is
+  // configured for the selected network.
+  select.disabled=!normalizedNetworkId;
+  if(!normalizedNetworkId){
+    select.innerHTML='<option value="">— select network first —</option>';
+  }else if(!vs.length){
+    select.innerHTML='<option value="">— no data types configured —</option>';
+  }
 }
 
 async function loadCatalogDimensions(){
