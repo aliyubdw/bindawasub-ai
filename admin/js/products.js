@@ -49,7 +49,7 @@ async function openProduct(p){
       <div class="field"><label>Unit *</label><select id="xPlanVolume"><option value="MB">MB</option><option value="GB">GB</option></select></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Validity *</label><input id="xValidity" placeholder="e.g. 30 Days" inputmode="decimal"></div>
+      <div class="field"><label>Validity *</label><input id="xValidity" placeholder="e.g. 30 Days, Weekly, Monthly" inputmode="text"></div>
       <div class="field"><label>Selling Price ₦ *</label><input id="xSell" type="number" min="0.01" step=".01" placeholder="e.g. 430"></div>
     </div>
     <div class="field"><label>Provider Cost ₦ *</label><input id="xCost" type="number" min="0.01" step=".01" placeholder="e.g. 349.70"></div>
@@ -135,10 +135,29 @@ async function openProduct(p){
       const size=String($("xPlanSize").value||"").trim();
       const unit=String($("xPlanVolume").value||"").trim().toUpperCase();
       const validity=String($("xValidity").value||"").trim();
-      const validityMatch=validity.match(/^(\d+(?:\.\d+)?)\s*([A-Za-z]+)$/);
-      if(!size||!Number.isFinite(Number(size))||Number(size)<0) throw new Error("Plan Size is required and must be a number.");
+      const normalizedValidity=validity.toLowerCase().replace(/\s+/g," ");
+      const validityAliases={
+        daily:{value:1,unit:"days"},
+        day:{value:1,unit:"days"},
+        weekly:{value:1,unit:"weeks"},
+        week:{value:1,unit:"weeks"},
+        monthly:{value:1,unit:"months"},
+        month:{value:1,unit:"months"},
+        yearly:{value:1,unit:"years"},
+        year:{value:1,unit:"years"}
+      };
+      const validityMatch=normalizedValidity.match(/^(\d+(?:\.\d+)?)\s*(day|days|week|weeks|month|months|year|years)$/i);
+      const aliasValidity=validityAliases[normalizedValidity];
+      const validityValue=validityMatch ? Number(validityMatch[1]) : aliasValidity?.value;
+      const validityUnitRaw=validityMatch ? validityMatch[2].toLowerCase() : aliasValidity?.unit;
+      const validityUnit=validityUnitRaw ? (
+        /^day/.test(validityUnitRaw) ? "days" :
+        /^week/.test(validityUnitRaw) ? "weeks" :
+        /^month/.test(validityUnitRaw) ? "months" : "years"
+      ) : "";
+      if(!size||!Number.isFinite(Number(size))||Number(size)<0) throw new Error("Data Amount is required and must be a number.");
       if(!["MB","GB"].includes(unit)) throw new Error("Unit must be MB or GB.");
-      if(!validityMatch) throw new Error("Validity must be entered like 30 Days.");
+      if(!Number.isFinite(Number(validityValue))||!validityUnit) throw new Error("Validity can be entered like 30 Days, Weekly, or Monthly.");
       if(!$("xNetwork").value) throw new Error("Network is required.");
       if(!$("xVariant").value) throw new Error("Data Type is required.");
       const sellingPrice=String($("xSell").value||"").trim();
@@ -171,7 +190,7 @@ async function openProduct(p){
       const saved=await admin({
         action:"save_product",id:p?.id,product_name:planName,sku,service_type:"data",
         network_id:$("xNetwork").value,variant_id:$("xVariant").value,volume:unit,
-        validity_type:"fixed",validity_value:validityMatch[1],validity_unit:validityMatch[2].toLowerCase(),
+        validity_type:"fixed",validity_value:validityValue,validity_unit:validityUnit,
         selling_price:sellingPrice,cost_price:providerCost,display_order:p?.display_order??100,active:$("xActive").checked
       });
 
