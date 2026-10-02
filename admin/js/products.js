@@ -156,6 +156,14 @@ async function openProduct(p){
         .toUpperCase() || "NETWORK";
       const sku="DATA-"+networkCode+"-"+variantCode+"-"+size+"-"+unit;
 
+      const duplicate=products.find(product =>
+        String(product.sku||"").toUpperCase()===sku.toUpperCase() &&
+        String(product.id||"")!==String(p?.id||"")
+      );
+      if(duplicate){
+        throw new Error("A "+networkName+" "+planName+" product already exists for this Data Type. Use a different plan size, Data Type, or edit the existing product.");
+      }
+
       const saved=await admin({
         action:"save_product",id:p?.id,product_name:planName,sku,service_type:"data",
         network_id:$("xNetwork").value,variant_id:$("xVariant").value,volume:unit,
