@@ -67,8 +67,8 @@ async function openProduct(p){
 
   const dataService=services.find(s=>String(s.code||"").toLowerCase()==="data"||String(s.name||"").toLowerCase()==="data");
   const dataNetworks=networks.filter(n=>!dataService||n.service_id===dataService.id);
-  const existingSize=p?.product_name ? String(p.product_name).match(/^\\s*([\\d.]+)/)?.[1] : "";
-  const existingUnit=String(p?.volume||"").match(/(MB|GB)\\b/i)?.[1]?.toUpperCase() || String(p?.product_name||"").match(/(MB|GB)\\b/i)?.[1]?.toUpperCase() || "GB";
+  const existingSize=p?.product_name ? String(p.product_name).match(/^\s*([\d.]+)/)?.[1] : "";
+  const existingUnit=String(p?.volume||"").match(/(MB|GB)\b/i)?.[1]?.toUpperCase() || String(p?.product_name||"").match(/(MB|GB)\b/i)?.[1]?.toUpperCase() || "GB";
   const existingValidity=[p?.validity_value,p?.validity_unit].filter(Boolean).join(" ");
 
   $("xNetwork").innerHTML='<option value="">— select network —</option>'+dataNetworks.map(n=>'<option value="'+n.id+'">'+escapeHtml(n.name)+'</option>').join("");
@@ -126,8 +126,8 @@ async function openProduct(p){
   }else addProviderMappingRow();
 
   $("addProviderMapping").onclick=()=>addProviderMappingRow();
-  await populateProductVariants("data",$("xNetwork").value,p?.variant_id||"");
-  $("xNetwork").onchange=()=>populateProductVariants("data",$("xNetwork").value,"");
+  await populateProductVariants(dataService?.id||"",$("xNetwork").value,p?.variant_id||"");
+  $("xNetwork").onchange=()=>populateProductVariants(dataService?.id||"",$("xNetwork").value,"");
   $("modal").classList.remove("hidden");
 
   $("saveProduct").onclick=async()=>{
@@ -135,7 +135,7 @@ async function openProduct(p){
       const size=String($("xPlanSize").value||"").trim();
       const unit=String($("xPlanVolume").value||"").trim().toUpperCase();
       const validity=String($("xValidity").value||"").trim();
-      const validityMatch=validity.match(/^(\\d+(?:\\.\\d+)?)\\s*([A-Za-z]+)$/);
+      const validityMatch=validity.match(/^(\d+(?:\.\d+)?)\s*([A-Za-z]+)$/);
       if(!size||!Number.isFinite(Number(size))||Number(size)<0) throw new Error("Plan Size is required and must be a number.");
       if(!["MB","GB"].includes(unit)) throw new Error("Plan Volume must be MB or GB.");
       if(!validityMatch) throw new Error("Plan Validity must be entered like 30 Days.");
