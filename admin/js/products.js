@@ -45,17 +45,17 @@ async function openProduct(p){
       <div class="field"><label>Data Type *</label><select id="xVariant"><option value="">— select data type —</option></select></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Plan Size *</label><input id="xPlanSize" type="number" min="0" step="0.01" placeholder="e.g. 1"></div>
-      <div class="field"><label>Plan Volume *</label><select id="xPlanVolume"><option value="MB">MB</option><option value="GB">GB</option></select></div>
+      <div class="field"><label>Data Amount *</label><input id="xPlanSize" type="number" min="0.01" step="0.01" placeholder="e.g. 1"></div>
+      <div class="field"><label>Unit *</label><select id="xPlanVolume"><option value="MB">MB</option><option value="GB">GB</option></select></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Plan Validity *</label><input id="xValidity" placeholder="e.g. 30 Days"></div>
-      <div class="field"><label>Amount (Price) ₦ *</label><input id="xSell" type="number" min="0" step=".01"></div>
+      <div class="field"><label>Validity *</label><input id="xValidity" placeholder="e.g. 30 Days" inputmode="decimal"></div>
+      <div class="field"><label>Selling Price ₦ *</label><input id="xSell" type="number" min="0.01" step=".01" placeholder="e.g. 430"></div>
     </div>
-    <div class="field"><label>Purchase Price ₦ *</label><input id="xCost" type="number" min="0" step=".01"></div>
+    <div class="field"><label>Provider Cost ₦ *</label><input id="xCost" type="number" min="0.01" step=".01" placeholder="e.g. 349.70"></div>
     <div id="providerMappingSection" class="field" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
-        <div><strong>Providers</strong><div class="muted">Select a connected provider and enter its exact Data Plan ID.</div></div>
+        <div><strong>Provider Mapping</strong><div class="muted">Select the provider and enter its exact plan ID. Add more than one provider when needed.</div></div>
         <button type="button" id="addProviderMapping" class="secondary">+ Add Provider</button>
       </div>
       <div id="providerMappingRows"></div>
@@ -137,10 +137,14 @@ async function openProduct(p){
       const validity=String($("xValidity").value||"").trim();
       const validityMatch=validity.match(/^(\d+(?:\.\d+)?)\s*([A-Za-z]+)$/);
       if(!size||!Number.isFinite(Number(size))||Number(size)<0) throw new Error("Plan Size is required and must be a number.");
-      if(!["MB","GB"].includes(unit)) throw new Error("Plan Volume must be MB or GB.");
-      if(!validityMatch) throw new Error("Plan Validity must be entered like 30 Days.");
+      if(!["MB","GB"].includes(unit)) throw new Error("Unit must be MB or GB.");
+      if(!validityMatch) throw new Error("Validity must be entered like 30 Days.");
       if(!$("xNetwork").value) throw new Error("Network is required.");
       if(!$("xVariant").value) throw new Error("Data Type is required.");
+      const sellingPrice=String($("xSell").value||"").trim();
+      const providerCost=String($("xCost").value||"").trim();
+      if(!sellingPrice||!Number.isFinite(Number(sellingPrice))||Number(sellingPrice)<=0) throw new Error("Selling Price is required and must be greater than 0.");
+      if(!providerCost||!Number.isFinite(Number(providerCost))||Number(providerCost)<=0) throw new Error("Provider Cost is required and must be greater than 0.");
 
       const planName=size+" "+unit;
       const networkName=String($("xNetwork").selectedOptions[0]?.textContent||"NETWORK").split(" — ")[0];
@@ -168,7 +172,7 @@ async function openProduct(p){
         action:"save_product",id:p?.id,product_name:planName,sku,service_type:"data",
         network_id:$("xNetwork").value,variant_id:$("xVariant").value,volume:unit,
         validity_type:"fixed",validity_value:validityMatch[1],validity_unit:validityMatch[2].toLowerCase(),
-        selling_price:$("xSell").value,cost_price:$("xCost").value,display_order:p?.display_order??100,active:$("xActive").checked
+        selling_price:sellingPrice,cost_price:providerCost,display_order:p?.display_order??100,active:$("xActive").checked
       });
 
       const productId=saved?.product?.id||p?.id;
@@ -178,7 +182,7 @@ async function openProduct(p){
           const providerId=row.querySelector(".pm-provider")?.value||"";
           const planId=row.querySelector(".pm-plan-id")?.value.trim()||"";
           if(row.dataset.removed==="true"){
-            if(row.dataset.mappingId) await admin({action:"save_mapping",id:row.dataset.mappingId,product_id:productId,provider_id:providerId,provider_plan_id:planId||"removed",provider_plan_name:planName,provider_cost:$("xCost").value||"",priority:100,provider_status:"inactive",active:false,metadata:{source:"data_plan_catalog"}});
+            if(row.dataset.mappingId) await admin({action:"save_mapping",id:row.dataset.mappingId,product_id:productId,provider_id:providerId,provider_plan_id:planId||"removed",provider_plan_name:planName,provider_cost:providerCost,priority:100,provider_status:"inactive",active:false,metadata:{source:"data_plan_catalog"}});
             continue;
           }
           if(!providerId&&!planId) continue;
