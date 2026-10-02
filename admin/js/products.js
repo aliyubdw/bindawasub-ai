@@ -215,12 +215,33 @@ async function openProduct(p){
       const generatedSku="DATA-"+networkCode+"-"+variantCode+"-"+size+"-"+unit+"-"+validitySkuPart;
       const sku=p?.id && p?.sku ? String(p.sku) : generatedSku;
 
-      const duplicate=products.find(product =>
-        String(product.sku||"").toUpperCase()===sku.toUpperCase() &&
-        String(product.id||"")!==String(p?.id||"")
-      );
+      // Uniqueness is based on the actual catalog dimensions, including validity.
+      // This allows 1GB Weekly and 1GB Monthly to coexist, while preventing
+      // another 1GB Weekly for the same network + Data Type.
+      const duplicate=products.find(product => {
+        if(String(product.id||"")===String(p?.id||"")) return false;
+
+        const productSize=String(product.product_name||"").match(/^\s*([\\d.]+)/)?.[1] || "";
+        const productUnit=String(product.volume||"").trim().toUpperCase()
+          || String(product.product_name||"").match(/(MB|GB)\\b/i)?.[1]?.toUpperCase()
+          || "";
+        const productValidityValue=Number(product.validity_value);
+        const productValidityUnit=String(product.validity_unit||"").trim().toLowerCase();
+
+        return String(product.network_id||"")===String($("xNetwork").value||"")
+          && String(product.variant_id||"")===String($("xVariant").value||"")
+          && Number(productSize)===Number(size)
+          && productUnit===unit
+          && Number.isFinite(productValidityValue)
+          && productValidityValue===Number(validityValue)
+          && productValidityUnit===validityUnit;
+      });
+
       if(duplicate){
-        throw new Error("A "+networkName+" "+planName+" product with the same validity already exists for this Data Type. Edit the existing product or use a different validity.");
+        throw new Error(
+          "A "+networkName+" "+planName+" product with validity "+formatValidity(validityValue,validityUnit)+
+          " already exists for this Data Type. Use a different validity or edit the existing product."
+        );
       }
 
       const saved=await admin({
