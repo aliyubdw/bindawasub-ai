@@ -3353,17 +3353,14 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "product_enquiry") {
-        // After a network is selected, show only that network's data types.
-        // Plans are shown only after a data type is selected.
-        if (requestedNetworkToken && !requestedVariantText) {
-          const typeText = availableDataTypes.map((item:any) =>
-            `• ${item.name} (${item.plan_count} plan${item.plan_count === 1 ? "" : "s"})`
-          ).join("\n");
+        const networkLabel = requestedNetworkToken
+          ? (requestedNetworkToken === "9mobile" ? "9mobile" : requestedNetworkToken.toUpperCase())
+          : null;
 
-          const networkLabel =
-            requestedNetworkToken === "9mobile"
-              ? "9mobile"
-              : requestedNetworkToken.toUpperCase();
+        // Once a network is selected, show ALL active plans on that network.
+        // The customer UI groups these plans under their Data Type headings.
+        if (requestedNetworkToken) {
+          const networkPlans = networkFilteredProducts.map(formatCatalogProduct);
 
           return new Response(
             JSON.stringify({
@@ -3372,10 +3369,10 @@ if (body.action === "manual_fund") {
               network: requestedNetworkToken,
               network_name: networkLabel,
               data_types: availableDataTypes,
-              products: [],
-              answer: typeText
-                ? `For ${networkLabel}, choose a data type first:\n\n${typeText}`
-                : `There are currently no active data types for ${networkLabel}.`,
+              products: networkPlans,
+              answer: networkPlans.length
+                ? `Here are the available ${networkLabel} data plans, grouped by Data Type.`
+                : `There are currently no active data plans for ${networkLabel}.`,
               ai_powered: true,
             }),
             {
@@ -3401,7 +3398,6 @@ if (body.action === "manual_fund") {
           }
         );
       }
-
       if (ai.intent === "purchase_intent") {
         // Resolve purchases only against the already network/data-type-filtered catalog.
         const purchaseCatalog = requestedVariantText
