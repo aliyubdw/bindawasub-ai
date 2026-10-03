@@ -2739,16 +2739,18 @@ if (body.action === "manual_fund") {
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
 
-      // Network selected but data type not selected:
-      // show only the data types available on that network.
+      // Network selected without a specific data type:
+      // return ALL active plans for that network. The customer UI groups them
+      // under each Data Type heading, so the customer can compare packages
+      // across SME, Social, Gifting, Awoop, etc. without another step.
       if (requestedNetwork && !requestedVariant) {
-        const types = Array.from(
+        const groupedTypes = Array.from(
           new Map(
             networkProducts.map((product:any) => {
               const variant = Array.isArray(product.service_variants)
                 ? product.service_variants[0]
                 : product.service_variants;
-              const key = normalizeCatalogToken(variant?.code || variant?.name);
+              const key = normalizeCatalogToken(variant?.code || variant?.name) || "data";
               return [key, {
                 code: variant?.code || null,
                 name: variant?.name || variant?.code || "Data",
@@ -2773,11 +2775,10 @@ if (body.action === "manual_fund") {
           service_type:"data",
           network:requestedNetwork,
           network_name:networkLabel,
-          data_types:types,
-          products:[],
-          answer:"Available " + networkLabel + " data types: " +
-            types.map((type:any) => type.name + " (" + type.plan_count + " plans)").join(", ") +
-            ". Please choose a data type."
+          data_types:groupedTypes,
+          products:networkProducts,
+          grouped_by:"data_type",
+          answer:"Here are all available " + networkLabel + " data plans, grouped by data type."
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
 
