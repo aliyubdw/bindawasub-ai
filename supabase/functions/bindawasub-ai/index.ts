@@ -3356,14 +3356,31 @@ if (body.action === "manual_fund") {
         );
 
         if (!matchedProduct) {
+          if (specificationCandidates.length > 1) {
+            const choices = specificationCandidates.slice(0, 12).map(productSpecification);
+            return new Response(JSON.stringify({
+              success:true,
+              intent:"purchase_intent",
+              service_type:serviceType || null,
+              product:null,
+              products:choices,
+              customer_input:customerInput,
+              missing_fields:missingFields,
+              answer:ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want.",
+              requires_confirmation:false,
+              ai_powered:true
+            }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+          }
+
           return new Response(JSON.stringify({
             success:true,
             intent:"purchase_intent",
             service_type:serviceType || null,
             product:null,
+            products:[],
             customer_input:customerInput,
             missing_fields:missingFields,
-            answer:ai.reply || "Please choose an available product for the service you want.",
+            answer:ai.reply || "That product is not currently available. Please choose an available product from the catalog.",
             requires_confirmation:false,
             ai_powered:true
           }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
