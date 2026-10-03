@@ -2919,10 +2919,13 @@ if (body.action === "manual_fund") {
             "id, sku, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, display_order, metadata, network_id, variant_id, service_networks(code,name), service_variants(code,name)"
           )
           .eq("active", true)
-          .eq("service_type", "data")
           .order("selling_price", { ascending: true });
 
       if (aiProductsError) throw aiProductsError;
+
+      const activeProducts = aiProducts || [];
+      const aiDataProducts = activeProducts.filter((product:any) => String(product.service_type || "").toLowerCase() === "data");
+      const activeServiceTypes = new Set(activeProducts.map((product:any) => String(product.service_type || "").trim().toLowerCase()).filter(Boolean));
 
       // Data catalog filtering is deterministic. The AI must never receive
       // plans from another network or another data type once those choices
@@ -2948,7 +2951,7 @@ if (body.action === "manual_fund") {
         /\b(?:awoop)\b/i.test(messageForCatalog) ? "awoop" :
         contextVariant;
 
-      const networkFilteredProducts = (aiProducts || []).filter((product:any) => {
+      const networkFilteredProducts = aiDataProducts.filter((product:any) => {
         if (!requestedNetworkToken) return true;
         const network = Array.isArray(product.service_networks)
           ? product.service_networks[0]
@@ -3012,13 +3015,24 @@ if (body.action === "manual_fund") {
 
       const ai = await callGemini(
         originalMessage,
-        aiProductsForAI,
+        activeProducts.map(formatCatalogProduct),
         serviceCatalog,
         conversationHistory,
         String(aiConfig?.default_language || "english").toLowerCase() === "hausa" ? "hausa" : "english",
         conversationContext,
         recentTransactionsForAI
       );
+
+      // Never let the AI imply that an inactive/unconfigured service is available.
+      const requestedServiceType = String(ai.service_type || "").trim().toLowerCase();
+      const availabilityCheckedIntents = new Set(["product_enquiry","product_price","purchase_intent","service_enquiry"]);
+      if (requestedServiceType && availabilityCheckedIntents.has(String(ai.intent || "").toLowerCase()) && requestedServiceType !== "airtime" && !activeServiceTypes.has(requestedServiceType)) {
+        const serviceLabel = requestedServiceType.replace(/[_-]+/g, " ").replace(/\b\w/g, (m:string) => m.toUpperCase());
+        const unavailableAnswer = ai.language === "hausa"
+          ? serviceLabel + " ba ya samuwa a halin yanzu. Zan sanar da kai idan ya dawo."
+          : serviceLabel + " is currently not available. I will let you know when it becomes available.";
+        return new Response(JSON.stringify({ success:true, intent:ai.intent, service_type:requestedServiceType, products:[], available:false, answer:unavailableAnswer, ai_powered:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }
 
       // Deterministic routing for Airtime. Once an Airtime task has started,
       // keep numeric/phone follow-ups in the Airtime flow instead of Data.
