@@ -1,5 +1,52 @@
 // Bindawasub AI — products, recipient validation and order confirmation
 
+function showDataTypes(dataTypes, networkName) {
+  const messages = document.getElementById("messages");
+  if (!messages || !Array.isArray(dataTypes) || !dataTypes.length) return;
+
+  const list = document.createElement("div");
+  list.className = "product-list data-type-list";
+
+  const heading = document.createElement("div");
+  heading.className = "product-list-heading";
+  heading.innerHTML = `
+    <span class="product-network-icon">📶</span>
+    <span><strong>${networkName || "Data"} Data Types</strong><small>Choose a data type</small></span>
+  `;
+  list.appendChild(heading);
+
+  const grid = document.createElement("div");
+  grid.className = "product-grid";
+
+  dataTypes.forEach(type => {
+    const card = document.createElement("button");
+    card.className = "product-card";
+    card.type = "button";
+
+    const name = String(type.name || type.code || "Data");
+    const count = Number(type.plan_count || 0);
+
+    card.innerHTML = `
+      <span class="product-network">${networkName || "Data"}</span>
+      <span class="product-name">${name}</span>
+      <span class="product-details">${count} plan${count === 1 ? "" : "s"} available</span>
+      <span class="product-select">Choose</span>
+    `;
+
+    card.onclick = function() {
+      addMessage(name, "user");
+      list.remove();
+      sendMessage(name);
+    };
+
+    grid.appendChild(card);
+  });
+
+  list.appendChild(grid);
+  messages.appendChild(list);
+  messages.scrollTop = messages.scrollHeight;
+}
+
 function showProducts(products) {
   const messages = document.getElementById("messages");
   if (!messages || !Array.isArray(products) || !products.length) return;
@@ -9,9 +56,22 @@ function showProducts(products) {
 
   const heading = document.createElement("div");
   heading.className = "product-list-heading";
+
+  const firstProduct = products[0] || {};
+  const networkName =
+    firstProduct.network_name ||
+    (Array.isArray(firstProduct.service_networks) ? firstProduct.service_networks[0]?.name : firstProduct.service_networks?.name) ||
+    firstProduct.network ||
+    "Data";
+
+  const variantName =
+    firstProduct.variant_name ||
+    (Array.isArray(firstProduct.service_variants) ? firstProduct.service_variants[0]?.name : firstProduct.service_variants?.name) ||
+    "Data Plans";
+
   heading.innerHTML = `
     <span class="product-network-icon">📶</span>
-    <span><strong>MTN Data Plans</strong><small>Choose a package</small></span>
+    <span><strong>${networkName} ${variantName}</strong><small>Choose a package</small></span>
   `;
   productList.appendChild(heading);
 
@@ -24,11 +84,21 @@ function showProducts(products) {
     card.type = "button";
 
     const name = String(product.product_name || "Data");
-    const duration = String(product.duration || "30 Days");
+    const duration =
+      String(product.duration || (
+        product.validity_value != null && product.validity_unit
+          ? product.validity_value + " " + product.validity_unit
+          : "Validity not specified"
+      ));
     const price = Number(product.selling_price || 0).toLocaleString();
+    const network =
+      product.network_name ||
+      product.network ||
+      (Array.isArray(product.service_networks) ? product.service_networks[0]?.name : product.service_networks?.name) ||
+      "Data";
 
     card.innerHTML = `
-      <span class="product-network">MTN</span>
+      <span class="product-network">${network}</span>
       <span class="product-name">${name}</span>
       <span class="product-details">${duration}</span>
       <span class="product-price">₦${price}</span>
