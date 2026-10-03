@@ -2916,14 +2916,88 @@ if (body.action === "manual_fund") {
         await supabase
           .from("products")
           .select(
-            "id, sku, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, display_order, metadata, service_networks(code,name), service_variants(code,name)"
+            "id, sku, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, display_order, metadata, network_id, variant_id, service_networks(code,name), service_variants(code,name)"
           )
           .eq("active", true)
+          .eq("service_type", "data")
           .order("selling_price", { ascending: true });
 
       if (aiProductsError) throw aiProductsError;
 
-      const aiProductsForAI = (aiProducts || []).map(formatCatalogProduct);
+      // Data catalog filtering is deterministic. The AI must never receive
+      // plans from another network or another data type once those choices
+      // have been resolved in the current conversation.
+      const normalizeCatalogToken = (value:any) =>
+        String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+      const messageForCatalog = String(originalMessage || "");
+      const contextNetwork = normalizeCatalogToken(conversationContext?.network);
+      const contextVariant = normalizeCatalogToken(conversationContext?.variant);
+
+      const requestedNetworkToken =
+        /\bmtn\b/i.test(messageForCatalog) ? "mtn" :
+        /\bairtel\b/i.test(messageForCatalog) ? "airtel" :
+        /\bglo\b/i.test(messageForCatalog) ? "glo" :
+        /\b(?:9mobile|t2)\b/i.test(messageForCatalog) ? "9mobile" :
+        contextNetwork;
+
+      const requestedVariantText =
+        /\b(?:sme|sme data|normal data)\b/i.test(messageForCatalog) ? "sme_data" :
+        /\b(?:social|social data)\b/i.test(messageForCatalog) ? "social" :
+        /\b(?:gifting|gift|gift data)\b/i.test(messageForCatalog) ? "gifting" :
+        /\b(?:awoop)\b/i.test(messageForCatalog) ? "awoop" :
+        contextVariant;
+
+      const networkFilteredProducts = (aiProducts || []).filter((product:any) => {
+        if (!requestedNetworkToken) return true;
+        const network = Array.isArray(product.service_networks)
+          ? product.service_networks[0]
+          : product.service_networks;
+        return normalizeCatalogToken(network?.code) === requestedNetworkToken ||
+          normalizeCatalogToken(network?.name) === requestedNetworkToken;
+      });
+
+      const variantFilteredProducts = networkFilteredProducts.filter((product:any) => {
+        if (!requestedVariantText) return true;
+        const variant = Array.isArray(product.service_variants)
+          ? product.service_variants[0]
+          : product.service_variants;
+        return normalizeCatalogToken(variant?.code) === requestedVariantText ||
+          normalizeCatalogToken(variant?.name) === requestedVariantText;
+      });
+
+      const catalogProductsForAI = requestedVariantText
+        ? variantFilteredProducts
+        : networkFilteredProducts;
+
+      const aiProductsForAI = catalogProductsForAI.map(formatCatalogProduct);
+
+      const availableDataTypes = Array.from(
+        new Map(
+          networkFilteredProducts.map((product:any) => {
+            const variant = Array.isArray(product.service_variants)
+              ? product.service_variants[0]
+              : product.service_variants;
+            return [
+              normalizeCatalogToken(variant?.code || variant?.name),
+              {
+                code: variant?.code || null,
+                name: variant?.name || variant?.code || "Data",
+                plan_count: 1
+              }
+            ];
+          })
+        ).values()
+      ).map((item:any) => ({
+        ...item,
+        plan_count: networkFilteredProducts.filter((product:any) => {
+          const variant = Array.isArray(product.service_variants)
+            ? product.service_variants[0]
+            : product.service_variants;
+          return normalizeCatalogToken(variant?.code || variant?.name) ===
+            normalizeCatalogToken(item.code || item.name);
+        }).length
+      }));
 
       const { data: recentTransactionRows, error: recentTransactionError } = await supabase
         .from("transactions")
@@ -3097,12 +3171,46 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "product_enquiry") {
+        // After a network is selected, show only that network's data types.
+        // Plans are shown only after a data type is selected.
+        if (requestedNetworkToken && !requestedVariantText) {
+          const typeText = availableDataTypes.map((item:any) =>
+            `• ${item.name} (${item.plan_count} plan${item.plan_count === 1 ? "" : "s"})`
+          ).join("\n");
+
+          const networkLabel =
+            requestedNetworkToken === "9mobile"
+              ? "9mobile"
+              : requestedNetworkToken.toUpperCase();
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              intent: "product_enquiry",
+              network: requestedNetworkToken,
+              network_name: networkLabel,
+              data_types: availableDataTypes,
+              products: [],
+              answer: typeText
+                ? `For ${networkLabel}, choose a data type first:\n\n${typeText}`
+                : `There are currently no active data types for ${networkLabel}.`,
+              ai_powered: true,
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
             intent: "product_enquiry",
-            products: (aiProducts || []).map(formatCatalogProduct),
-            answer: ai.reply || "Ga kayan data da ake samu a Bindawasub.",
+            network: requestedNetworkToken || null,
+            variant: requestedVariantText || null,
+            products: (aiProductsForAI || []).map(formatCatalogProduct),
+            answer: ai.reply || "Here are the available plans.",
             ai_powered: true,
           }),
           {
@@ -3113,7 +3221,11 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "purchase_intent") {
-        const matchedProduct = resolveCatalogProduct(ai, aiProducts || []);
+        // Resolve purchases only against the already network/data-type-filtered catalog.
+        const purchaseCatalog = requestedVariantText
+          ? variantFilteredProducts
+          : networkFilteredProducts;
+        const matchedProduct = resolveCatalogProduct(ai, purchaseCatalog);
 
         const serviceType = String(ai.service_type || matchedProduct?.service_type || "").trim().toLowerCase();
         const catalogService = serviceCatalog.find((s:any) => s.code === serviceType);
