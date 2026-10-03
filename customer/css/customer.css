@@ -1849,6 +1849,30 @@ body{
   color:#74847e;
   font-size:9px;
 }
+.product-category{
+  margin-top:10px;
+}
+.product-category-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:12px 0 7px;
+  padding:8px 10px;
+  border-left:3px solid #087f5b;
+  border-radius:8px;
+  background:#f1faf6;
+  color:#173f32;
+}
+.product-category-heading strong{
+  font-size:13px;
+  font-weight:900;
+}
+.product-category-heading small{
+  color:#71817b;
+  font-size:9px;
+  font-weight:700;
+}
 .product-grid{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
