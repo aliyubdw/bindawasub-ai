@@ -612,18 +612,28 @@ Misali: 08012345678`,
     }
 
     /* =========================================
+       SHOW DATA TYPES
+    ========================================= */
+
+    if (
+      Array.isArray(data?.data_types) &&
+      data.data_types.length > 0
+    ) {
+      showDataTypes(
+        data.data_types,
+        data.network_name || data.network || "Data"
+      );
+    }
+
+    /* =========================================
        SHOW PACKAGES
     ========================================= */
 
     if (
-      data?.products &&
+      Array.isArray(data?.products) &&
       data.products.length > 0
     ) {
-
-      showProducts(
-        data.products
-      );
-
+      showProducts(data.products);
     }
 
   } catch (error) {
