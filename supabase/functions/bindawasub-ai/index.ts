@@ -2942,7 +2942,7 @@ if (body.action === "manual_fund") {
         contextNetwork;
 
       const requestedVariantText =
-        /\b(?:sme|sme data|normal data)\b/i.test(messageForCatalog) ? "sme_data" :
+        /\b(?:sme|sme data|normal data)\b/i.test(messageForCatalog) ? "smedata" :
         /\b(?:social|social data)\b/i.test(messageForCatalog) ? "social" :
         /\b(?:gifting|gift|gift data)\b/i.test(messageForCatalog) ? "gifting" :
         /\b(?:awoop)\b/i.test(messageForCatalog) ? "awoop" :
