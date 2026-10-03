@@ -31,19 +31,83 @@ function normalizeLookup(value:any){
 function resolveCatalogProduct(ai:any, products:any[]){
   const list=Array.isArray(products)?products:[];
   const id=String(ai?.product_id||"").trim();
-  if(id){ const exact=list.find((p:any)=>p.id===id); if(exact)return exact; }
+  if(id){
+    const exact=list.find((p:any)=>p.id===id);
+    if(exact)return exact;
+  }
+
   let candidates=list.slice();
   const service=normalizeLookup(ai?.service_type);
   const network=normalizeLookup(ai?.network);
   const volume=normalizeLookup(ai?.volume);
   const variant=normalizeLookup(ai?.variant);
   const name=normalizeLookup(ai?.product_name);
+
   if(service)candidates=candidates.filter((p:any)=>normalizeLookup(p.service_type)===service);
-  if(network)candidates=candidates.filter((p:any)=>{ const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks; return normalizeLookup(n?.code)===network||normalizeLookup(n?.name)===network; });
+  if(network)candidates=candidates.filter((p:any)=>{
+    const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;
+    return normalizeLookup(n?.code)===network||normalizeLookup(n?.name)===network;
+  });
   if(volume)candidates=candidates.filter((p:any)=>normalizeLookup(p.volume)===volume);
-  if(variant)candidates=candidates.filter((p:any)=>{ const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants; return normalizeLookup(v?.code)===variant||normalizeLookup(v?.name)===variant; });
-  if(name){ const named=candidates.filter((p:any)=>normalizeLookup(p.product_name)===name); if(named.length===1)return named[0]; if(named.length>0)candidates=named; }
+  if(variant)candidates=candidates.filter((p:any)=>{
+    const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants;
+    return normalizeLookup(v?.code)===variant||normalizeLookup(v?.name)===variant;
+  });
+  if(name){
+    const named=candidates.filter((p:any)=>normalizeLookup(p.product_name)===name);
+    if(named.length===1)return named[0];
+    if(named.length>0)candidates=named;
+  }
   return candidates.length===1?candidates[0]:null;
+}
+
+function productSpecification(p:any){
+  const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
+  const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
+  const validity=p?.validity_type==="unlimited"
+    ?"Unlimited"
+    :(p?.validity_value!=null&&p?.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):"");
+  return {
+    id:p?.id||null,
+    service_type:p?.service_type||null,
+    network:n?.code||n?.name||null,
+    network_name:n?.name||null,
+    variant:v?.code||v?.name||null,
+    variant_name:v?.name||null,
+    product_name:p?.product_name||null,
+    volume:p?.volume||null,
+    validity,
+    validity_value:p?.validity_value??null,
+    validity_unit:p?.validity_unit??null,
+    selling_price:Number(p?.selling_price||0),
+    sku:p?.sku||null
+  };
+}
+
+function filterCatalogBySpecification(ai:any, products:any[]){
+  const list=Array.isArray(products)?products:[];
+  const requested={
+    service:normalizeLookup(ai?.service_type),
+    network:normalizeLookup(ai?.network),
+    variant:normalizeLookup(ai?.variant),
+    volume:normalizeLookup(ai?.volume),
+    product:normalizeLookup(ai?.product_name)
+  };
+
+  let candidates=list.slice();
+  if(requested.service)candidates=candidates.filter((p:any)=>normalizeLookup(p?.service_type)===requested.service);
+  if(requested.network)candidates=candidates.filter((p:any)=>{
+    const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
+    return normalizeLookup(n?.code)===requested.network||normalizeLookup(n?.name)===requested.network;
+  });
+  if(requested.variant)candidates=candidates.filter((p:any)=>{
+    const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
+    return normalizeLookup(v?.code)===requested.variant||normalizeLookup(v?.name)===requested.variant;
+  });
+  if(requested.volume)candidates=candidates.filter((p:any)=>normalizeLookup(p?.volume)===requested.volume);
+  if(requested.product)candidates=candidates.filter((p:any)=>normalizeLookup(p?.product_name)===requested.product);
+
+  return candidates;
 }
 
 
