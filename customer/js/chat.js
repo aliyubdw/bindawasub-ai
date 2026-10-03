@@ -617,7 +617,8 @@ Misali: 08012345678`,
 
     if (
       Array.isArray(data?.data_types) &&
-      data.data_types.length > 0
+      data.data_types.length > 0 &&
+      !(Array.isArray(data?.products) && data.products.length > 0)
     ) {
       showDataTypes(
         data.data_types,
