@@ -57,54 +57,60 @@ function showProducts(products) {
   const firstProduct = products[0] || {};
   const networkName =
     firstProduct.network_name ||
-    (Array.isArray(firstProduct.service_networks) ? firstProduct.service_networks[0]?.name : firstProduct.service_networks?.name) ||
     firstProduct.network ||
+    (Array.isArray(firstProduct.service_networks)
+      ? firstProduct.service_networks[0]?.name
+      : firstProduct.service_networks?.name) ||
     "Data";
 
-  const topHeading = document.createElement("div");
-  topHeading.className = "product-list-heading";
-  topHeading.innerHTML = `
+  const heading = document.createElement("div");
+  heading.className = "product-list-heading";
+  heading.innerHTML = `
     <span class="product-network-icon">📶</span>
     <span><strong>${networkName} Data Plans</strong><small>Choose a package</small></span>
   `;
-  productList.appendChild(topHeading);
+  productList.appendChild(heading);
 
-  // Group every plan by its Data Type. The network response already contains
-  // only plans for the selected network, so no other network can leak here.
+  // Group every plan by its Data Type / variant.
+  // This is intentionally done from the live product metadata so every
+  // network can have its own set of categories.
   const groups = new Map();
 
   products.forEach(product => {
     const variantName =
       product.variant_name ||
-      (Array.isArray(product.service_variants) ? product.service_variants[0]?.name : product.service_variants?.name) ||
       product.variant ||
-      "Data";
+      (Array.isArray(product.service_variants)
+        ? product.service_variants[0]?.name
+        : product.service_variants?.name) ||
+      "Other Data";
 
-    const key =
-      String(
-        product.variant ||
-        product.variant_name ||
-        variantName
-      ).trim().toLowerCase().replace(/[^a-z0-9]+/g, "") || "data";
+    const variantKey = String(
+      product.variant ||
+      variantName
+    ).trim().toLowerCase();
 
-    if (!groups.has(key)) {
-      groups.set(key, {
-        name: variantName,
+    if (!groups.has(variantKey)) {
+      groups.set(variantKey, {
+        name: String(variantName),
         products: []
       });
     }
 
-    groups.get(key).products.push(product);
+    groups.get(variantKey).products.push(product);
   });
 
   groups.forEach(group => {
-    const groupHeading = document.createElement("div");
-    groupHeading.className = "product-list-heading data-type-heading";
-    groupHeading.innerHTML = `
-      <span class="product-network-icon">▣</span>
-      <span><strong>${group.name}</strong><small>${group.products.length} plan${group.products.length === 1 ? "" : "s"} available</small></span>
+    const category = document.createElement("section");
+    category.className = "product-category";
+
+    const categoryHeading = document.createElement("div");
+    categoryHeading.className = "product-category-heading";
+    categoryHeading.innerHTML = `
+      <strong>${group.name}</strong>
+      <small>${group.products.length} plan${group.products.length === 1 ? "" : "s"}</small>
     `;
-    productList.appendChild(groupHeading);
+    category.appendChild(categoryHeading);
 
     const grid = document.createElement("div");
     grid.className = "product-grid";
@@ -122,14 +128,9 @@ function showProducts(products) {
             : "Validity not specified"
         ));
       const price = Number(product.selling_price || 0).toLocaleString();
-      const network =
-        product.network_name ||
-        product.network ||
-        (Array.isArray(product.service_networks) ? product.service_networks[0]?.name : product.service_networks?.name) ||
-        "Data";
 
       card.innerHTML = `
-        <span class="product-network">${network}</span>
+        <span class="product-network">${networkName}</span>
         <span class="product-name">${name}</span>
         <span class="product-details">${duration}</span>
         <span class="product-price">₦${price}</span>
@@ -156,7 +157,8 @@ function showProducts(products) {
       grid.appendChild(card);
     });
 
-    productList.appendChild(grid);
+    category.appendChild(grid);
+    productList.appendChild(category);
   });
 
   messages.appendChild(productList);
