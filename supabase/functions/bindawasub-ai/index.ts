@@ -3086,19 +3086,25 @@ if (body.action === "manual_fund") {
       const contextNetwork = normalizeCatalogToken(conversationContext?.network);
       const contextVariant = normalizeCatalogToken(conversationContext?.variant);
 
-      const requestedNetworkToken =
+      const explicitNetwork =
         /\bmtn\b/i.test(messageForCatalog) ? "mtn" :
         /\bairtel\b/i.test(messageForCatalog) ? "airtel" :
         /\bglo\b/i.test(messageForCatalog) ? "glo" :
         /\b(?:9mobile|t2)\b/i.test(messageForCatalog) ? "9mobile" :
-        contextNetwork;
+        "";
 
-      const requestedVariantText =
+      const requestedNetworkToken = explicitNetwork || contextNetwork;
+
+      const explicitVariant =
         /\b(?:sme|sme data|normal data)\b/i.test(messageForCatalog) ? "smedata" :
         /\b(?:social|social data)\b/i.test(messageForCatalog) ? "social" :
         /\b(?:gifting|gift|gift data)\b/i.test(messageForCatalog) ? "gifting" :
         /\b(?:awoop)\b/i.test(messageForCatalog) ? "awoop" :
-        contextVariant;
+        "";
+
+      // Selecting a network explicitly resets any older Data Type context so
+      // the customer sees the complete catalog for that network.
+      const requestedVariantText = explicitVariant || (explicitNetwork ? "" : contextVariant);
 
       const networkFilteredProducts = aiDataProducts.filter((product:any) => {
         if (!requestedNetworkToken) return true;
