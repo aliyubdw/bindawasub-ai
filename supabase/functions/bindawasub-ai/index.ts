@@ -3322,7 +3322,19 @@ if (body.action === "manual_fund") {
         const purchaseCatalog = requestedVariantText
           ? variantFilteredProducts
           : networkFilteredProducts;
-        const matchedProduct = resolveCatalogProduct(ai, purchaseCatalog);
+
+        // Product specification is resolved from the live catalog, never from Gemini's
+        // product identity alone. An exact product ID is accepted only if it belongs to
+        // the already-filtered catalog.
+        const specificationCandidates = filterCatalogBySpecification(ai, purchaseCatalog);
+        const matchedById = String(ai?.product_id||"").trim()
+          ? specificationCandidates.find((p:any)=>p.id===String(ai.product_id).trim())
+          : null;
+        const matchedProduct = matchedById || (
+          specificationCandidates.length === 1
+            ? specificationCandidates[0]
+            : null
+        );
 
         const serviceType = String(ai.service_type || matchedProduct?.service_type || "").trim().toLowerCase();
         const catalogService = serviceCatalog.find((s:any) => s.code === serviceType);
