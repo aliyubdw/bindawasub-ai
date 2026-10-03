@@ -3023,6 +3023,25 @@ if (body.action === "manual_fund") {
         recentTransactionsForAI
       );
 
+      // If a requested data network or data type has no active plans, say so explicitly.
+      const dataAvailabilityIntent = new Set(["product_enquiry","product_price","purchase_intent"]);
+      if (dataAvailabilityIntent.has(String(ai.intent || "").toLowerCase()) &&
+          (String(ai.service_type || "").toLowerCase() === "data" || requestedNetworkToken || requestedVariantText) &&
+          requestedNetworkToken && networkFilteredProducts.length === 0) {
+        const networkLabel = requestedNetworkToken === "9mobile" ? "9mobile" : requestedNetworkToken.toUpperCase();
+        const unavailableAnswer = ai.language === "hausa"
+          ? "A halin yanzu babu active data plans na " + networkLabel + ". Zan sanar da kai idan sun samu."
+          : "There are currently no active data plans for " + networkLabel + ". I will let you know when they become available.";
+        return new Response(JSON.stringify({ success:true, intent:ai.intent, service_type:"data", network:requestedNetworkToken, products:[], available:false, answer:unavailableAnswer, ai_powered:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }
+
+      if (dataAvailabilityIntent.has(String(ai.intent || "").toLowerCase()) && requestedNetworkToken && requestedVariantText && variantFilteredProducts.length === 0) {
+        const networkLabel = requestedNetworkToken === "9mobile" ? "9mobile" : requestedNetworkToken.toUpperCase();
+        const unavailableAnswer = ai.language === "hausa"
+          ? requestedVariantText + " ba ya samuwa a halin yanzu a " + networkLabel + ". Zan sanar da kai idan ya samu."
+          : requestedVariantText + " is currently not available on " + networkLabel + ". I will let you know when it becomes available.";
+        return new Response(JSON.stringify({ success:true, intent:ai.intent, service_type:"data", network:requestedNetworkToken, variant:requestedVariantText, products:[], available:false, answer:unavailableAnswer, ai_powered:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      }
       // Never let the AI imply that an inactive/unconfigured service is available.
       const requestedServiceType = String(ai.service_type || "").trim().toLowerCase();
       const availabilityCheckedIntents = new Set(["product_enquiry","product_price","purchase_intent","service_enquiry"]);
