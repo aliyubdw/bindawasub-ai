@@ -240,7 +240,18 @@ async function showChatScreen() {
   if (input) input.focus();
 }
 
+function cleanUiText(value) {
+  return String(value ?? "")
+    .replace(/\\\\r?\\\\n/g, "\n")
+    .replace(/\\r?\\n/g, "\n")
+    .replace(/\\\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\/n/g, "\n")
+    .replace(/'n/g, "\n");
+}
+
 function addMessage(text, type) {
+  text = cleanUiText(text);
 
   const welcome = document.getElementById("welcomeCard");
   if (welcome) welcome.remove();
