@@ -242,12 +242,10 @@ async function showChatScreen() {
 
 function cleanUiText(value) {
   return String(value ?? "")
-    .replace(/\\\\r?\\\\n/g, "\n")
-    .replace(/\\\\n/g, "\n")
-    .replace(/\\/n/g, "\n")
-    .replace(/'n/g, "\n")
-    .replace(/(^|[\\s])\\/n/g, "$1\n")
-    .replace(/(^|[\\s])'n/g, "$1\n");
+    .split("\\\\r\\\\n").join("\n")
+    .split("\\\\n").join("\n")
+    .split("\\/n").join("\n")
+    .split("'n").join("\n");
 }
 
 function addMessage(text, type) {
