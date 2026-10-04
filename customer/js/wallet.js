@@ -1,8 +1,17 @@
 // Bindawasub AI — wallet and manual funding
 
+// Customer funding is intentionally MANUAL-ONLY until BillStack is fully finished and tested.
+const CUSTOMER_FUNDING_MODE = "manual";
+
 function showManualFunding(data) {
   const messages = document.getElementById("messages");
   if (!messages) return;
+
+  // Safety guard: never render an automatic/BillStack funding response to customers.
+  if (data?.funding_mode && String(data.funding_mode).toLowerCase() !== CUSTOMER_FUNDING_MODE) {
+    addMessage("Automatic wallet funding is temporarily unavailable. Please use Manual Funding.", "bot");
+    return;
+  }
 
   const card = document.createElement("div");
   card.className = "message bot";
