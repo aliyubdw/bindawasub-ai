@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { formatCatalogProduct, productSpecification } from "./catalog/format.ts";
 import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
 import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
+import { getWalletBalance } from "./wallet/balance.ts";
+import { createManualFundingRequest } from "./wallet/funding.ts";
+import { getCustomerTransactions } from "./transactions/handler.ts";
 
 
 const corsHeaders = {
@@ -356,38 +359,6 @@ Deno.serve(async (req) => {
 // ==========================================
 
     const isAdmin = bindawasubUser.role === "admin";
-
-    const createManualFundingRequest = async (amount:number) => {
-      const { data: settings, error: settingsError } = await supabase
-        .from("manual_funding_settings")
-        .select("active, bank_name, account_name, account_number, instructions")
-        .eq("id", 1)
-        .maybeSingle();
-
-      if (settingsError) throw settingsError;
-      if (!settings?.active) return { success:false, error:"Manual wallet funding is temporarily unavailable." };
-      if (!Number.isFinite(amount) || amount <= 0) return { success:false, error:"Funding amount must be greater than zero." };
-
-      const reference = `MFR-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
-      const { data: request, error: requestError } = await supabase
-        .from("manual_funding_requests")
-        .insert({ user_id:userId, amount, reference, status:"pending" })
-        .select("id, amount, reference, status, created_at")
-        .single();
-
-      if (requestError) throw requestError;
-
-      return {
-        success:true,
-        request,
-        bank_account: settings.account_number ? {
-          bank_name:settings.bank_name,
-          account_name:settings.account_name,
-          account_number:settings.account_number
-        } : null,
-        instructions:settings.instructions || "Transfer the exact amount to the configured Bindawasub bank account, then submit your transfer reference."
-      };
-    };
 
     // Customer conversation endpoints. Every query is scoped to the authenticated customer.
     if (body.action === "new_conversation") {
@@ -3487,29 +3458,15 @@ if (body.action === "manual_fund") {
       }
 
       if (ai.intent === "wallet_balance") {
-        const { data: walletData, error: walletError } =
-          await supabase.rpc("get_my_balance", { p_user_id: userId });
-
-        if (walletError) throw walletError;
-        const wallet = walletData?.[0];
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            intent: "wallet_balance",
-            balance: wallet?.balance ?? 0,
-            currency: wallet?.currency ?? "NGN",
-            answer:
-              `Your wallet balance is ₦${Number(
-                wallet?.balance ?? 0
-              ).toLocaleString()}.`,
-            ai_powered: true,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        const wallet = await getWalletBalance(supabase, userId);
+        return new Response(JSON.stringify({
+          success: true,
+          intent: "wallet_balance",
+          balance: wallet.balance,
+          currency: wallet.currency,
+          answer: `Your wallet balance is ₦${wallet.balance.toLocaleString()}.`,
+          ai_powered: true,
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (
@@ -3519,33 +3476,7 @@ if (body.action === "manual_fund") {
       ) {
         const accountAction = ai.intent;
 
-        let recentTransactions:any[] = [];
-        let transactionError:any = null;
-        const txSelect=`
-          id, created_at, phone_number, amount, status, provider, provider_reference, product_id, description, service_type,
-          products (
-            product_name, service_type, volume, validity_value, validity_unit, validity_type,
-            service_networks(code,name), service_variants(code,name)
-          )
-        `;
-
-        if (ai.transaction_id) {
-          const exactTx=await supabase.from("transactions")
-            .select(txSelect).eq("user_id",userId).eq("id",String(ai.transaction_id)).maybeSingle();
-          if (exactTx.error) transactionError=exactTx.error;
-          else if (exactTx.data) recentTransactions=[exactTx.data];
-        }
-
-        if (!recentTransactions.length) {
-          const fallbackQuery=await supabase.from("transactions")
-            .select(txSelect).eq("user_id",userId).order("created_at",{ascending:false})
-            .limit(accountAction === "transaction_history" ? 5 : 3);
-          recentTransactions=fallbackQuery.data||[];
-          transactionError=fallbackQuery.error;
-        }
-
-        if (transactionError) throw transactionError;
-
+        const recentTransactions = await getCustomerTransactions(supabase, userId, ai.transaction_id || null, accountAction);
         const rows = recentTransactions || [];
 
         const maskPhone = (phone: string | null) => {
@@ -3678,7 +3609,7 @@ if (body.action === "manual_fund") {
         const parsedAmount = amountMatch ? Number(String(amountMatch[1]).replace(/,/g, "")) : 0;
 
         if (parsedAmount > 0) {
-          const funding = await createManualFundingRequest(parsedAmount);
+          const funding = await createManualFundingRequest(supabase, userId, parsedAmount);
 
           if (!funding.success) {
             return new Response(JSON.stringify({
