@@ -352,11 +352,13 @@ Deno.serve(async (req) => {
 
     // This is the existing Bindawasub users.id.
     // It remains separate from the Supabase Auth UUID.
-    const userId = bir
-        } : null,
-        instructions:settings.instructions || "Transfer the exact amount to the configured Bindawasub bank account, then submit your transfer reference."
-      };
-    };
+    const userId = bindawasubUser.id;
+
+    // ==========================================
+// ADMIN ACCESS CHECK
+// ==========================================
+
+    const isAdmin = bindawasubUser.role === "admin";
 
     // Customer conversation endpoints. Every query is scoped to the authenticated customer.
     if (body.action === "new_conversation") {
