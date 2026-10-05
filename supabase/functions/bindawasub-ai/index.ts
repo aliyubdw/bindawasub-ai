@@ -3217,7 +3217,72 @@ if (body.action === "manual_fund") {
           );
         }
 
-        const latest = formatted[0];
+        let latest = formatted[0];
+
+        // A status request on a pending transaction should perform one safe
+        // provider requery before reporting the state. Requery never creates
+        // a new purchase and provider-execution is responsible for exactly-once
+        // finalization/refund behavior.
+        if (accountAction === "transaction_status" && latest.status === "pending" && latest.id) {
+          try {
+            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+            const supabaseUrl = Deno.env.get("SUPABASE_URL");
+            if (serviceRoleKey && supabaseUrl) {
+              const requeryResponse = await fetch(
+                `${supabaseUrl}/functions/v1/provider-execution`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${serviceRoleKey}`,
+                    "apikey": serviceRoleKey,
+                  },
+                  body: JSON.stringify({
+                    action: "requery_transaction",
+                    transaction_id: latest.id,
+                  }),
+                }
+              );
+
+              if (requeryResponse.ok) {
+                const requeryRaw = await requeryResponse.text();
+                let requeryResult: any = null;
+                try { requeryResult = JSON.parse(requeryRaw); } catch {}
+
+                const refreshed = await getCustomerTransactions(
+                  supabase,
+                  userId,
+                  latest.id,
+                  "transaction_status"
+                );
+                if (refreshed?.length) {
+                  const refreshedTx = refreshed[0];
+                  const refreshedProduct = normalizeProduct(refreshedTx.products);
+                  const refreshedNetwork = Array.isArray(refreshedProduct?.service_networks)
+                    ? refreshedProduct.service_networks[0]
+                    : refreshedProduct?.service_networks;
+                  latest = {
+                    ...latest,
+                    status: refreshedTx.status,
+                    provider: refreshedTx.provider,
+                    provider_reference: refreshedTx.provider_reference || latest.provider_reference,
+                    product_name: refreshedProduct?.product_name || latest.product_name,
+                    network: refreshedNetwork?.code || latest.network,
+                    network_name: refreshedNetwork?.name || latest.network_name,
+                    volume: refreshedProduct?.volume || latest.volume,
+                  };
+                } else if (requeryResult?.status) {
+                  latest = { ...latest, status: requeryResult.status };
+                }
+              }
+            }
+          } catch (requeryError) {
+            console.error("Customer transaction status requery error:", requeryError);
+            // Do not turn a provider requery error into a false failure.
+            // The transaction remains pending and the normal status response
+            // below tells the customer the current known state.
+          }
+        }
 
         if (conversationId) {
           const txContext = {
