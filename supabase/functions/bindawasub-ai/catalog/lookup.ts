@@ -1,8 +1,8 @@
-function normalizeLookup(value:any){
+export function normalizeLookup(value:any){
   return String(value??"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 }
 
-function resolveCatalogProduct(ai:any, products:any[]){
+export function resolveCatalogProduct(ai:any, products:any[]){
   const list=Array.isArray(products)?products:[];
   const id=String(ai?.product_id||"").trim();
   if(id){
@@ -35,7 +35,7 @@ function resolveCatalogProduct(ai:any, products:any[]){
   return candidates.length===1?candidates[0]:null;
 }
 
-function filterCatalogBySpecification(ai:any, products:any[]){
+export function filterCatalogBySpecification(ai:any, products:any[]){
   const list=Array.isArray(products)?products:[];
   const requested={
     service:normalizeLookup(ai?.service_type),
