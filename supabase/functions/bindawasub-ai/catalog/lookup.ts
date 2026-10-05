@@ -61,5 +61,3 @@ export function filterCatalogBySpecification(ai:any, products:any[]){
   return candidates;
 }
 
-
-async
