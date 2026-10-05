@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function callGemini(
+async function callGemini(
   userMessage: string,
   availableProducts: any[],
   serviceCatalog: any[],
