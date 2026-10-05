@@ -3,7 +3,7 @@ export function maskTransactionPhone(phone:any){
   return digits.length>=7?digits.slice(0,4)+"****"+digits.slice(-3):"—";
 }
 
-function formatTransactionForAI(tx:any){
+export function formatTransactionForAI(tx:any){
   const p=Array.isArray(tx?.products)?tx.products[0]:tx?.products;
   const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
   const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
