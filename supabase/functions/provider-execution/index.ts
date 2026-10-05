@@ -101,6 +101,30 @@ async function getCredentials(providerId:string) {
   try { return JSON.parse(data); } catch { return {api_key:String(data),source:"vault"}; }
 }
 
+async function finalizeAndVerify(transactionId:string, providerStatus:"successful"|"failed", providerReference:string|null, providerMessage:string, providerResponse:any) {
+  const result=await db.rpc("finalize_vtu_transaction",{
+    p_transaction_id:transactionId,
+    p_provider_status:providerStatus,
+    p_provider_reference:providerReference,
+    p_provider_message:providerMessage,
+    p_provider_response:providerResponse,
+  });
+  if(result.error) throw new Error((providerStatus==="failed"?"Refund/finalization failed: ":"Finalization failed: ")+result.error.message);
+  const row=Array.isArray(result.data)?result.data[0]:result.data;
+  if(!row || row.final_status!==providerStatus) {
+    throw new Error("Finalization returned an unexpected transaction status.");
+  }
+  if(providerStatus==="failed") {
+    const {data:tx,error:txError}=await db.from("transactions").select("id,provider_reference").eq("id",transactionId).single();
+    if(txError || !tx) throw new Error("Refund verification failed: transaction could not be reloaded.");
+    const refundReference="REFUND-"+String(tx.provider_reference||providerReference||transactionId);
+    const {data:refund,error:refundError}=await db.from("wallet_transactions").select("reference,status,amount").eq("reference",refundReference).maybeSingle();
+    if(refundError) throw new Error("Refund verification failed: "+refundError.message);
+    if(!refund || refund.status!=="successful") throw new Error("Confirmed provider failure was recorded, but the wallet refund could not be verified.");
+  }
+  return row;
+}
+
 async function dryRunPurchase(req:Request, body:any) {
   await authorize(req,false);
   const txId=String(body.transaction_id||""); if(!txId) throw new Error("transaction_id is required.");
@@ -250,8 +274,7 @@ async function executePurchase(req:Request, body:any) {
 
     if(providerStatus==="successful"){
       await db.from("transaction_provider_attempts").update({status:"successful",provider_status:String(statusValue??""),provider_reference:providerRef||reference,response:parsed,completed_at:new Date().toISOString(),ambiguous:false}).eq("id",attempt.id);
-      const result=await db.rpc("finalize_vtu_transaction",{p_transaction_id:tx.id,p_provider_status:"successful",p_provider_reference:providerRef||reference,p_provider_message:String(providerMessage||""),p_provider_response:parsed});
-      if(result.error) throw new Error("Finalization failed: "+result.error.message);
+      await finalizeAndVerify(tx.id,"successful",providerRef||reference,String(providerMessage||""),parsed);
       if(mapping?.id) await db.from("provider_plan_mappings").update({failure_count:0,last_failure_at:null,cooldown_until:null,last_success_at:new Date().toISOString()}).eq("id",mapping.id);
       await db.from("transactions").update({processing_at:null}).eq("id",tx.id);
       return {success:true,status:"successful",transaction_id:tx.id,provider:provider.name,provider_reference:providerRef||reference,attempt_no:attemptNo,message:String(providerMessage||"")};
@@ -274,8 +297,7 @@ async function executePurchase(req:Request, body:any) {
   }
 
   const finalMessage="All eligible providers returned a confirmed failure. Your wallet has been refunded.";
-  const result=await db.rpc("finalize_vtu_transaction",{p_transaction_id:tx.id,p_provider_status:"failed",p_provider_reference:lastFailure?.provider_reference||null,p_provider_message:finalMessage,p_provider_response:{failover:true,last_failure:lastFailure}});
-  if(result.error) throw new Error("Refund/finalization failed: "+result.error.message);
+  await finalizeAndVerify(tx.id,"failed",lastFailure?.provider_reference||null,finalMessage,{failover:true,last_failure:lastFailure});
   await db.from("transactions").update({processing_at:null}).eq("id",tx.id);
   return {success:false,status:"failed",transaction_id:tx.id,message:finalMessage,failover_exhausted:true,last_failure:lastFailure};
 }
@@ -336,16 +358,14 @@ async function requeryTransaction(req:Request, body:any) {
 
   if(providerStatus==="successful"){
     await db.from("transaction_provider_attempts").update({status:"successful",provider_status:String(statusValue??""),provider_reference:String(providerRef),response:parsed,completed_at:new Date().toISOString(),ambiguous:false}).eq("id",attempt.id);
-    const result=await db.rpc("finalize_vtu_transaction",{p_transaction_id:tx.id,p_provider_status:"successful",p_provider_reference:String(providerRef),p_provider_message:String(providerMessage||""),p_provider_response:parsed});
-    if(result.error) throw new Error("Finalization failed: "+result.error.message);
+    await finalizeAndVerify(tx.id,"successful",String(providerRef),String(providerMessage||""),parsed);
     await db.from("transactions").update({processing_at:null}).eq("id",tx.id);
     return {success:true,status:"successful",transaction_id:tx.id,provider:provider.name,provider_reference:String(providerRef),attempt_no:attempt.attempt_no,message:String(providerMessage||"")};
   }
 
   if(providerStatus==="failed"){
     await db.from("transaction_provider_attempts").update({status:"failed",provider_status:String(statusValue??""),provider_reference:String(providerRef),response:parsed,completed_at:new Date().toISOString(),ambiguous:false,error_code:"REQUERY_CONFIRMED_FAILURE",error_message:String(providerMessage||"")}).eq("id",attempt.id);
-    const result=await db.rpc("finalize_vtu_transaction",{p_transaction_id:tx.id,p_provider_status:"failed",p_provider_reference:String(providerRef),p_provider_message:String(providerMessage||"Provider confirmed the transaction failed."),p_provider_response:parsed});
-    if(result.error) throw new Error("Refund/finalization failed: "+result.error.message);
+    await finalizeAndVerify(tx.id,"failed",String(providerRef),String(providerMessage||"Provider confirmed the transaction failed."),parsed);
     await db.from("transactions").update({processing_at:null}).eq("id",tx.id);
     return {success:false,status:"failed",transaction_id:tx.id,provider:provider.name,provider_reference:String(providerRef),attempt_no:attempt.attempt_no,message:String(providerMessage||"")};
   }
