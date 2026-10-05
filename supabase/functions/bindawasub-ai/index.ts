@@ -1,115 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { formatCatalogProduct, productSpecification } from "./catalog/format.ts";
+import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
+import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-function maskTransactionPhone(phone:any){
-  const digits=String(phone||"").replace(/\D/g,"");
-  return digits.length>=7?digits.slice(0,4)+"****"+digits.slice(-3):"—";
-}
-
-function formatTransactionForAI(tx:any){
-  const p=Array.isArray(tx?.products)?tx.products[0]:tx?.products;
-  const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
-  const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
-  return {transaction_id:tx?.id||null,created_at:tx?.created_at||null,status:tx?.status||"pending",amount:Number(tx?.amount||0),service_type:tx?.service_type||p?.service_type||null,product_name:p?.product_name||tx?.description||"Purchase",volume:p?.volume||null,network:n?.code||n?.name||null,variant:v?.code||v?.name||null,phone_number:maskTransactionPhone(tx?.phone_number)};
-}
-function formatCatalogProduct(p:any){
-  const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;
-  const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants;
-  const duration=p.validity_type==="fixed"&&p.validity_value!=null&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):(p.validity_type==="unlimited"?"Unlimited":"");
-  return {...p,network:n?.code||null,network_name:n?.name||null,variant:v?.code||null,variant_name:v?.name||null,duration};
-}
-function normalizeLookup(value:any){
-  return String(value??"").toLowerCase().replace(/[^a-z0-9]+/g,"");
-}
-
-function resolveCatalogProduct(ai:any, products:any[]){
-  const list=Array.isArray(products)?products:[];
-  const id=String(ai?.product_id||"").trim();
-  if(id){
-    const exact=list.find((p:any)=>p.id===id);
-    if(exact)return exact;
-  }
-
-  let candidates=list.slice();
-  const service=normalizeLookup(ai?.service_type);
-  const network=normalizeLookup(ai?.network);
-  const volume=normalizeLookup(ai?.volume);
-  const variant=normalizeLookup(ai?.variant);
-  const name=normalizeLookup(ai?.product_name);
-
-  if(service)candidates=candidates.filter((p:any)=>normalizeLookup(p.service_type)===service);
-  if(network)candidates=candidates.filter((p:any)=>{
-    const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;
-    return normalizeLookup(n?.code)===network||normalizeLookup(n?.name)===network;
-  });
-  if(volume)candidates=candidates.filter((p:any)=>normalizeLookup(p.volume)===volume);
-  if(variant)candidates=candidates.filter((p:any)=>{
-    const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants;
-    return normalizeLookup(v?.code)===variant||normalizeLookup(v?.name)===variant;
-  });
-  if(name){
-    const named=candidates.filter((p:any)=>normalizeLookup(p.product_name)===name);
-    if(named.length===1)return named[0];
-    if(named.length>0)candidates=named;
-  }
-  return candidates.length===1?candidates[0]:null;
-}
-
-function productSpecification(p:any){
-  const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
-  const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
-  const validity=p?.validity_type==="unlimited"
-    ?"Unlimited"
-    :(p?.validity_value!=null&&p?.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):"");
-  return {
-    id:p?.id||null,
-    service_type:p?.service_type||null,
-    network:n?.code||n?.name||null,
-    network_name:n?.name||null,
-    variant:v?.code||v?.name||null,
-    variant_name:v?.name||null,
-    product_name:p?.product_name||null,
-    volume:p?.volume||null,
-    validity,
-    validity_value:p?.validity_value??null,
-    validity_unit:p?.validity_unit??null,
-    selling_price:Number(p?.selling_price||0),
-    sku:p?.sku||null
-  };
-}
-
-function filterCatalogBySpecification(ai:any, products:any[]){
-  const list=Array.isArray(products)?products:[];
-  const requested={
-    service:normalizeLookup(ai?.service_type),
-    network:normalizeLookup(ai?.network),
-    variant:normalizeLookup(ai?.variant),
-    volume:normalizeLookup(ai?.volume),
-    product:normalizeLookup(ai?.product_name)
-  };
-
-  let candidates=list.slice();
-  if(requested.service)candidates=candidates.filter((p:any)=>normalizeLookup(p?.service_type)===requested.service);
-  if(requested.network)candidates=candidates.filter((p:any)=>{
-    const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks;
-    return normalizeLookup(n?.code)===requested.network||normalizeLookup(n?.name)===requested.network;
-  });
-  if(requested.variant)candidates=candidates.filter((p:any)=>{
-    const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
-    return normalizeLookup(v?.code)===requested.variant||normalizeLookup(v?.name)===requested.variant;
-  });
-  if(requested.volume)candidates=candidates.filter((p:any)=>normalizeLookup(p?.volume)===requested.volume);
-  if(requested.product)candidates=candidates.filter((p:any)=>normalizeLookup(p?.product_name)===requested.product);
-
-  return candidates;
-}
-
 
 async function callGemini(
   userMessage: string,
