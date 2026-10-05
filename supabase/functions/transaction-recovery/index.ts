@@ -20,12 +20,6 @@ Deno.serve(async (req) => {
       return json({ success: false, error: "Internal service authorization required." }, 401);
     }
 
-    // Prevent overlapping recovery runs.
-    const { data: lockRows, error: lockError } = await db.rpc("pg_try_advisory_lock", { key: 8242026 });
-    if (lockError) {
-      console.error("Recovery lock unavailable:", lockError.message);
-    }
-
     const { data: pending, error } = await db
       .from("transactions")
       .select("id,status,provider_reference,created_at")
