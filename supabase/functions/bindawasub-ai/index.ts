@@ -12,6 +12,7 @@ import { isInternalTelegramRequest as isInternalTelegramRequestCheck } from "./t
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleNewConversation, handleConversationList, handleConversationHistory } from "./conversation/handler.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
+import { handleAiSummary, handleAiSettings, handleAiCustomerWallet, handleAdminStatus, handleCustomerSearch } from "./admin/handler.ts";
 
 
 const corsHeaders = {
@@ -133,51 +134,20 @@ Deno.serve(async (req) => {
       return await handleConversationHistory({ supabase, userId, corsHeaders }, body);
     }
 
-    // AI MANAGEMENT: admin-only dashboard summary
     if (body.action === "ai_summary") {
-      if (!isAdmin) return new Response(JSON.stringify({ success:false, error:"Admin access required." }), { status:403, headers:{...corsHeaders,"Content-Type":"application/json"} });
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const [conversations, messages, activities, successful, failed, pending] = await Promise.all([
-        supabase.from("ai_conversations").select("id", { count:"exact", head:true }).gte("last_message_at", since),
-        supabase.from("ai_messages").select("id", { count:"exact", head:true }).gte("created_at", since),
-        supabase.from("ai_activity_log").select("id", { count:"exact", head:true }).gte("created_at", since),
-        supabase.from("transactions").select("id", { count:"exact", head:true }).eq("status","successful").gte("created_at", since),
-        supabase.from("transactions").select("id", { count:"exact", head:true }).eq("status","failed").gte("created_at", since),
-        supabase.from("transactions").select("id", { count:"exact", head:true }).eq("status","pending").gte("created_at", since)
-      ]);
-      const errors = [conversations,messages,activities,successful,failed,pending].find((q:any)=>q.error);
-      if (errors?.error) throw errors.error;
-      return new Response(JSON.stringify({ success:true, period_days:7, summary:{ conversations:conversations.count||0, messages:messages.count||0, activity_events:activities.count||0, successful_purchases:successful.count||0, failed_purchases:failed.count||0, pending_purchases:pending.count||0 } }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      return await handleAiSummary({ supabase, isAdmin, corsHeaders });
     }
 
-    // AI MANAGEMENT: admin-only settings read/write
     if (body.action === "ai_settings_get" || body.action === "ai_settings_save") {
-      if (!isAdmin) return new Response(JSON.stringify({ success:false, error:"Admin access required." }), { status:403, headers:{...corsHeaders,"Content-Type":"application/json"} });
-      if (body.action === "ai_settings_get") {
-        const { data, error } = await supabase.from("ai_settings").select("*").limit(1).maybeSingle();
-        if (error) throw error;
-        return new Response(JSON.stringify({success:true, settings:data}), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-      const patch:any = {};
-      for (const key of ["enabled","gemini_enabled","require_purchase_confirmation","max_purchase_amount","default_language","allowed_channels","fallback_message"]) if (body.settings?.[key] !== undefined) patch[key]=body.settings[key];
-      patch.updated_at = new Date().toISOString();
-      const { data, error } = await supabase.from("ai_settings").update(patch).not("id","is",null).select("*").limit(1).single();
-      if (error) throw error;
-      return new Response(JSON.stringify({success:true,settings:data}), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      return await handleAiSettings({ supabase, isAdmin, corsHeaders }, body.action, body.settings);
     }
 
-    // AI MANAGEMENT: admin-only customer wallet history
     if (body.action === "ai_customer_wallet") {
-      if (!isAdmin) return new Response(JSON.stringify({ success:false, error:"Admin access required." }), { status:403, headers:{...corsHeaders,"Content-Type":"application/json"} });
-      const customerId = String(body.user_id || "").trim();
-      if (!customerId) return new Response(JSON.stringify({ success:false, error:"Customer user_id is required." }), { status:400, headers:{...corsHeaders,"Content-Type":"application/json"} });
-      const [wallet, walletTx] = await Promise.all([
-        supabase.from("wallets").select("id,user_id,balance,currency,updated_at").eq("user_id",customerId).maybeSingle(),
-        supabase.from("wallet_transactions").select("id,type,amount,reference,balance_before,balance_after,status,created_at").eq("user_id",customerId).order("created_at",{ascending:false}).limit(50)
-      ]);
-      if (wallet.error) throw wallet.error;
-      if (walletTx.error) throw walletTx.error;
-      return new Response(JSON.stringify({success:true,wallet:wallet.data||null,transactions:walletTx.data||[]}), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
+      return await handleAiCustomerWallet({ supabase, isAdmin, corsHeaders }, String(body.user_id || "").trim());
+    }
+
+    if (body.action === "admin_status") {
+      return await handleAdminStatus({ supabase, isAdmin, corsHeaders }, bindawasubUser);
     }
 
     const originalMessage = body.message || "";
@@ -506,121 +476,8 @@ Deno.serve(async (req) => {
 // ==========================================
 
 if (body.action === "customer_search") {
-  if (!isAdmin) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Admin access required.",
-      }),
-      {
-        status: 403,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  const search = String(body.search || "").trim();
-
-  if (!search) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Search name or phone number.",
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  const { data: customers, error: searchError } =
-    await supabase
-      .from("users")
-      .select(`
-        id,
-        name,
-        phone,
-        role,
-        wallets (
-          balance
-        )
-      `)
-      .or(
-        `name.ilike.%${search}%,phone.ilike.%${search}%`
-      )
-      .order("name", { ascending: true })
-      .limit(20);
-
-  if (searchError) {
-    console.error(
-      "Customer search error:",
-      searchError
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: searchError.message,
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  // Normalize the wallet relation so the frontend
-  // always receives wallets as an array.
-  const normalizedCustomers = (customers || []).map(
-    (customer) => {
-      const wallet = Array.isArray(customer.wallets)
-        ? customer.wallets[0]
-        : customer.wallets;
-
-      const balance = Number(wallet?.balance ?? 0);
-
-      return {
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone,
-        role: customer.role,
-
-        wallets: [
-          {
-            balance: Number.isFinite(balance)
-              ? balance
-              : 0,
-          },
-        ],
-      };
+      return await handleCustomerSearch({ supabase, isAdmin, corsHeaders }, body.search);
     }
-  );
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      intent: "customer_search",
-      customers: normalizedCustomers,
-    }),
-    {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-}
 
 
     // ==========================================
