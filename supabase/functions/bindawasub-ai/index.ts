@@ -13,6 +13,7 @@ import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleNewConversation, handleConversationList, handleConversationHistory } from "./conversation/handler.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
 import { handleAiSummary, handleAiSettings, handleAiCustomerWallet, handleAdminStatus, handleCustomerSearch } from "./admin/handler.ts";
+import { handleCheckWallet, handleTransactionActions, handlePendingRequery } from "./account/handler.ts";
 
 
 const corsHeaders = {
@@ -454,304 +455,42 @@ if (body.action === "customer_search") {
 
 
     // ==========================================
-    // CHECK WALLET
-    // ==========================================
+        if (body.action === "check_wallet") {
+      return await handleCheckWallet({ supabase, userId, corsHeaders }, body.amount);
+    }
 
-    if (body.action === "check_wallet") {
-      const amount = Number(body.amount || 0);
-
-      const { data, error } = await supabase.rpc(
-        "get_my_balance",
-        {
-          p_user_id: userId,
-        }
-      );
-
-      if (error) {
-        throw error;
-      }
-
-      const wallet = data?.[0];
-
-      if (!wallet) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: "Wallet not found",
-          }),
-          {
-            status: 404,
+        if (body.action === "requery_pending_purchase") {
+      return await handlePendingRequery({
+        supabase,
+        userId,
+        corsHeaders,
+        executePendingRequery: async (transactionId: string) => {
+          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          if (!serviceRoleKey || !supabaseUrl) throw new Error("Supabase server configuration is incomplete.");
+          const response = await fetch(`${supabaseUrl}/functions/v1/provider-execution`, {
+            method: "POST",
             headers: {
-              ...corsHeaders,
               "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceRoleKey}`,
+              "apikey": serviceRoleKey,
             },
-          }
-        );
-      }
-
-      const sufficient =
-        Number(wallet.balance) >= amount;
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          balance: wallet.balance,
-          currency: wallet.currency,
-          sufficient,
-          answer: sufficient
-            ? `Your wallet balance is ₦${Number(
-                wallet.balance
-              ).toLocaleString()}.`
-            : `Your wallet balance is ₦${Number(
-                wallet.balance
-              ).toLocaleString()}, but ₦${amount.toLocaleString()} is required.`,
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+            body: JSON.stringify({ action: "requery_transaction", transaction_id: transactionId }),
+          });
+          const raw = await response.text();
+          let result: any;
+          try { result = JSON.parse(raw); } catch { result = { success: false, error: raw }; }
+          if (!response.ok) throw new Error(result?.error || "Provider requery failed.");
+          return result;
+        },
+      }, body.transaction_id);
     }
 
-
-
-    // ==========================================
-    // CUSTOMER FAST REQUERY FOR PENDING PURCHASE
-    // ==========================================
-
-    if (body.action === "requery_pending_purchase") {
-      const transactionId = String(body.transaction_id || "").trim();
-
-      if (!transactionId) {
-        return new Response(
-          JSON.stringify({ success:false, error:"transaction_id is required." }),
-          { status:400, headers:{...corsHeaders,"Content-Type":"application/json"} }
-        );
-      }
-
-      const { data: pendingTx, error: pendingTxError } = await supabase
-        .from("transactions")
-        .select("id,user_id,status,provider_reference")
-        .eq("id", transactionId)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (pendingTxError) throw pendingTxError;
-      if (!pendingTx) {
-        return new Response(
-          JSON.stringify({ success:false, error:"Transaction not found." }),
-          { status:404, headers:{...corsHeaders,"Content-Type":"application/json"} }
-        );
-      }
-
-      if (["successful","failed","reversed"].includes(String(pendingTx.status || "").toLowerCase())) {
-        return new Response(
-          JSON.stringify({
-            success:true,
-            intent:"requery_pending_purchase",
-            transaction_id:pendingTx.id,
-            status:pendingTx.status,
-            finalized:true
-          }),
-          { status:200, headers:{...corsHeaders,"Content-Type":"application/json"} }
-        );
-      }
-
-      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      if (!serviceRoleKey || !supabaseUrl) {
-        throw new Error("Supabase server configuration is incomplete.");
-      }
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/provider-execution`,
-        {
-          method:"POST",
-          headers:{
-            "Content-Type":"application/json",
-            "Authorization":`Bearer ${serviceRoleKey}`,
-            "apikey":serviceRoleKey
-          },
-          body:JSON.stringify({
-            action:"requery_transaction",
-            transaction_id:transactionId
-          })
-        }
-      );
-
-      const raw = await response.text();
-      let result:any;
-      try { result = JSON.parse(raw); } catch { result = { success:false, error:raw }; }
-
-      if (!response.ok) {
-        throw new Error(result?.error || "Provider requery failed.");
-      }
-
-      return new Response(
-        JSON.stringify({
-          success:true,
-          intent:"requery_pending_purchase",
-          ...result
-        }),
-        { status:200, headers:{...corsHeaders,"Content-Type":"application/json"} }
-      );
+        if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
+      return await handleTransactionActions({ supabase, userId, corsHeaders }, body);
     }
 
-    // ==========================================
-    // CUSTOMER TRANSACTION HISTORY / STATUS
-    // ==========================================
-
-    if (
-      body.action === "transaction_history" ||
-      body.action === "last_transaction" ||
-      body.action === "transaction_status"
-    ) {
-      const requestedLimit =
-        Math.min(Math.max(Number(body.limit || 5), 1), 10);
-
-      let transactionQuery = supabase
-        .from("transactions")
-        .select(`
-          id,
-          created_at,
-          phone_number,
-          amount,
-          status,
-          provider,
-          provider_reference,
-          product_id,
-          products (
-            product_name,
-            volume,
-            validity_type,
-            validity_value,
-            validity_unit,
-            service_networks(code,name)
-          )
-        `)
-        .eq("user_id", userId);
-
-      if (body.action === "transaction_status" && body.transaction_id) {
-        transactionQuery = transactionQuery
-          .eq("id", String(body.transaction_id).trim())
-          .limit(1);
-      } else {
-        transactionQuery = transactionQuery
-          .order("created_at", { ascending: false })
-          .limit(
-            body.action === "last_transaction" ||
-            body.action === "transaction_status"
-              ? 1
-              : requestedLimit
-          );
-      }
-
-      const { data: recentTransactions, error: transactionError } =
-        await transactionQuery;
-
-      if (transactionError) {
-        console.error("Transaction history error:", transactionError);
-        throw transactionError;
-      }
-
-      const rows = recentTransactions || [];
-
-      const maskPhone = (phone: string | null) => {
-        if (!phone) return "—";
-        const digits = phone.replace(/\\D/g, "");
-        if (digits.length < 7) return phone;
-        return `${digits.slice(0, 4)}****${digits.slice(-3)}`;
-      };
-
-      const normalizeProduct = (product: any) =>
-        Array.isArray(product) ? product[0] : product;
-
-      const formatted = rows.map((tx: any) => {
-        const product = normalizeProduct(tx.products);
-        return {
-          id: tx.id,
-          date: tx.created_at,
-          product_name: product?.product_name || "Purchase",
-          network: (Array.isArray(product?.service_networks)?product.service_networks[0]:product?.service_networks)?.code || null,
-          volume: product?.volume || null,
-          duration: product?.validity_type==="fixed"&&product?.validity_value!=null&&product?.validity_unit?`${product.validity_value} ${product.validity_unit}`:(product?.validity_type==="unlimited"?"Unlimited":null),
-          phone_number: maskPhone(tx.phone_number),
-          amount: Number(tx.amount || 0),
-          status: tx.status,
-          provider: tx.provider,
-          provider_reference: tx.provider_reference || null,
-        };
-      });
-
-      if (body.action === "transaction_history") {
-        const answer =
-          formatted.length === 0
-            ? "You do not have any purchases yet."
-            : `Here are your latest ${formatted.length} purchase${formatted.length === 1 ? "" : "s"}.`;
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            intent: "transaction_history",
-            transactions: formatted,
-            answer,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      if (formatted.length === 0) {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            intent: body.action,
-            transaction: null,
-            answer: "You do not have any purchases yet.",
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      const latest = formatted[0];
-
-      let answer = `Your latest purchase is ${latest.product_name} for ₦${latest.amount.toLocaleString()} to ${latest.phone_number}. Status: ${latest.status}.`;
-
-      if (body.action === "transaction_status") {
-        if (latest.status === "successful") {
-          answer = `Yes. Your latest purchase, ${latest.product_name}, was successful.`;
-        } else if (latest.status === "failed") {
-          answer = `Your latest purchase, ${latest.product_name}, failed.`;
-        } else {
-          answer = `Your latest purchase, ${latest.product_name}, is currently ${latest.status}.`;
-        }
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          intent: body.action,
-          transaction: latest,
-          answer,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // ==========================================
-// ==========================================
-// FUND WALLET — MANUAL BANK TRANSFER (CURRENT MODE)
+    // FUND WALLET// FUND WALLET — MANUAL BANK TRANSFER (CURRENT MODE)
 // ==========================================
 
 if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
