@@ -5,17 +5,17 @@ import { getActiveDataCatalog, normalizeCatalogToken } from "./catalog/list.ts";
 import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
 import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
 import { getWalletBalance } from "./wallet/balance.ts";
+import { executeViaProviderExecution } from "./purchase/execution.ts";
+import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
+import { loadCustomerTransaction } from "./transactions/lookup.ts";
+import { routeExplicitAction } from "./router/action-router.ts";
+import { recoverFundingAmountFromConversation } from "./funding/context.ts";
 import { createManualFundingRequest } from "./wallet/funding.ts";
-import { getCustomerTransactions } from "./transactions/handler.ts";
 import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts";
 import { classifyIntent } from "./ai/intent.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
-import { handleNewConversation, handleConversationList, handleConversationHistory } from "./conversation/handler.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
-import { handleAiSummary, handleAiSettings, handleAiCustomerWallet, handleAdminStatus, handleCustomerSearch } from "./admin/handler.ts";
-import { handleCheckWallet, handleTransactionActions, handlePendingRequery } from "./account/handler.ts";
-import { handleStartAirtime, handleFundingActions } from "./funding/handler.ts";
 
 
 const corsHeaders = {
@@ -125,34 +125,6 @@ Deno.serve(async (req) => {
 
     const isAdmin = bindawasubUser.role === "admin";
 
-    if (body.action === "new_conversation") {
-      return await handleNewConversation({ supabase, userId, corsHeaders }, body);
-    }
-
-    if (body.action === "conversation_list") {
-      return await handleConversationList({ supabase, userId, corsHeaders }, body);
-    }
-
-    if (body.action === "conversation_history") {
-      return await handleConversationHistory({ supabase, userId, corsHeaders }, body);
-    }
-
-    if (body.action === "ai_summary") {
-      return await handleAiSummary({ supabase, isAdmin, corsHeaders });
-    }
-
-    if (body.action === "ai_settings_get" || body.action === "ai_settings_save") {
-      return await handleAiSettings({ supabase, isAdmin, corsHeaders }, body.action, body.settings);
-    }
-
-    if (body.action === "ai_customer_wallet") {
-      return await handleAiCustomerWallet({ supabase, isAdmin, corsHeaders }, String(body.user_id || "").trim());
-    }
-
-    if (body.action === "admin_status") {
-      return await handleAdminStatus({ supabase, isAdmin, corsHeaders }, bindawasubUser);
-    }
-
     const originalMessage = body.message || "";
     const message = originalMessage.toLowerCase();
 
@@ -171,12 +143,22 @@ Deno.serve(async (req) => {
       body.channel
     );
 
-    if (body.action === "start_airtime") {
-      return await handleStartAirtime(
-        { supabase, userId, corsHeaders, originalMessage, conversationId, channel },
-        body
-      );
-    }
+
+    const earlyAction = await routeExplicitAction(
+      {
+        supabase,
+        userId,
+        isAdmin,
+        corsHeaders,
+        bindawasubUser,
+        originalMessage,
+        conversationId,
+        channel,
+      },
+      body,
+      "early",
+    );
+    if (earlyAction) return earlyAction;
 
     // Load live AI controls before processing customer requests.
     const { data: aiConfig, error: aiConfigError } = await supabase
@@ -246,178 +228,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ==========================================
-    // RECOVER MANUAL FUNDING AMOUNT FROM CHAT CONTEXT
-    // ==========================================
-    // This keeps the funding flow working even if an older frontend
-    // does not send the explicit manual_funding_request action.
-    if (conversationId) {
-      const amountMatch = String(originalMessage).trim().match(
-        /^(?:₦\\s*|NGN\\s*|naira\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*$/i
-      );
-
-      if (amountMatch) {
-        const parsedAmount = Number(
-          String(amountMatch[1]).replace(/,/g, "")
-        );
-
-        if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
-          // The fund_wallet action returns before an assistant message is logged,
-          // so the previous assistant message may not exist here. Check the
-          // immediately previous user message as the durable conversation signal.
-          const { data: previousUserMessages } = await supabase
-            .from("ai_messages")
-            .select("message, created_at")
-            .eq("conversation_id", conversationId)
-            .eq("role", "user")
-            .order("created_at", { ascending: false })
-            .limit(2);
-
-          const previousUserMessage = String(
-            previousUserMessages?.[1]?.message || ""
-          ).toLowerCase().trim();
-
-          if (
-            /fund.*wallet|wallet.*fund|funding.*wallet|add.*money|add.*amount|fund my wallet/.test(
-              previousUserMessage
-            )
-          ) {
-            body.action = "manual_funding_request";
-            body.amount = parsedAmount;
-          }
-        }
-      }
-    }
+    // Recover a numeric funding amount from the previous funding request.
+    await recoverFundingAmountFromConversation({
+      supabase,
+      conversationId,
+      originalMessage,
+      body,
+    });
 
 
 
-    async function executeViaProviderExecution(transactionId: string) {
-      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      if (!serviceRoleKey || !supabaseUrl) {
-        throw new Error("Supabase server configuration is incomplete.");
-      }
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/provider-execution`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceRoleKey}`,
-            "apikey": serviceRoleKey,
-          },
-          body: JSON.stringify({
-            action: "execute_purchase",
-            transaction_id: transactionId,
-          }),
-        }
-      );
-
-      const raw = await response.text();
-      let result: any;
-      try { result = JSON.parse(raw); } catch { result = { success: false, error: raw }; }
-
-      if (!response.ok) {
-        throw new Error(result?.error || "Provider execution failed.");
-      }
-      return result;
-    }
-
-    async function loadCustomerTransaction(transactionId: string) {
-      const { data, error } = await supabase.from("transactions").select(`
-        id, created_at, phone_number, amount, status, provider, provider_reference,
-        description, service_type, product_id,
-        products (product_name, volume, validity_type, validity_value, validity_unit,
-          service_networks(code,name), service_variants(code,name))
-      `).eq("id", transactionId).eq("user_id", userId).maybeSingle();
-      if (error) { console.error("Customer transaction readback error:", error); return null; }
-      return data || null;
-    }
-
-    function buildPurchaseConfirmation(tx: any, fallbackPurchase: any, execution: any) {
-      const product=Array.isArray(tx?.products)?tx.products[0]:tx?.products;
-      const networkInfo=Array.isArray(product?.service_networks)?product.service_networks[0]:product?.service_networks;
-      const variantInfo=Array.isArray(product?.service_variants)?product.service_variants[0]:product?.service_variants;
-      const reference=tx?.provider_reference||execution?.provider_reference||fallbackPurchase?.provider_reference||null;
-      const description=tx?.description||fallbackPurchase?.description||product?.product_name||"Purchase";
-      const productName=product?.product_name||fallbackPurchase?.product_name||description;
-      const phoneNumber=tx?.phone_number||fallbackPurchase?.phone_number||fallbackPurchase?.customer_input?.phone||null;
-      const amount=Number(tx?.amount??fallbackPurchase?.amount??0);
-      const status=tx?.status||execution?.status||fallbackPurchase?.status||"pending";
-      const provider=tx?.provider||execution?.provider||fallbackPurchase?.provider||null;
-      return {
-        transaction_id:tx?.id||fallbackPurchase?.id||fallbackPurchase?.transaction_id||execution?.transaction_id||null,
-        date:tx?.created_at||fallbackPurchase?.created_at||null, description, product_name:productName,
-        service_type:tx?.service_type||fallbackPurchase?.service_type||null,
-        network:networkInfo?.code||networkInfo?.name||fallbackPurchase?.network||null,
-        variant:variantInfo?.code||variantInfo?.name||fallbackPurchase?.variant||null,
-        volume:product?.volume||fallbackPurchase?.volume||null, phone_number:phoneNumber, amount, status, provider,
-        reference, provider_reference:reference, provider_message:execution?.message||null
-      };
-    }
-
-// ==========================================
-// ADMIN CUSTOMER SEARCH
-// ==========================================
-
-if (body.action === "customer_search") {
-      return await handleCustomerSearch({ supabase, isAdmin, corsHeaders }, body.search);
-    }
-
-
-    // ==========================================
-        if (body.action === "check_wallet") {
-      return await handleCheckWallet({ supabase, userId, corsHeaders }, body.amount);
-    }
-
-        if (body.action === "requery_pending_purchase") {
-      return await handlePendingRequery({
+    // Explicit actions that depend on conversation/AI state.
+    const routedAction = await routeExplicitAction(
+      {
         supabase,
         userId,
+        isAdmin,
         corsHeaders,
-        executePendingRequery: async (transactionId: string) => {
-          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-          const supabaseUrl = Deno.env.get("SUPABASE_URL");
-          if (!serviceRoleKey || !supabaseUrl) throw new Error("Supabase server configuration is incomplete.");
-          const response = await fetch(`${supabaseUrl}/functions/v1/provider-execution`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${serviceRoleKey}`,
-              "apikey": serviceRoleKey,
-            },
-            body: JSON.stringify({ action: "requery_transaction", transaction_id: transactionId }),
-          });
-          const raw = await response.text();
-          let result: any;
-          try { result = JSON.parse(raw); } catch { result = { success: false, error: raw }; }
-          if (!response.ok) throw new Error(result?.error || "Provider requery failed.");
-          return result;
-        },
-      }, body.transaction_id);
-    }
-
-        if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
-      return await handleTransactionActions({ supabase, userId, corsHeaders }, body);
-    }
-
-    // FUNDING ACTIONS
-    // ==========================================
-    if ([
-      "fund_wallet",
-      "manual_funding_request",
-      "manual_funding_submit",
-      "manual_funding_history",
-      "manual_funding_requests",
-      "manual_funding_approve",
-      "manual_funding_reject",
-      "manual_funding_settings_get",
-      "manual_funding_settings_save",
-      "manual_fund",
-    ].includes(body.action)) {
-      return await handleFundingActions({ supabase, userId, isAdmin, corsHeaders }, body);
-    }
+        bindawasubUser,
+        originalMessage,
+        conversationId,
+        channel,
+      },
+      body,
+      "normal",
+    );
+    if (routedAction) return routedAction;
 
     // ==========================================
     // CONFIRMATION OF A PENDING PURCHASE
@@ -512,7 +348,7 @@ if (body.action === "customer_search") {
           originalMessage,
           corsHeaders,
           executeViaProviderExecution,
-          loadCustomerTransaction,
+          loadCustomerTransaction: (transactionId: string) => loadCustomerTransaction(supabase, userId, transactionId),
           buildPurchaseConfirmation,
           persistAssistantMessage,
           logAiActivity,
@@ -534,7 +370,7 @@ if (body.action === "customer_search") {
           originalMessage,
           corsHeaders,
           executeViaProviderExecution,
-          loadCustomerTransaction,
+          loadCustomerTransaction: (transactionId: string) => loadCustomerTransaction(supabase, userId, transactionId),
           buildPurchaseConfirmation,
           persistAssistantMessage,
           logAiActivity,
