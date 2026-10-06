@@ -455,22 +455,42 @@ if (body.action === "customer_search") {
 
 
     // ==========================================
-        if (body.action === "check_wallet") return await handleCheckWallet({ supabase, userId, corsHeaders }, body.amount);
-
-    //     if (body.action === "requery_pending_purchase") {
-      return await handlePendingRequery({ supabase, userId, corsHeaders, executePendingRequery: async (transactionId: string) => {
-        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); const supabaseUrl = Deno.env.get("SUPABASE_URL");
-        if (!serviceRoleKey || !supabaseUrl) throw new Error("Supabase server configuration is incomplete.");
-        const response = await fetch(`${supabaseUrl}/functions/v1/provider-execution`, { method:"POST", headers:{"Content-Type":"application/json","Authorization":`Bearer ${serviceRoleKey}`,"apikey":serviceRoleKey}, body:JSON.stringify({action:"requery_transaction",transaction_id:transactionId}) });
-        const raw=await response.text(); let result:any; try{result=JSON.parse(raw)}catch{result={success:false,error:raw}}; if(!response.ok) throw new Error(result?.error||"Provider requery failed."); return result;
-      }}, body.transaction_id);
+        if (body.action === "check_wallet") {
+      return await handleCheckWallet({ supabase, userId, corsHeaders }, body.amount);
     }
 
-    if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
+        if (body.action === "requery_pending_purchase") {
+      return await handlePendingRequery({
+        supabase,
+        userId,
+        corsHeaders,
+        executePendingRequery: async (transactionId: string) => {
+          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          if (!serviceRoleKey || !supabaseUrl) throw new Error("Supabase server configuration is incomplete.");
+          const response = await fetch(`${supabaseUrl}/functions/v1/provider-execution`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceRoleKey}`,
+              "apikey": serviceRoleKey,
+            },
+            body: JSON.stringify({ action: "requery_transaction", transaction_id: transactionId }),
+          });
+          const raw = await response.text();
+          let result: any;
+          try { result = JSON.parse(raw); } catch { result = { success: false, error: raw }; }
+          if (!response.ok) throw new Error(result?.error || "Provider requery failed.");
+          return result;
+        },
+      }, body.transaction_id);
+    }
+
+        if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
       return await handleTransactionActions({ supabase, userId, corsHeaders }, body);
     }
 
-    // // FUND WALLET — MANUAL BANK TRANSFER (CURRENT MODE)
+    // FUND WALLET// FUND WALLET — MANUAL BANK TRANSFER (CURRENT MODE)
 // ==========================================
 
 if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
