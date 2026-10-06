@@ -57,7 +57,7 @@ export async function handleTransactionActions(ctx: AccountActionContext, body: 
   const rows = recentTransactions || [];
   const maskPhone = (phone: string | null) => {
     if (!phone) return "—";
-    const digits = phone.replace(/\\D/g, "");
+    const digits = phone.replace(/\D/g, "");
     if (digits.length < 7) return phone;
     return `${digits.slice(0, 4)}****${digits.slice(-3)}`;
   };
@@ -172,7 +172,7 @@ export async function handleManualFunding(ctx: AccountActionContext, body: any) 
 
 export function handleStartAirtime(ctx: AccountActionContext, body: any, originalMessage: string) {
   const requestedNetwork = String(body.network || "").trim().toLowerCase();
-  const match = !requestedNetwork ? String(originalMessage || "").match(/\\b(mtn|airtel|glo|9mobile|t2)\\b/i) : null;
+  const match = !requestedNetwork ? String(originalMessage || "").match(/\b(mtn|airtel|glo|9mobile|t2)\b/i) : null;
   const normalized = (requestedNetwork || match?.[1] || "").toLowerCase();
   const network = normalized === "t2" || normalized.startsWith("9mobile") ? "9mobile" : normalized;
   if (!["mtn", "airtel", "glo", "9mobile"].includes(network)) {
