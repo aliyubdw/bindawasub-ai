@@ -258,33 +258,6 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================
-    // ADMIN STATUS
-    // ==========================================
-
-    if (body.action === "admin_status") {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          authenticated: true,
-          is_admin: isAdmin,
-          role: bindawasubUser.role,
-          user: {
-            id: bindawasubUser.id,
-            name: bindawasubUser.name,
-            phone: bindawasubUser.phone,
-          },
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-
-    // ==========================================
     // CONVERSATION + PENDING PURCHASE STATE
     // ==========================================
 
