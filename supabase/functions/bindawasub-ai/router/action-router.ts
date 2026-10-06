@@ -81,37 +81,6 @@ export async function routeExplicitAction(
     return null;
   }
 
-  if (body.action === "new_conversation") {
-    return await handleNewConversation({ supabase, userId, corsHeaders }, body);
-  }
-  if (body.action === "conversation_list") {
-    return await handleConversationList({ supabase, userId, corsHeaders }, body);
-  }
-  if (body.action === "conversation_history") {
-    return await handleConversationHistory({ supabase, userId, corsHeaders }, body);
-  }
-  if (body.action === "ai_summary") {
-    return await handleAiSummary({ supabase, isAdmin, corsHeaders });
-  }
-  if (body.action === "ai_settings_get" || body.action === "ai_settings_save") {
-    return await handleAiSettings(
-      { supabase, isAdmin, corsHeaders },
-      body.action,
-      body.settings,
-    );
-  }
-  if (body.action === "ai_customer_wallet") {
-    return await handleAiCustomerWallet(
-      { supabase, isAdmin, corsHeaders },
-      String(body.user_id || "").trim(),
-    );
-  }
-  if (body.action === "admin_status") {
-    return await handleAdminStatus(
-      { supabase, isAdmin, corsHeaders },
-      bindawasubUser,
-    );
-  }
   if (body.action === "start_airtime") {
     return await handleStartAirtime(
       {
