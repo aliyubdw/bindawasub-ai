@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { formatCatalogProduct, productSpecification } from "./catalog/format.ts";
+import { getActiveDataCatalog, normalizeCatalogToken } from "./catalog/list.ts";
 import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
 import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
 import { getWalletBalance } from "./wallet/balance.ts";
@@ -800,9 +801,6 @@ if (body.action === "customer_search") {
         /\b(mtn|airtel|glo|9mobile|t2)\b/i.test(message)
       )
     ) {
-      const normalizeCatalogToken = (value:any) =>
-        String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-
       const requestedNetwork =
         /\bmtn\b/i.test(originalMessage) ? "mtn" :
         /\bairtel\b/i.test(originalMessage) ? "airtel" :
@@ -817,19 +815,7 @@ if (body.action === "customer_search") {
         /\bawoop\b/i.test(originalMessage) ? "awoop" :
         normalizeCatalogToken(conversationContext?.variant) || null;
 
-      const { data: catalogProducts, error: catalogError } =
-        await supabase
-          .from("products")
-          .select(
-            "id, sku, service_type, product_name, volume, selling_price, validity_type, validity_value, validity_unit, network_id, variant_id, service_networks(code,name), service_variants(code,name), metadata"
-          )
-          .eq("active", true)
-          .eq("service_type", "data")
-          .order("selling_price", { ascending: true });
-
-      if (catalogError) throw catalogError;
-
-      const activeDataProducts = catalogProducts || [];
+      const activeDataProducts = await getActiveDataCatalog(supabase);
 
       const networkProducts = requestedNetwork
         ? activeDataProducts.filter((product:any) => {
