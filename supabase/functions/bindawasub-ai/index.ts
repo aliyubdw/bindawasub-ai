@@ -9,6 +9,7 @@ import { getCustomerTransactions } from "./transactions/handler.ts";
 import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts";
 import { classifyIntent } from "./ai/intent.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck } from "./telegram/handler.ts";
+import { authenticateRequest } from "./auth/authenticate.ts";
 
 
 const corsHeaders = {
@@ -44,54 +45,22 @@ Deno.serve(async (req) => {
 
     const authorization = req.headers.get("Authorization") || "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const isInternalTelegramRequest = isInternalTelegramRequestCheck(authorization, serviceRoleKey, req.headers.get("X-Bindawasub-Channel"), body?.user_id);
-    let authUser: any = null;
+    const isInternalTelegramRequest = isInternalTelegramRequestCheck(
+      authorization,
+      serviceRoleKey,
+      req.headers.get("X-Bindawasub-Channel"),
+      body?.user_id
+    );
 
-    if (!isInternalTelegramRequest) {
-      const accessToken =
-        authorization.replace(/^Bearer\s+/i, "").trim();
+    const authResult = await authenticateRequest(
+      req,
+      supabase,
+      isInternalTelegramRequest
+    );
 
-      if (!accessToken) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: "Authentication required.",
-          }),
-          {
-            status: 401,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
+    if (authResult instanceof Response) return authResult;
 
-      const {
-        data: { user: verifiedUser },
-        error: authError,
-      } = await supabase.auth.getUser(accessToken);
-
-      authUser = verifiedUser;
-
-      if (authError || !authUser) {
-        console.error("Authentication error:", authError);
-
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: "Invalid or expired authentication token.",
-          }),
-          {
-            status: 401,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-    }
+    const authUser = authResult.authUser;
 
     // ==========================================
     // FIND BINDWASUB USER
