@@ -11,6 +11,7 @@ import { classifyIntent } from "./ai/intent.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleNewConversation, handleConversationList, handleConversationHistory } from "./conversation/handler.ts";
+import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
 
 
 const corsHeaders = {
@@ -273,7 +274,7 @@ Deno.serve(async (req) => {
       }
 
       const answer = `You selected ${networkName} airtime. How much airtime do you want to buy?`;
-      await persistAssistantMessage(answer, "airtime_purchase", "backend");
+      await persistAssistantMessage(supabase, conversationId, answer, "airtime_purchase", "backend");
 
       return new Response(JSON.stringify({
         success: true,
@@ -349,88 +350,35 @@ Deno.serve(async (req) => {
 
     {
       const requestedConversationId = String(body.conversation_id || "").trim();
+      const state = await loadOrCreateConversation(
+        { supabase, userId, channel },
+        requestedConversationId || null,
+        aiConfig?.default_language || "english"
+      );
 
-      let conversationLookupError:any = null;
-
-      if (requestedConversationId) {
-        const result = await supabase
-          .from("ai_conversations")
-          .select("id, conversation_context, pending_product_id, pending_phone_number, pending_at, pending_service_type, pending_airtime_amount, pending_network, pending_customer_input")
-          .eq("id", requestedConversationId)
-          .eq("user_id", userId)
-          .eq("channel", channel)
-          .maybeSingle();
-
-        existingConversation = result.data;
-        conversationLookupError = result.error;
-
-        if (conversationLookupError) {
-          throw conversationLookupError;
-        }
-
-        if (!existingConversation) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: "Conversation not found."
-          }), {
-            status: 404,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-      } else {
-        const result = await supabase
-          .from("ai_conversations")
-          .select("id, conversation_context, pending_product_id, pending_phone_number, pending_at, pending_service_type, pending_airtime_amount, pending_network, pending_customer_input")
-          .eq("user_id", userId)
-          .eq("channel", channel)
-          .order("last_message_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        existingConversation = result.data;
-        conversationLookupError = result.error;
-
-        if (conversationLookupError) {
-          console.error("Conversation lookup error:", conversationLookupError);
-        }
+      if (state.error) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: state.error
+        }), {
+          status: state.status || 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
 
-      if (existingConversation) {
-        conversationId = existingConversation.id;
-        conversationContext = existingConversation.conversation_context && typeof existingConversation.conversation_context === "object"
-          ? existingConversation.conversation_context
-          : {};
-      } else {
-        const { data: newConversation, error: conversationCreateError } =
-          await supabase
-            .from("ai_conversations")
-            .insert({
-              user_id: userId,
-              channel,
-              language: aiConfig?.default_language || "english",
-              started_at: new Date().toISOString(),
-              last_message_at: new Date().toISOString(),
-            })
-            .select("id")
-            .single();
-
-        if (conversationCreateError) {
-          console.error("Conversation create error:", conversationCreateError);
-        } else {
-          conversationId = newConversation.id;
-        }
-      }
+      conversationId = state.conversationId || null;
+      conversationContext = state.conversationContext || {};
+      existingConversation = state.existingConversation || null;
 
       if (conversationId) {
-        await supabase
-          .from("ai_conversations")
-          .update({ last_message_at: new Date().toISOString() })
-          .eq("id", conversationId)
-        .eq("user_id", userId)
-        .eq("channel", channel);
-
-        await logAiMessage("user", originalMessage);
-        await logAiActivity(
+        await touchConversation(supabase, conversationId, userId, channel);
+        await logAiMessage(supabase, conversationId, "user", originalMessage);
+        await logAiActivity(supabase, userId, conversationId, channel,
+          
+          supabase,
+          userId,
+          conversationId,
+          channel,
           "ai_request",
           null,
           originalMessage,
@@ -442,7 +390,6 @@ Deno.serve(async (req) => {
         );
       }
     }
-
 
     // ==========================================
     // RECOVER MANUAL FUNDING AMOUNT FROM CHAT CONTEXT
@@ -487,63 +434,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ==========================================
-    // AI MANAGEMENT LOGGING
-    // ==========================================
-    async function logAiMessage(
-      role: "user" | "assistant",
-      text: string,
-      intent: string | null = null,
-      toolCalled: string | null = null,
-    ) {
-      if (!conversationId || !text) return;
-      try {
-        await supabase.from("ai_messages").insert({
-          conversation_id: conversationId,
-          role,
-          message: text,
-          intent,
-          tool_called: toolCalled,
-        });
-      } catch (e) {
-        console.error("AI message logging error:", e);
-      }
-    }
 
-    async function persistAssistantMessage(answer: any, intent: string | null, toolCalled: string | null = null) {
-      const textValue = typeof answer === "string" ? answer : "";
-      if (!textValue) return;
-      await logAiMessage("assistant", textValue, intent, toolCalled);
-    }
-
-    async function logAiActivity(
-      eventType: string,
-      intent: string | null,
-      userMessage: string | null,
-      aiResponse: string | null,
-      success: boolean,
-      errorMessage: string | null = null,
-      transactionId: string | null = null,
-      metadata: Record<string, unknown> = {},
-    ) {
-      try {
-        await supabase.from("ai_activity_log").insert({
-          user_id: userId,
-          conversation_id: conversationId,
-          transaction_id: transactionId,
-          channel,
-          event_type: eventType,
-          intent,
-          user_message: userMessage,
-          ai_response: aiResponse,
-          success,
-          error_message: errorMessage,
-          metadata,
-        });
-      } catch (e) {
-        console.error("AI activity logging error:", e);
-      }
-    }
 
     async function executeViaProviderExecution(transactionId: string) {
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -1470,7 +1361,7 @@ if (body.action === "manual_fund") {
 
       if(negativeConfirmation){
         if(pendingIsFresh) await clearPending();
-        await persistAssistantMessage(pendingIsFresh ? "Okay, I cancelled the pending purchase. No money was deducted." : "There is no active purchase waiting for confirmation.", "purchase_cancelled", "backend");
+        await persistAssistantMessage(supabase, conversationId, pendingIsFresh ? "Okay, I cancelled the pending purchase. No money was deducted." : "There is no active purchase waiting for confirmation.", "purchase_cancelled", "backend");
         return new Response(JSON.stringify({
           success:true,intent:"purchase_cancelled",
           answer:pendingIsFresh ? "Okay, I cancelled the pending purchase. No money was deducted." : "There is no active purchase waiting for confirmation."
@@ -1498,7 +1389,7 @@ if (body.action === "manual_fund") {
           body.idempotency_key=pendingIdempotencyKey;
         }
       }else if(affirmativeConfirmation){
-        await persistAssistantMessage("That purchase confirmation has expired. Please start the purchase again.", "purchase_confirmation_expired", "backend");
+        await persistAssistantMessage(supabase, conversationId, "That purchase confirmation has expired. Please start the purchase again.", "purchase_confirmation_expired", "backend");
         return new Response(JSON.stringify({
           success:true,intent:"purchase_confirmation_expired",
           answer:"That purchase confirmation has expired. Please start the purchase again."
@@ -2031,7 +1922,7 @@ if (body.action === "manual_fund") {
       const { data: walletData, error: walletError } = await supabase.rpc("get_my_balance", { p_user_id: userId });
       if (walletError) throw walletError;
       const wallet = walletData?.[0];
-      await persistAssistantMessage(`Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, "wallet_balance", "backend");
+      await persistAssistantMessage(supabase, conversationId, `Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, "wallet_balance", "backend");
       return new Response(JSON.stringify({ success:true, intent:"wallet_balance", balance:wallet?.balance ?? 0, currency:wallet?.currency ?? "NGN", answer:`Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, ai_powered:false, quick_action:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
     }
 
@@ -2039,7 +1930,7 @@ if (body.action === "manual_fund") {
       const { data: rows, error } = await supabase.from("transactions").select(`id,created_at,phone_number,amount,status,provider,provider_reference,products(product_name,volume,validity_value,validity_unit,validity_type,service_networks(code,name))`).eq("user_id",userId).order("created_at",{ascending:false}).limit(5);
       if (error) throw error;
       const transactions=(rows||[]).map((tx:any)=>{ const p=Array.isArray(tx.products)?tx.products[0]:tx.products; const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks; const d=p?.validity_type==="fixed"&&p?.validity_value!=null&&p?.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):(p?.validity_type==="unlimited"?"Unlimited":""); const digits=String(tx.phone_number||"").replace(/\\D/g,""); return {id:tx.id,date:tx.created_at,product_name:p?.product_name||"Purchase",network:n?.code||null,network_name:n?.name||null,volume:p?.volume||null,duration:d,phone_number:digits.length>=7?`${digits.slice(0,4)}****${digits.slice(-3)}`:"—",amount:Number(tx.amount||0),status:tx.status,provider:tx.provider,provider_reference:tx.provider_reference||null}; });
-      await persistAssistantMessage(transactions.length ? `Here are your latest ${transactions.length} purchases.` : "You do not have any purchases yet.", "transaction_history", "backend");
+      await persistAssistantMessage(supabase, conversationId, transactions.length ? `Here are your latest ${transactions.length} purchases.` : "You do not have any purchases yet.", "transaction_history", "backend");
       return new Response(JSON.stringify({success:true,intent:"transaction_history",transactions,answer:transactions.length?`Here are your latest ${transactions.length} purchases.`:"You do not have any purchases yet.",ai_powered:false,quick_action:true}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
     }
 
@@ -2077,7 +1968,7 @@ if (body.action === "manual_fund") {
 
         const names:any = {mtn:"MTN",airtel:"Airtel",glo:"Glo","9mobile":"9mobile (T2)"};
         const answer = `You selected ${names[preAirtimeNetwork]} airtime worth ₦${amount.toLocaleString("en-NG")}. Please provide the recipient phone number.`;
-        await persistAssistantMessage(answer, "airtime_purchase", "backend");
+        await persistAssistantMessage(supabase, conversationId, answer, "airtime_purchase", "backend");
         return new Response(JSON.stringify({
           success:true,
           intent:"airtime_purchase",
@@ -2152,7 +2043,7 @@ if (body.action === "manual_fund") {
       const networkName = networkNames[storedAirtimeNetwork] || storedAirtimeNetwork;
       const answer = `You want to buy ${networkName} airtime worth ₦${storedAirtimeAmount.toLocaleString("en-NG")} for ${phoneNumber}. Please confirm to proceed with your purchase.`;
 
-      await persistAssistantMessage(answer, "airtime_purchase", "backend");
+      await persistAssistantMessage(supabase, conversationId, answer, "airtime_purchase", "backend");
       return new Response(JSON.stringify({
         success: true,
         intent: "airtime_purchase",
@@ -2180,8 +2071,9 @@ if (body.action === "manual_fund") {
 
     if (aiConfig?.gemini_enabled === false) {
       const disabledAnswer = aiConfig.fallback_message || "I can help with Bindawasub services, wallet balance, funding, and purchases.";
-      await persistAssistantMessage(disabledAnswer, "other", "gemini_disabled");
-      await logAiActivity(
+      await persistAssistantMessage(supabase, conversationId, disabledAnswer, "other", "gemini_disabled");
+      await logAiActivity(supabase, userId, conversationId, channel,
+          
         "ai_disabled_response",
         "other",
         originalMessage,
@@ -2467,7 +2359,8 @@ if (body.action === "manual_fund") {
         String(ai.intent || "other"),
         "gemini"
       );
-      await logAiActivity(
+      await logAiActivity(supabase, userId, conversationId, channel,
+          
         "ai_response",
         String(ai.intent || "other"),
         originalMessage,
@@ -2911,7 +2804,7 @@ if (body.action === "manual_fund") {
           }
         }
 
-        await persistAssistantMessage(answer, accountAction, "backend");
+        await persistAssistantMessage(supabase, conversationId, answer, accountAction, "backend");
         return new Response(
           JSON.stringify({
             success: true,
@@ -2998,8 +2891,9 @@ if (body.action === "manual_fund") {
       const fallbackAnswer =
         "I can help you check available services, prices, wallet balance, and make purchases.";
 
-      await persistAssistantMessage(fallbackAnswer, "unknown", "fallback");
-      await logAiActivity(
+      await persistAssistantMessage(supabase, conversationId, fallbackAnswer, "unknown", "fallback");
+      await logAiActivity(supabase, userId, conversationId, channel,
+          
         "ai_fallback_response",
         "unknown",
         originalMessage,
