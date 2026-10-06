@@ -109,6 +109,78 @@ export async function handleStartAirtime(ctx: FundingAirtimeContext, body: any) 
 
 export async function handleFundingActions(ctx: FundingAirtimeContext, body: any) {
   const { supabase, userId, isAdmin, corsHeaders } = ctx;
+
+  // CUSTOMER WALLET FUNDING REQUEST
+  if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
+    const { data: settings, error: settingsError } = await supabase
+      .from("manual_funding_settings")
+      .select("active, bank_name, account_name, account_number, instructions")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (settingsError) throw settingsError;
+
+    if (!settings?.active) {
+      return new Response(JSON.stringify({
+        success: false,
+        intent: "fund_wallet",
+        error: "Manual wallet funding is temporarily unavailable."
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const requestedAmount = Number(body.amount || 0);
+
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        intent: "fund_wallet",
+        funding_mode: "manual",
+        requires_amount: true,
+        bank_account: settings?.account_number ? {
+          bank_name: settings.bank_name,
+          account_name: settings.account_name,
+          account_number: settings.account_number
+        } : null,
+        instructions: settings?.instructions || "Enter the amount you want to fund, then transfer the exact amount using the payment details provided.",
+        answer: settings?.account_number
+          ? "You can fund your wallet by bank transfer. Please enter the amount you want to add."
+          : "Manual funding is ready. Please enter the amount you want to add. The bank transfer details will be shown once configured."
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const reference = `MFR-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+
+    const { data: request, error: requestError } = await supabase
+      .from("manual_funding_requests")
+      .insert({
+        user_id: userId,
+        amount: requestedAmount,
+        reference,
+        status: "pending"
+      })
+      .select("id, amount, reference, status, created_at")
+      .single();
+
+    if (requestError) throw requestError;
+
+    return new Response(JSON.stringify({
+      success: true,
+      intent: "fund_wallet",
+      funding_mode: "manual",
+      requires_payment: true,
+      request,
+      bank_account: settings?.account_number ? {
+        bank_name: settings.bank_name,
+        account_name: settings.account_name,
+        account_number: settings.account_number
+      } : null,
+      instructions: settings?.instructions || "Transfer the exact amount to the configured Bindawasub bank account, then submit your transfer reference.",
+      answer: settings?.account_number
+        ? `Funding request created for ₦${requestedAmount.toLocaleString("en-NG")}. Transfer the exact amount to the account below, then send your transfer reference.`
+        : `Funding request ${reference} created for ₦${requestedAmount.toLocaleString("en-NG")}. Bank transfer details have not been configured yet.`
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
   // SUBMIT MANUAL FUNDING PAYMENT REFERENCE
 // ==========================================
 

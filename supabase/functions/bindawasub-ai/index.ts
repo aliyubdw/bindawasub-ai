@@ -8,7 +8,7 @@ import { createManualFundingRequest } from "./wallet/funding.ts";
 import { getCustomerTransactions } from "./transactions/handler.ts";
 import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts";
 import { classifyIntent } from "./ai/intent.ts";
-import { isInternalTelegramRequest as isInternalTelegramRequestCheck } from "./telegram/handler.ts";
+import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleNewConversation, handleConversationList, handleConversationHistory } from "./conversation/handler.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
@@ -161,17 +161,21 @@ Deno.serve(async (req) => {
     let conversationContext: any = {};
     let existingConversation: any = null;
 
-    if (body.action === "start_airtime") {
-      return await handleStartAirtime({ supabase, userId, corsHeaders, originalMessage, conversationId, channel }, body);
-    }
-
     // ==========================================
     // CONVERSATION + PENDING PURCHASE STATE
     // ==========================================
 
-    const channel = isInternalTelegramRequest
-      ? "telegram"
-      : String(body.channel || "web").toLowerCase();
+    const channel = resolveRequestChannel(
+      isInternalTelegramRequest,
+      body.channel
+    );
+
+    if (body.action === "start_airtime") {
+      return await handleStartAirtime(
+        { supabase, userId, corsHeaders, originalMessage, conversationId, channel },
+        body
+      );
+    }
 
     // Load live AI controls before processing customer requests.
     const { data: aiConfig, error: aiConfigError } = await supabase
@@ -397,81 +401,11 @@ if (body.action === "customer_search") {
       return await handleTransactionActions({ supabase, userId, corsHeaders }, body);
     }
 
-    // FUND WALLET// FUND WALLET — MANUAL BANK TRANSFER (CURRENT MODE)
-// ==========================================
-
-if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
-  const { data: settings, error: settingsError } = await supabase
-    .from("manual_funding_settings")
-    .select("active, bank_name, account_name, account_number, instructions")
-    .eq("id", 1)
-    .maybeSingle();
-
-  if (settingsError) throw settingsError;
-
-  if (!settings?.active) {
-    return new Response(JSON.stringify({
-      success: false,
-      intent: "fund_wallet",
-      error: "Manual wallet funding is temporarily unavailable."
-    }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-
-  const requestedAmount = Number(body.amount || 0);
-
-  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
-    return new Response(JSON.stringify({
-      success: true,
-      intent: "fund_wallet",
-      funding_mode: "manual",
-      requires_amount: true,
-      bank_account: settings?.account_number ? {
-        bank_name: settings.bank_name,
-        account_name: settings.account_name,
-        account_number: settings.account_number
-      } : null,
-      instructions: settings?.instructions || "Enter the amount you want to fund, then transfer the exact amount using the payment details provided.",
-      answer: settings?.account_number
-        ? "You can fund your wallet by bank transfer. Please enter the amount you want to add."
-        : "Manual funding is ready. Please enter the amount you want to add. The bank transfer details will be shown once configured."
-    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-
-  const reference = `MFR-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
-
-  const { data: request, error: requestError } = await supabase
-    .from("manual_funding_requests")
-    .insert({
-      user_id: userId,
-      amount: requestedAmount,
-      reference,
-      status: "pending"
-    })
-    .select("id, amount, reference, status, created_at")
-    .single();
-
-  if (requestError) throw requestError;
-
-  return new Response(JSON.stringify({
-    success: true,
-    intent: "fund_wallet",
-    funding_mode: "manual",
-    requires_payment: true,
-    request,
-    bank_account: settings?.account_number ? {
-      bank_name: settings.bank_name,
-      account_name: settings.account_name,
-      account_number: settings.account_number
-    } : null,
-    instructions: settings?.instructions || "Transfer the exact amount to the configured Bindawasub bank account, then submit your transfer reference.",
-    answer: settings?.account_number
-      ? `Funding request created for ₦${requestedAmount.toLocaleString("en-NG")}. Transfer the exact amount to the account below, then send your transfer reference.`
-      : `Funding request ${reference} created for ₦${requestedAmount.toLocaleString("en-NG")}. Bank transfer details have not been configured yet.`
-  }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-}
-
-// ==========================================
+    // FUNDING ACTIONS
+    // ==========================================
     if ([
+      "fund_wallet",
+      "manual_funding_request",
       "manual_funding_submit",
       "manual_funding_history",
       "manual_funding_requests",
@@ -1518,6 +1452,8 @@ if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
       if (!supportedIntents.has(ai.intent)) ai.intent = "unknown";
 
       await logAiMessage(
+        supabase,
+        conversationId,
         "assistant",
         String(ai.reply || ""),
         String(ai.intent || "other"),
