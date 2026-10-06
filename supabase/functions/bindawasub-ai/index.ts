@@ -151,10 +151,6 @@ Deno.serve(async (req) => {
       return await handleAdminStatus({ supabase, isAdmin, corsHeaders }, bindawasubUser);
     }
 
-    if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
-      return await handleManualFunding({ supabase, userId, corsHeaders }, body);
-    }
-
     const originalMessage = body.message || "";
     const message = originalMessage.toLowerCase();
 
@@ -382,6 +378,10 @@ Deno.serve(async (req) => {
     }
 
 
+
+    if (body.action === "fund_wallet" || body.action === "manual_funding_request") {
+      return await handleManualFunding({ supabase, userId, corsHeaders }, body);
+    }
 
     async function executeViaProviderExecution(transactionId: string) {
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
