@@ -1,0 +1,172 @@
+import {
+  handleNewConversation,
+  handleConversationList,
+  handleConversationHistory,
+} from "../conversation/handler.ts";
+import {
+  handleAiSummary,
+  handleAiSettings,
+  handleAiCustomerWallet,
+  handleAdminStatus,
+  handleCustomerSearch,
+} from "../admin/handler.ts";
+import { handleCheckWallet, handleTransactionActions, handlePendingRequery } from "../account/handler.ts";
+import { handleStartAirtime, handleFundingActions } from "../funding/handler.ts";
+
+export type ActionRouterContext = {
+  supabase: any;
+  userId: string;
+  isAdmin: boolean;
+  corsHeaders: Record<string, string>;
+  bindawasubUser: any;
+  originalMessage: string;
+  conversationId: string | null;
+  channel: string;
+};
+
+export async function routeExplicitAction(
+  context: ActionRouterContext,
+  body: any,
+): Promise<Response | null> {
+  const {
+    supabase,
+    userId,
+    isAdmin,
+    corsHeaders,
+    bindawasubUser,
+    originalMessage,
+    conversationId,
+    channel,
+  } = context;
+
+  if (body.action === "new_conversation") {
+    return await handleNewConversation({ supabase, userId, corsHeaders }, body);
+  }
+  if (body.action === "conversation_list") {
+    return await handleConversationList({ supabase, userId, corsHeaders }, body);
+  }
+  if (body.action === "conversation_history") {
+    return await handleConversationHistory({ supabase, userId, corsHeaders }, body);
+  }
+  if (body.action === "ai_summary") {
+    return await handleAiSummary({ supabase, isAdmin, corsHeaders });
+  }
+  if (body.action === "ai_settings_get" || body.action === "ai_settings_save") {
+    return await handleAiSettings(
+      { supabase, isAdmin, corsHeaders },
+      body.action,
+      body.settings,
+    );
+  }
+  if (body.action === "ai_customer_wallet") {
+    return await handleAiCustomerWallet(
+      { supabase, isAdmin, corsHeaders },
+      String(body.user_id || "").trim(),
+    );
+  }
+  if (body.action === "admin_status") {
+    return await handleAdminStatus(
+      { supabase, isAdmin, corsHeaders },
+      bindawasubUser,
+    );
+  }
+  if (body.action === "start_airtime") {
+    return await handleStartAirtime(
+      {
+        supabase,
+        userId,
+        corsHeaders,
+        originalMessage,
+        conversationId,
+        channel,
+      },
+      body,
+    );
+  }
+  if (body.action === "customer_search") {
+    return await handleCustomerSearch(
+      { supabase, isAdmin, corsHeaders },
+      body.search,
+    );
+  }
+  if (body.action === "check_wallet") {
+    return await handleCheckWallet(
+      { supabase, userId, corsHeaders },
+      body.amount,
+    );
+  }
+  if (body.action === "requery_pending_purchase") {
+    return await handlePendingRequery(
+      {
+        supabase,
+        userId,
+        corsHeaders,
+        executePendingRequery: async (transactionId: string) => {
+          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          if (!serviceRoleKey || !supabaseUrl) {
+            throw new Error("Supabase server configuration is incomplete.");
+          }
+          const response = await fetch(
+            `${supabaseUrl}/functions/v1/provider-execution`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${serviceRoleKey}`,
+                "apikey": serviceRoleKey,
+              },
+              body: JSON.stringify({
+                action: "requery_transaction",
+                transaction_id: transactionId,
+              }),
+            },
+          );
+          const raw = await response.text();
+          let result: any;
+          try {
+            result = JSON.parse(raw);
+          } catch {
+            result = { success: false, error: raw };
+          }
+          if (!response.ok) {
+            throw new Error(result?.error || "Provider requery failed.");
+          }
+          return result;
+        },
+      },
+      body.transaction_id,
+    );
+  }
+  if (
+    body.action === "transaction_history" ||
+    body.action === "last_transaction" ||
+    body.action === "transaction_status"
+  ) {
+    return await handleTransactionActions(
+      { supabase, userId, corsHeaders },
+      body,
+    );
+  }
+  if (
+    [
+      "fund_wallet",
+      "manual_funding_request",
+      "manual_funding_submit",
+      "manual_funding_history",
+      "manual_funding_requests",
+      "manual_funding_approve",
+      "manual_funding_reject",
+      "manual_funding_settings_get",
+      "manual_funding_settings_save",
+      "manual_fund",
+    ].includes(body.action)
+  ) {
+    return await handleFundingActions(
+      { supabase, userId, isAdmin, corsHeaders },
+      body,
+    );
+  }
+
+  return null;
+}
