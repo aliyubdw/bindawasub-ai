@@ -373,8 +373,7 @@ Deno.serve(async (req) => {
       if (conversationId) {
         await touchConversation(supabase, conversationId, userId, channel);
         await logAiMessage(supabase, conversationId, "user", originalMessage);
-        await logAiActivity(supabase, userId, conversationId, channel,
-          
+        await logAiActivity(
           supabase,
           userId,
           conversationId,
