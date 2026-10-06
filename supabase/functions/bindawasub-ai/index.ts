@@ -466,7 +466,7 @@ if (body.action === "customer_search") {
       }}, body.transaction_id);
     }
 
-    //     if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
+    if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
       return await handleTransactionActions({ supabase, userId, corsHeaders }, body);
     }
 
