@@ -8,6 +8,7 @@ import { createManualFundingRequest } from "./wallet/funding.ts";
 import { getCustomerTransactions } from "./transactions/handler.ts";
 import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts";
 import { classifyIntent } from "./ai/intent.ts";
+import { isInternalTelegramRequest as isInternalTelegramRequestCheck } from "./telegram/handler.ts";
 
 
 const corsHeaders = {
@@ -43,11 +44,7 @@ Deno.serve(async (req) => {
 
     const authorization = req.headers.get("Authorization") || "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const isInternalTelegramRequest =
-      authorization === "Bearer " + serviceRoleKey &&
-      req.headers.get("X-Bindawasub-Channel") === "telegram" &&
-      typeof body?.user_id === "string";
-
+    const isInternalTelegramRequest = isInternalTelegramRequestCheck(authorization, serviceRoleKey, req.headers.get("X-Bindawasub-Channel"), body?.user_id);
     let authUser: any = null;
 
     if (!isInternalTelegramRequest) {
