@@ -17,6 +17,7 @@ import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts
 import { classifyIntent } from "./ai/intent.ts";
 import { loadAiConfig, isChannelAllowed } from "./ai/config.ts";
 import { jsonResponse } from "./ai/response.ts";
+import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
