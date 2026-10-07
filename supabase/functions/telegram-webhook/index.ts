@@ -988,6 +988,24 @@ Deno.serve(async(req)=>{
   const catalogRequest=/\b(show|list|see|view|give|what|which|available|nawa|ina)\b/.test(normalizedText)&&/\b(data|package|packages|plan|plans|mtn|glo|airtel|9mobile)\b/.test(normalizedText)&&!/\b(buy|purchase|send|siya|saya|for|zuwa)\b/.test(normalizedText);
   const formatProducts=async()=>{const {data:products,error}=await db.from("products").select("id,product_name,service_type,volume,selling_price,validity_type,validity_value,validity_unit,service_networks(code,name),service_variants(code,name)").eq("active",true).order("selling_price",{ascending:true});if(error)throw error;if(!products?.length){await send(chatId,"There are no active data plans available right now.",true);return}const lines=products.map((p:any,i:number)=>{const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;const duration=p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"";const details=[n?.name||n?.code,p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+"\n   "+details});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n")+"\n\nTo buy one, send: buy 1GB for 080xxxxxxxx",true)};
   if(catalogRequest){await saveState("awaiting_network_selection",{});await send(chatId,"📦 Buy Data\n\nWhich network do you want?\n\nSelect MTN, Airtel, Glo or T2.",false,networkKeyboard);return out({success:true,linked:true,state:"awaiting_network_selection"})}
+  // Resolve saved beneficiary names before AI purchase routing.
+  // Examples: "buy 1GB MTN for Mum", "send 2GB to wife".
+  // The resolved phone is passed to the same existing purchase flow; no separate purchase logic is created here.
+  const purchaseLike=/\\b(?:buy|purchase|send|get|give|saya|siya)\\b/i.test(String(effectiveText||""));
+  if(purchaseLike){
+    const targetMatch=String(effectiveText||"").match(/\\b(?:for|to|zuwa)\\s+(.+?)\\s*$/i);
+    const targetName=normalizeBeneficiaryName(targetMatch?.[1]||"");
+    const targetLooksLikePhone=/^(?:\\+?234|0)?\\d{10,13}$/.test(targetName.replace(/[\\s-]/g,""));
+    if(targetName && !targetLooksLikePhone){
+      const {data:savedTargets,error:savedTargetError}=await db.from("saved_beneficiaries").select("name,phone_number").eq("user_id",acct.user_id);
+      if(savedTargetError) throw savedTargetError;
+      const target=savedTargets?.find((b:any)=>String(b.name||"").trim().toLowerCase()===targetName.toLowerCase());
+      if(target?.phone_number && targetMatch){
+        effectiveText=String(effectiveText).slice(0,targetMatch.index||0)+targetMatch[0].replace(targetMatch[1],String(target.phone_number));
+      }
+    }
+  }
+
   const runAi=async()=>{try{
     const spendingRequest=/(?:\bhow much (?:have|did) i (?:spend|spent)\b|\bwhat did i spend\b|\bspending (?:summary|analysis|report)\b|\bwhat network .*?(?:buy|purchase).*(?:most|the most)\b|\bnawa .*?(?:kashe|na kashe)\b|\bwace network .*?(?:saya|akai-akai)\b)/i.test(String(effectiveText||""));
     if(spendingRequest){
