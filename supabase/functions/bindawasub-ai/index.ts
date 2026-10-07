@@ -852,7 +852,19 @@ Deno.serve(async (req) => {
       // keep numeric/phone follow-ups in the Airtime flow instead of Data.
       const activeAirtimeContext = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
       const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
-      if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {
+      const explicitDataPurchase = /\b(?:buy|purchase|get|order|send|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
+      if (explicitDataPurchase) {
+        ai.intent = "purchase_intent";
+        ai.service_type = "data";
+        ai.product_id = null;
+        ai.product_name = null;
+        ai.amount = undefined;
+        ai.volume = ai.volume || (String(originalMessage || "").match(/\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i)?.[0] || null);
+        const dataNetworkMatch = String(originalMessage || "").match(/\b(mtn|airtel|glo|9mobile|t2)\b/i);
+        if (dataNetworkMatch) ai.network = dataNetworkMatch[1].toLowerCase() === "t2" ? "9mobile" : dataNetworkMatch[1].toLowerCase();
+        const dataPhoneMatch = String(originalMessage || "").match(/(?:\+234|234|0)\d{10}\b/);
+        if (dataPhoneMatch) ai.phone_number = dataPhoneMatch[0];
+      } else if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {
         ai.intent = "airtime_purchase";
         ai.service_type = "airtime";
         ai.network = ai.network || conversationContext?.network || null;
