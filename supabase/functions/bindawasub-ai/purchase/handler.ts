@@ -60,6 +60,8 @@ const network = String(body.network || "").trim().toUpperCase();
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      const providerNetwork = String(configuredNetwork.code || configuredNetwork.name || network).trim().toLowerCase();
+
       if (!phoneNumber || !reference) {
         return new Response(JSON.stringify({
           success: false,
@@ -78,7 +80,7 @@ const network = String(body.network || "").trim().toUpperCase();
       const { data: airtimePurchaseData, error: airtimePurchaseError } =
         await supabase.rpc("process_ai_airtime_purchase", {
           p_user_id: userId,
-          p_network: network,
+          p_network: providerNetwork,
           p_amount: amount,
           p_phone_number: phoneNumber,
           p_reference: reference,
@@ -100,10 +102,12 @@ const network = String(body.network || "").trim().toUpperCase();
         return new Response(JSON.stringify({ success:true, intent:"airtime_purchase", answer: airtimePurchase?.status === "successful" ? "This airtime purchase was already completed successfully." : airtimePurchase?.status === "failed" ? "This airtime purchase was already processed and failed; any wallet refund has already been handled." : "This airtime purchase request was already received and is still pending. No second airtime purchase was sent.", purchase:airtimePurchase||null, idempotent_replay:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
 
-      if (!airtimePurchase?.success) {
+      // process_ai_airtime_purchase returns success at the RPC-result level;
+      // the created transaction is nested under "transaction".
+      if (!airtimePurchaseResult?.success || !airtimePurchaseResult?.transaction_id) {
         return new Response(JSON.stringify({
           success: false,
-          error: airtimePurchase?.message || "Unable to process airtime purchase"
+          error: airtimePurchaseResult?.message || "Unable to process airtime purchase"
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
