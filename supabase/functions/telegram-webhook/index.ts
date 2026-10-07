@@ -498,7 +498,7 @@ Deno.serve(async(req)=>{
     return out({success:true,linked:true,state:"awaiting_airtime_network_selection"});
   }
 
-  if(state==="awaiting_airtime_network_selection"){
+  if(state==="awaiting_airtime_network_selection" && !completeAirtimeNaturalRequest){
     if(cancelRequest){await clearState();await send(chatId,"Airtime purchase cancelled. What would you like to do next?",true);return out({success:true,linked:true,state:"idle"});}
     const networks=Array.isArray(context?.networks)?context.networks:[];
     const selected=networks.find((n:any)=>String(n.name).toLowerCase()===text.toLowerCase()||String(n.code).toLowerCase()===text.toLowerCase());
