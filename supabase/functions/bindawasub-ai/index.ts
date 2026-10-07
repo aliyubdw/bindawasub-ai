@@ -8,6 +8,8 @@ import { getWalletBalance } from "./wallet/balance.ts";
 import { executeViaProviderExecution } from "./purchase/execution.ts";
 import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
 import { loadCustomerTransaction } from "./transactions/lookup.ts";
+import { detectTransactionAction } from "./transactions/intent.ts";
+import { isFundingHistoryRequest } from "./funding/history.ts";
 import { routeExplicitAction } from "./router/action-router.ts";
 import { recoverFundingAmountFromConversation } from "./funding/context.ts";
 import { createManualFundingRequest } from "./wallet/funding.ts";
@@ -377,196 +379,45 @@ Deno.serve(async (req) => {
         });
     }
 
-    // ==========================================
-    // DETERMINISTIC CUSTOMER ACCOUNT INTENTS
-    // Keep account-history requests out of Gemini.
-    // ==========================================
-
-    const normalizedFundingMessage = originalMessage.trim().toLowerCase();
-
-    const wantsFundingHistory =
-      normalizedFundingMessage.includes("funding history") ||
-      normalizedFundingMessage.includes("funding histories") ||
-      normalizedFundingMessage.includes("show my funding") ||
-      normalizedFundingMessage.includes("my funding") ||
-      normalizedFundingMessage.includes("wallet funding") ||
-      normalizedFundingMessage.includes("funding transactions") ||
-      normalizedFundingMessage.includes("deposit history") ||
-      normalizedFundingMessage.includes("deposit histories") ||
-      normalizedFundingMessage.includes("show my deposits") ||
-      normalizedFundingMessage.includes("my deposits") ||
-      normalizedFundingMessage.includes("how did i fund my wallet") ||
-      normalizedFundingMessage.includes("how did i fund") ||
-      normalizedFundingMessage.includes("tarihin funding") ||
-      normalizedFundingMessage.includes("tarihin kudin wallet") ||
-      normalizedFundingMessage.includes("yadda na saka kudi") ||
-      normalizedFundingMessage.includes("kudin da na saka") ||
-      normalizedFundingMessage.includes("yadda na cika wallet") ||
-      normalizedFundingMessage.includes("cikawa wallet");
-
-    const wantsTransactionHistory =
-      /\b(transaction history|transaction histories|show my transactions|show my transaction|my transactions|my transaction history|purchase history|purchase histories|show my purchases|my purchases|show transactions|history)\b/i.test(originalMessage) ||
-      /\b(taarihin ciniki|tarihin ciniki|tarihin sayayya|abubuwan da na saya|abinda na saya)\b/i.test(originalMessage);
-
-    const wantsLastTransaction =
-      /\b(last transaction|latest transaction|last purchase|latest purchase|most recent purchase|most recent transaction)\b/i.test(originalMessage) ||
-      /\b(sayayyata ta karshe|sayan da na yi na karshe|ciniki na karshe)\b/i.test(originalMessage);
-
-    const wantsTransactionStatus =
-      /\b(transaction status|purchase status|did my last purchase go through|was my last purchase successful|is my purchase successful|is my transaction successful)\b/i.test(originalMessage) ||
-      /\b(sayayyata ta yi nasara|sayayyata ta samu|ciniki na yi nasara)\b/i.test(originalMessage);
-
-    if (!wantsFundingHistory && (wantsTransactionHistory || wantsLastTransaction || wantsTransactionStatus)) {
-      const accountAction = wantsTransactionHistory
-        ? "transaction_history"
-        : wantsLastTransaction
-          ? "last_transaction"
-          : "transaction_status";
-
-      const { data: recentTransactions, error: transactionError } =
-        await supabase
-          .from("transactions")
-          .select(`
-            id, created_at, phone_number, amount, status, provider, provider_reference,
-            product_id, products (product_name, volume, validity_type, validity_value, validity_unit, service_networks(code,name))
-          `)
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(accountAction === "transaction_history" ? 5 : 1);
-
-      if (transactionError) {
-        console.error("Deterministic transaction history error:", transactionError);
-        throw transactionError;
-      }
-
-      const rows = recentTransactions || [];
-      const maskPhone = (phone: string | null) => {
-        if (!phone) return "—";
-        const digits = phone.replace(/\D/g, "");
-        if (digits.length < 7) return phone;
-        return digits.slice(0, 4) + "****" + digits.slice(-3);
-      };
-
-      const normalizeProduct = (product: any) =>
-        Array.isArray(product) ? product[0] : product;
-
-      const formatted = rows.map((tx: any) => {
-        const product = normalizeProduct(tx.products);
-        return {
-          id: tx.id,
-          date: tx.created_at,
-          product_name: product?.product_name || "Purchase",
-          network: product?.network || null,
-          volume: product?.volume || null,
-          duration: product?.duration || null,
-          phone_number: maskPhone(tx.phone_number),
-          amount: Number(tx.amount || 0),
-          status: tx.status,
-          provider: tx.provider,
-          provider_reference: tx.provider_reference || null,
-        };
-      });
-
-      if (formatted.length === 0) {
-        return new Response(JSON.stringify({
-          success: true,
-          intent: accountAction,
-          transactions: accountAction === "transaction_history" ? [] : undefined,
-          transaction: accountAction === "transaction_history" ? undefined : null,
-          answer: "You do not have any purchases yet.",
-          ai_powered: false,
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      if (accountAction === "transaction_history") {
-        return new Response(JSON.stringify({
-          success: true,
-          intent: "transaction_history",
-          transactions: formatted,
-          answer: "Here are your latest " + formatted.length + " purchase" + (formatted.length === 1 ? "" : "s") + ".",
-          ai_powered: false,
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      const latest = formatted[0];
-      let answer =
-        "Your latest purchase is " + latest.product_name +
-        " for ₦" + latest.amount.toLocaleString() +
-        " to " + latest.phone_number +
-        ". Status: " + latest.status + ".";
-
-      if (accountAction === "transaction_status") {
-        if (latest.status === "successful") {
-          answer = "Yes. Your latest purchase, " + latest.product_name + ", was successful.";
-        } else if (latest.status === "failed") {
-          answer = "Your latest purchase, " + latest.product_name + ", failed.";
-        } else {
-          answer = "Your latest purchase, " + latest.product_name + ", is currently " + latest.status + ".";
-        }
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        intent: accountAction,
-        transaction: latest,
-        answer,
-        ai_powered: false,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+    // Deterministic account intents stay out of Gemini.
+    const fundingHistoryRequested = isFundingHistoryRequest(originalMessage);
+    if (fundingHistoryRequested) {
+      body.action = "funding_history";
+      const fundingHistoryAction = await routeExplicitAction(
+        {
+          supabase,
+          userId,
+          isAdmin,
+          corsHeaders,
+          bindawasubUser,
+          originalMessage,
+          conversationId,
+          channel,
+        },
+        body,
+        "normal",
+      );
+      if (fundingHistoryAction) return fundingHistoryAction;
     }
 
-    // ==========================================
-    // CUSTOMER FUNDING HISTORY
-    // Keep funding-history requests deterministic so Gemini cannot invent deposits.
-    // ==========================================
-
-
-
-    if (wantsFundingHistory) {
-      const requestedLimit = Math.min(Math.max(Number(body.limit || 5), 1), 10);
-
-      const { data: fundingRows, error: fundingError } = await supabase
-        .from("wallet_funding")
-        .select("id, amount, reference, billstack_reference, status, payment_method, created_at, completed_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(requestedLimit);
-
-      if (fundingError) {
-        console.error("Funding history error:", fundingError);
-        throw fundingError;
-      }
-
-      const formattedFunding = (fundingRows || []).map((funding: any) => ({
-        id: funding.id,
-        amount: Number(funding.amount || 0),
-        reference: funding.reference || null,
-        billstack_reference: funding.billstack_reference || null,
-        status: funding.status || "unknown",
-        payment_method: funding.payment_method || null,
-        date: funding.completed_at || funding.created_at,
-      }));
-
-      return new Response(JSON.stringify({
-        success: true,
-        intent: "funding_history",
-        funding: formattedFunding,
-        answer: formattedFunding.length > 0
-          ? `Here are your latest ${formattedFunding.length} wallet funding transaction${formattedFunding.length === 1 ? "" : "s"}.`
-          : "You do not have any wallet funding records yet.",
-        ai_powered: false,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+    const transactionAction = detectTransactionAction(originalMessage);
+    if (transactionAction) {
+      body.action = transactionAction;
+      const transactionIntentAction = await routeExplicitAction(
+        {
+          supabase,
+          userId,
+          isAdmin,
+          corsHeaders,
+          bindawasubUser,
+          originalMessage,
+          conversationId,
+          channel,
+        },
+        body,
+        "normal",
+      );
+      if (transactionIntentAction) return transactionIntentAction;
     }
 
     // ==========================================
