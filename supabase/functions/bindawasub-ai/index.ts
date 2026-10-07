@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { formatCatalogProduct } from "./catalog/format.ts";
 import { normalizeCatalogToken } from "./catalog/list.ts";
 import { handleProductEnquiry } from "./catalog/handler.ts";
+import { handleDeterministicDataPriceQuery } from "./catalog/price.ts";
 import { formatTransactionForAI } from "./transactions/format.ts";
 import { executeViaProviderExecution } from "./purchase/execution.ts";
 import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
@@ -778,7 +779,7 @@ Deno.serve(async (req) => {
 
       const recentTransactionsForAI = (recentTransactionRows || []).map(formatTransactionForAI);
 
-      const ai = await classifyIntent(
+      // Exact data-price requests are resolved from the live catalog before Gemini.\n      // This prevents AI wording from inventing or selecting the wrong price.\n      const deterministicPrice = handleDeterministicDataPriceQuery(\n        originalMessage,\n        activeProducts,\n      );\n      if (deterministicPrice) {\n        await persistAssistantMessage(\n          supabase,\n          conversationId,\n          deterministicPrice.answer,\n          "product_price",\n          "backend",\n        );\n        return new Response(JSON.stringify({\n          success: true,\n          intent: "product_price",\n          service_type: "data",\n          product: deterministicPrice.product || null,\n          products: deterministicPrice.products || undefined,\n          answer: deterministicPrice.answer,\n          ai_powered: false,\n          quick_action: true,\n        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });\n      }\n\n      const ai = await classifyIntent(
         originalMessage,
         activeProducts.map(formatCatalogProduct),
         serviceCatalog,
