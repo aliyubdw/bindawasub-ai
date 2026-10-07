@@ -991,11 +991,11 @@ Deno.serve(async(req)=>{
   // Resolve saved beneficiary names before AI purchase routing.
   // Examples: "buy 1GB MTN for Mum", "send 2GB to wife".
   // The resolved phone is passed to the same existing purchase flow; no separate purchase logic is created here.
-  const purchaseLike=/\\b(?:buy|purchase|send|get|give|saya|siya)\\b/i.test(String(effectiveText||""));
+  const purchaseLike=/\b(?:buy|purchase|send|get|give|saya|siya)\b/i.test(String(effectiveText||""));
   if(purchaseLike){
-    const targetMatch=String(effectiveText||"").match(/\\b(?:for|to|zuwa)\\s+(.+?)\\s*$/i);
+    const targetMatch=String(effectiveText||"").match(/\b(?:for|to|zuwa)\s+(.+?)\s*$/i);
     const targetName=normalizeBeneficiaryName(targetMatch?.[1]||"");
-    const targetLooksLikePhone=/^(?:\\+?234|0)?\\d{10,13}$/.test(targetName.replace(/[\\s-]/g,""));
+    const targetLooksLikePhone=/^(?:\+?234|0)?\d{10,13}$/.test(targetName.replace(/[\s-]/g,""));
     if(targetName && !targetLooksLikePhone){
       const {data:savedTargets,error:savedTargetError}=await db.from("saved_beneficiaries").select("name,phone_number").eq("user_id",acct.user_id);
       if(savedTargetError) throw savedTargetError;
