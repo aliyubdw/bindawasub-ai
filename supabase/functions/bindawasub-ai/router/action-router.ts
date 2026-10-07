@@ -13,6 +13,7 @@ import {
 import { handleCheckWallet, handleTransactionActions, handlePendingRequery } from "../account/handler.ts";
 import { handleStartAirtime, handleFundingActions } from "../funding/handler.ts";
 import { handleFundingHistory } from "../funding/history-handler.ts";
+import { handleWalletBalance } from "../wallet/balance-handler.ts";
 
 export type ActionRouterContext = {
   supabase: any;
@@ -23,6 +24,7 @@ export type ActionRouterContext = {
   originalMessage: string;
   conversationId: string | null;
   channel: string;
+  persistAssistantMessage?: (...args: any[]) => Promise<void>;
 };
 
 export async function routeExplicitAction(
@@ -39,6 +41,7 @@ export async function routeExplicitAction(
     originalMessage,
     conversationId,
     channel,
+    persistAssistantMessage,
   } = context;
 
   if (phase === "early") {
@@ -82,6 +85,15 @@ export async function routeExplicitAction(
     return null;
   }
 
+  if (body.action === "wallet_balance") {
+    return await handleWalletBalance(
+      supabase,
+      userId,
+      corsHeaders,
+      conversationId,
+      persistAssistantMessage,
+    );
+  }
   if (body.action === "start_airtime") {
     return await handleStartAirtime(
       {
