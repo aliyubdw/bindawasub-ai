@@ -12,6 +12,7 @@ import {
 } from "../admin/handler.ts";
 import { handleCheckWallet, handleTransactionActions, handlePendingRequery } from "../account/handler.ts";
 import { handleStartAirtime, handleFundingActions } from "../funding/handler.ts";
+import { handleFundingHistory } from "../funding/history-handler.ts";
 
 export type ActionRouterContext = {
   supabase: any;
@@ -92,12 +93,21 @@ export async function routeExplicitAction(
         channel,
       },
       body,
+      originalMessage,
     );
   }
   if (body.action === "customer_search") {
     return await handleCustomerSearch(
       { supabase, isAdmin, corsHeaders },
       body.search,
+    );
+  }
+  if (body.action === "funding_history") {
+    return await handleFundingHistory(
+      supabase,
+      userId,
+      corsHeaders,
+      body.limit,
     );
   }
   if (body.action === "check_wallet") {
