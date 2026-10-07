@@ -195,7 +195,7 @@ export async function routeExplicitAction(
     ].includes(body.action)
   ) {
     return await handleFundingActions(
-      { supabase, userId, isAdmin, corsHeaders },
+      { supabase, userId, isAdmin, corsHeaders, persistAssistantMessage },
       body,
     );
   }
