@@ -25,7 +25,7 @@ export type AiIntentRouterContext = {
 };
 
 export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Response | null> {
-  const {
+  let {
     ai, aiProducts, purchaseCatalog, variantFilteredProducts,
     networkFilteredProducts, requestedNetworkToken, requestedVariantText,
     availableDataTypes, serviceCatalog, supabase, userId,
