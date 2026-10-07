@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { formatCatalogProduct, productSpecification } from "./catalog/format.ts";
 import { getActiveDataCatalog, normalizeCatalogToken } from "./catalog/list.ts";
+import { handleProductEnquiry } from "./catalog/handler.ts";
 import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
 import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
 import { getWalletBalance } from "./wallet/balance.ts";
@@ -473,151 +474,15 @@ Deno.serve(async (req) => {
     const shouldUseGeminiFirst =
       hasPhoneNumber && hasPurchaseLanguage;
 
-    // ==========================================
-    // PRODUCT ENQUIRY
-    // Product specification is resolved deterministically from the live
-    // catalog: network -> data type -> plans.
-    // ==========================================
-
-    if (
-      !shouldUseGeminiFirst &&
-      (
-        message.includes("data") ||
-        message.includes("package") ||
-        message.includes("plan") ||
-        /\b(mtn|airtel|glo|9mobile|t2)\b/i.test(message)
-      )
-    ) {
-      const requestedNetwork =
-        /\bmtn\b/i.test(originalMessage) ? "mtn" :
-        /\bairtel\b/i.test(originalMessage) ? "airtel" :
-        /\bglo\b/i.test(originalMessage) ? "glo" :
-        /\b(?:9mobile|t2)\b/i.test(originalMessage) ? "9mobile" :
-        normalizeCatalogToken(conversationContext?.network) || null;
-
-      const requestedVariant =
-        /\b(?:sme|sme data|normal data)\b/i.test(originalMessage) ? "smedata" :
-        /\b(?:social|social data)\b/i.test(originalMessage) ? "social" :
-        /\b(?:gifting|gift|gift data)\b/i.test(originalMessage) ? "gifting" :
-        /\bawoop\b/i.test(originalMessage) ? "awoop" :
-        normalizeCatalogToken(conversationContext?.variant) || null;
-
-      const activeDataProducts = await getActiveDataCatalog(supabase);
-
-      const networkProducts = requestedNetwork
-        ? activeDataProducts.filter((product:any) => {
-            const network = Array.isArray(product.service_networks)
-              ? product.service_networks[0]
-              : product.service_networks;
-            return normalizeCatalogToken(network?.code) === requestedNetwork ||
-              normalizeCatalogToken(network?.name) === requestedNetwork;
-          })
-        : activeDataProducts;
-
-      const variantProducts = requestedVariant
-        ? networkProducts.filter((product:any) => {
-            const variant = Array.isArray(product.service_variants)
-              ? product.service_variants[0]
-              : product.service_variants;
-            return normalizeCatalogToken(variant?.code) === requestedVariant ||
-              normalizeCatalogToken(variant?.name) === requestedVariant;
-          })
-        : networkProducts;
-
-      const networkLabel = requestedNetwork === "9mobile"
-        ? "9mobile (T2)"
-        : requestedNetwork
-          ? requestedNetwork.toUpperCase()
-          : null;
-
-      if (requestedNetwork && networkProducts.length === 0) {
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_enquiry",
-          service_type:"data",
-          network:requestedNetwork,
-          products:[],
-          available:false,
-          answer:"There are currently no active data plans for " + networkLabel + "."
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      // Network selected without a specific data type:
-      // return ALL active plans for that network. The customer UI groups them
-      // under each Data Type heading, so the customer can compare packages
-      // across SME, Social, Gifting, Awoop, etc. without another step.
-      if (requestedNetwork && !requestedVariant) {
-        const groupedTypes = Array.from(
-          new Map(
-            networkProducts.map((product:any) => {
-              const variant = Array.isArray(product.service_variants)
-                ? product.service_variants[0]
-                : product.service_variants;
-              const key = normalizeCatalogToken(variant?.code || variant?.name) || "data";
-              return [key, {
-                code: variant?.code || null,
-                name: variant?.name || variant?.code || "Data",
-                plan_count: 0
-              }];
-            })
-          ).values()
-        ).map((type:any) => ({
-          ...type,
-          plan_count: networkProducts.filter((product:any) => {
-            const variant = Array.isArray(product.service_variants)
-              ? product.service_variants[0]
-              : product.service_variants;
-            return normalizeCatalogToken(variant?.code || variant?.name) ===
-              normalizeCatalogToken(type.code || type.name);
-          }).length
-        }));
-
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_enquiry",
-          service_type:"data",
-          network:requestedNetwork,
-          network_name:networkLabel,
-          data_types:groupedTypes,
-          products:networkProducts,
-          grouped_by:"data_type",
-          answer:"Here are all available " + networkLabel + " data plans, grouped by data type."
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      if (requestedNetwork && requestedVariant && variantProducts.length === 0) {
-        const variantLabel =
-          requestedVariant === "smedata" ? "SME Data" :
-          requestedVariant === "social" ? "Social Data" :
-          requestedVariant === "gifting" ? "Gifting" :
-          requestedVariant;
-
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_enquiry",
-          service_type:"data",
-          network:requestedNetwork,
-          network_name:networkLabel,
-          variant:requestedVariant,
-          products:[],
-          available:false,
-          answer:variantLabel + " is currently not available on " + networkLabel + "."
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      return new Response(JSON.stringify({
-        success:true,
-        intent:"product_enquiry",
-        service_type:"data",
-        network:requestedNetwork,
-        network_name:networkLabel,
-        variant:requestedVariant,
-        products:variantProducts,
-        answer:requestedVariant
-          ? "Here are the available " + (requestedVariant === "smedata" ? "SME Data" : requestedVariant === "social" ? "Social Data" : requestedVariant === "gifting" ? "Gifting" : requestedVariant) + " plans on " + networkLabel + "."
-          : "Here are the available Bindawasub data plans."
-      }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-    }
+    const productEnquiry = await handleProductEnquiry({
+      supabase,
+      originalMessage,
+      message,
+      conversationContext,
+      corsHeaders,
+      shouldUseGeminiFirst,
+    });
+    if (productEnquiry) return productEnquiry;
 
     // ==========================================
     // UNIVERSAL SERVICE CATALOG
