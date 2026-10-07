@@ -805,15 +805,18 @@ Deno.serve(async (req) => {
         }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const ai = await classifyIntent(
-        originalMessage,
-        activeProducts.map(formatCatalogProduct),
+      const ai = await classifyIntent({
+        userMessage: originalMessage,
+        availableProducts: activeProducts.map(formatCatalogProduct),
         serviceCatalog,
         conversationHistory,
-        String(aiConfig?.default_language || "english").toLowerCase() === "hausa" ? "hausa" : "english",
+        defaultLanguage:
+          String(aiConfig?.default_language || "english").toLowerCase() === "hausa"
+            ? "hausa"
+            : "english",
         conversationContext,
-        recentTransactionsForAI
-      );
+        recentTransactions: recentTransactionsForAI,
+      });
 
       // If a requested data network or data type has no active plans, say so explicitly.
       const dataAvailabilityIntent = new Set(["product_enquiry","product_price","purchase_intent"]);
