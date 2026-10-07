@@ -5,7 +5,6 @@ import { normalizeCatalogToken } from "./catalog/list.ts";
 import { handleProductEnquiry } from "./catalog/handler.ts";
 import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
 import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
-import { getWalletBalance } from "./wallet/balance.ts";
 import { executeViaProviderExecution } from "./purchase/execution.ts";
 import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
 import { loadCustomerTransaction } from "./transactions/lookup.ts";
@@ -157,6 +156,7 @@ Deno.serve(async (req) => {
         originalMessage,
         conversationId,
         channel,
+        persistAssistantMessage,
       },
       body,
       "early",
@@ -252,6 +252,7 @@ Deno.serve(async (req) => {
         originalMessage,
         conversationId,
         channel,
+        persistAssistantMessage,
       },
       body,
       "normal",
@@ -552,23 +553,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ==========================================
-        // CUSTOMER QUICK ACTIONS: deterministic account data, no Gemini needed.
-    if (body.action === "wallet_balance") {
-      const { data: walletData, error: walletError } = await supabase.rpc("get_my_balance", { p_user_id: userId });
-      if (walletError) throw walletError;
-      const wallet = walletData?.[0];
-      await persistAssistantMessage(supabase, conversationId, `Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, "wallet_balance", "backend");
-      return new Response(JSON.stringify({ success:true, intent:"wallet_balance", balance:wallet?.balance ?? 0, currency:wallet?.currency ?? "NGN", answer:`Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, ai_powered:false, quick_action:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-    }
-
-    if (body.action === "transaction_history") {
-      const { data: rows, error } = await supabase.from("transactions").select(`id,created_at,phone_number,amount,status,provider,provider_reference,products(product_name,volume,validity_value,validity_unit,validity_type,service_networks(code,name))`).eq("user_id",userId).order("created_at",{ascending:false}).limit(5);
-      if (error) throw error;
-      const transactions=(rows||[]).map((tx:any)=>{ const p=Array.isArray(tx.products)?tx.products[0]:tx.products; const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks; const d=p?.validity_type==="fixed"&&p?.validity_value!=null&&p?.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):(p?.validity_type==="unlimited"?"Unlimited":""); const digits=String(tx.phone_number||"").replace(/\\D/g,""); return {id:tx.id,date:tx.created_at,product_name:p?.product_name||"Purchase",network:n?.code||null,network_name:n?.name||null,volume:p?.volume||null,duration:d,phone_number:digits.length>=7?`${digits.slice(0,4)}****${digits.slice(-3)}`:"—",amount:Number(tx.amount||0),status:tx.status,provider:tx.provider,provider_reference:tx.provider_reference||null}; });
-      await persistAssistantMessage(supabase, conversationId, transactions.length ? `Here are your latest ${transactions.length} purchases.` : "You do not have any purchases yet.", "transaction_history", "backend");
-      return new Response(JSON.stringify({success:true,intent:"transaction_history",transactions,answer:transactions.length?`Here are your latest ${transactions.length} purchases.`:"You do not have any purchases yet.",ai_powered:false,quick_action:true}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-    }
+    // Deterministic account actions are routed through the action router above.
 
 // Deterministic Airtime amount follow-up.
     // At this point conversationContext has already been loaded.
