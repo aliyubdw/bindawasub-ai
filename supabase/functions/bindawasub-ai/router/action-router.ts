@@ -85,7 +85,12 @@ export async function routeExplicitAction(
     return null;
   }
 
-  if (body.action === "wallet_balance") {
+  // Deterministic natural-language wallet balance detection.
+  // Balance is account data and must never depend on Gemini intent classification.
+  const balanceMessage = String(originalMessage || "").trim().toLowerCase();
+  const asksForBalance = /^(?:what(?:'s| is)\s+(?:my\s+)?balance|check\s+(?:my\s+)?balance|show\s+(?:my\s+)?balance|my\s+balance|how\s+much\s+(?:do\s+)?i\s+have|nawa\s+ne\s+(?:kudin|money)\s+(?:na|a)\s+wallet(?:\s+ta)?|duba\s+balance)$/i.test(balanceMessage);
+
+  if (body.action === "wallet_balance" || asksForBalance) {
     return await handleWalletBalance(
       supabase,
       userId,
