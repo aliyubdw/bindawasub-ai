@@ -1,21 +1,23 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-import { formatCatalogProduct, productSpecification } from "./catalog/format.ts";
-import { getActiveDataCatalog, normalizeCatalogToken } from "./catalog/list.ts";
-import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
-import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
-import { getWalletBalance } from "./wallet/balance.ts";
-import { createManualFundingRequest } from "./wallet/funding.ts";
-import { getCustomerTransactions } from "./transactions/handler.ts";
+import { formatCatalogProduct } from "./catalog/format.ts";
+import { normalizeCatalogToken } from "./catalog/list.ts";
+import { handleProductEnquiry } from "./catalog/handler.ts";
+import { handleDeterministicDataPriceQuery } from "./catalog/price.ts";
+import { formatTransactionForAI } from "./transactions/format.ts";
+import { executeViaProviderExecution } from "./purchase/execution.ts";
+import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
+import { loadCustomerTransaction } from "./transactions/lookup.ts";
+import { routeExplicitAction } from "./router/action-router.ts";
+import { recoverFundingAmountFromConversation } from "./funding/context.ts";
 import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts";
 import { classifyIntent } from "./ai/intent.ts";
+import { loadAiConfig, isChannelAllowed } from "./ai/config.ts";
+import { jsonResponse } from "./ai/response.ts";
+import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
-import { handleNewConversation, handleConversationList, handleConversationHistory } from "./conversation/handler.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
-import { handleAiSummary, handleAiSettings, handleAiCustomerWallet, handleAdminStatus, handleCustomerSearch } from "./admin/handler.ts";
-import { handleCheckWallet, handleTransactionActions, handlePendingRequery } from "./account/handler.ts";
-import { handleStartAirtime, handleFundingActions } from "./funding/handler.ts";
 
 
 const corsHeaders = {
@@ -125,34 +127,6 @@ Deno.serve(async (req) => {
 
     const isAdmin = bindawasubUser.role === "admin";
 
-    if (body.action === "new_conversation") {
-      return await handleNewConversation({ supabase, userId, corsHeaders }, body);
-    }
-
-    if (body.action === "conversation_list") {
-      return await handleConversationList({ supabase, userId, corsHeaders }, body);
-    }
-
-    if (body.action === "conversation_history") {
-      return await handleConversationHistory({ supabase, userId, corsHeaders }, body);
-    }
-
-    if (body.action === "ai_summary") {
-      return await handleAiSummary({ supabase, isAdmin, corsHeaders });
-    }
-
-    if (body.action === "ai_settings_get" || body.action === "ai_settings_save") {
-      return await handleAiSettings({ supabase, isAdmin, corsHeaders }, body.action, body.settings);
-    }
-
-    if (body.action === "ai_customer_wallet") {
-      return await handleAiCustomerWallet({ supabase, isAdmin, corsHeaders }, String(body.user_id || "").trim());
-    }
-
-    if (body.action === "admin_status") {
-      return await handleAdminStatus({ supabase, isAdmin, corsHeaders }, bindawasubUser);
-    }
-
     const originalMessage = body.message || "";
     const message = originalMessage.toLowerCase();
 
@@ -171,20 +145,27 @@ Deno.serve(async (req) => {
       body.channel
     );
 
-    if (body.action === "start_airtime") {
-      return await handleStartAirtime(
-        { supabase, userId, corsHeaders, originalMessage, conversationId, channel },
-        body
-      );
-    }
+
+    const earlyAction = await routeExplicitAction(
+      {
+        supabase,
+        userId,
+        isAdmin,
+        corsHeaders,
+        bindawasubUser,
+        originalMessage,
+        conversationId,
+        channel,
+        persistAssistantMessage,
+      },
+      body,
+      "early",
+    );
+    if (earlyAction) return earlyAction;
 
     // Load live AI controls before processing customer requests.
-    const { data: aiConfig, error: aiConfigError } = await supabase
-      .from("ai_settings")
-      .select("enabled, gemini_enabled, require_purchase_confirmation, max_purchase_amount, default_language, allowed_channels, fallback_message")
-      .limit(1)
-      .maybeSingle();
-    if (aiConfigError) throw aiConfigError;
+    const aiConfig = await loadAiConfig(supabase);
+
 
     if (aiConfig && aiConfig.enabled === false) {
       return new Response(JSON.stringify({
@@ -196,12 +177,12 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const allowedChannels = Array.isArray(aiConfig?.allowed_channels) ? aiConfig.allowed_channels.map((x:any)=>String(x).toLowerCase()) : ["web","app","whatsapp","telegram"];
-    if (!allowedChannels.includes(channel)) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "This AI channel is currently disabled."
-      }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!isChannelAllowed(aiConfig, channel)) {
+      return jsonResponse(
+        { success: false, error: "This AI channel is currently disabled." },
+        corsHeaders,
+        403,
+      );
     }
 
     {
@@ -246,178 +227,33 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ==========================================
-    // RECOVER MANUAL FUNDING AMOUNT FROM CHAT CONTEXT
-    // ==========================================
-    // This keeps the funding flow working even if an older frontend
-    // does not send the explicit manual_funding_request action.
-    if (conversationId) {
-      const amountMatch = String(originalMessage).trim().match(
-        /^(?:₦\\s*|NGN\\s*|naira\\s*)?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*$/i
-      );
-
-      if (amountMatch) {
-        const parsedAmount = Number(
-          String(amountMatch[1]).replace(/,/g, "")
-        );
-
-        if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
-          // The fund_wallet action returns before an assistant message is logged,
-          // so the previous assistant message may not exist here. Check the
-          // immediately previous user message as the durable conversation signal.
-          const { data: previousUserMessages } = await supabase
-            .from("ai_messages")
-            .select("message, created_at")
-            .eq("conversation_id", conversationId)
-            .eq("role", "user")
-            .order("created_at", { ascending: false })
-            .limit(2);
-
-          const previousUserMessage = String(
-            previousUserMessages?.[1]?.message || ""
-          ).toLowerCase().trim();
-
-          if (
-            /fund.*wallet|wallet.*fund|funding.*wallet|add.*money|add.*amount|fund my wallet/.test(
-              previousUserMessage
-            )
-          ) {
-            body.action = "manual_funding_request";
-            body.amount = parsedAmount;
-          }
-        }
-      }
-    }
+    // Recover a numeric funding amount from the previous funding request.
+    await recoverFundingAmountFromConversation({
+      supabase,
+      conversationId,
+      originalMessage,
+      body,
+    });
 
 
 
-    async function executeViaProviderExecution(transactionId: string) {
-      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      if (!serviceRoleKey || !supabaseUrl) {
-        throw new Error("Supabase server configuration is incomplete.");
-      }
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/provider-execution`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceRoleKey}`,
-            "apikey": serviceRoleKey,
-          },
-          body: JSON.stringify({
-            action: "execute_purchase",
-            transaction_id: transactionId,
-          }),
-        }
-      );
-
-      const raw = await response.text();
-      let result: any;
-      try { result = JSON.parse(raw); } catch { result = { success: false, error: raw }; }
-
-      if (!response.ok) {
-        throw new Error(result?.error || "Provider execution failed.");
-      }
-      return result;
-    }
-
-    async function loadCustomerTransaction(transactionId: string) {
-      const { data, error } = await supabase.from("transactions").select(`
-        id, created_at, phone_number, amount, status, provider, provider_reference,
-        description, service_type, product_id,
-        products (product_name, volume, validity_type, validity_value, validity_unit,
-          service_networks(code,name), service_variants(code,name))
-      `).eq("id", transactionId).eq("user_id", userId).maybeSingle();
-      if (error) { console.error("Customer transaction readback error:", error); return null; }
-      return data || null;
-    }
-
-    function buildPurchaseConfirmation(tx: any, fallbackPurchase: any, execution: any) {
-      const product=Array.isArray(tx?.products)?tx.products[0]:tx?.products;
-      const networkInfo=Array.isArray(product?.service_networks)?product.service_networks[0]:product?.service_networks;
-      const variantInfo=Array.isArray(product?.service_variants)?product.service_variants[0]:product?.service_variants;
-      const reference=tx?.provider_reference||execution?.provider_reference||fallbackPurchase?.provider_reference||null;
-      const description=tx?.description||fallbackPurchase?.description||product?.product_name||"Purchase";
-      const productName=product?.product_name||fallbackPurchase?.product_name||description;
-      const phoneNumber=tx?.phone_number||fallbackPurchase?.phone_number||fallbackPurchase?.customer_input?.phone||null;
-      const amount=Number(tx?.amount??fallbackPurchase?.amount??0);
-      const status=tx?.status||execution?.status||fallbackPurchase?.status||"pending";
-      const provider=tx?.provider||execution?.provider||fallbackPurchase?.provider||null;
-      return {
-        transaction_id:tx?.id||fallbackPurchase?.id||fallbackPurchase?.transaction_id||execution?.transaction_id||null,
-        date:tx?.created_at||fallbackPurchase?.created_at||null, description, product_name:productName,
-        service_type:tx?.service_type||fallbackPurchase?.service_type||null,
-        network:networkInfo?.code||networkInfo?.name||fallbackPurchase?.network||null,
-        variant:variantInfo?.code||variantInfo?.name||fallbackPurchase?.variant||null,
-        volume:product?.volume||fallbackPurchase?.volume||null, phone_number:phoneNumber, amount, status, provider,
-        reference, provider_reference:reference, provider_message:execution?.message||null
-      };
-    }
-
-// ==========================================
-// ADMIN CUSTOMER SEARCH
-// ==========================================
-
-if (body.action === "customer_search") {
-      return await handleCustomerSearch({ supabase, isAdmin, corsHeaders }, body.search);
-    }
-
-
-    // ==========================================
-        if (body.action === "check_wallet") {
-      return await handleCheckWallet({ supabase, userId, corsHeaders }, body.amount);
-    }
-
-        if (body.action === "requery_pending_purchase") {
-      return await handlePendingRequery({
+    // Explicit actions that depend on conversation/AI state.
+    const routedAction = await routeExplicitAction(
+      {
         supabase,
         userId,
+        isAdmin,
         corsHeaders,
-        executePendingRequery: async (transactionId: string) => {
-          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-          const supabaseUrl = Deno.env.get("SUPABASE_URL");
-          if (!serviceRoleKey || !supabaseUrl) throw new Error("Supabase server configuration is incomplete.");
-          const response = await fetch(`${supabaseUrl}/functions/v1/provider-execution`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${serviceRoleKey}`,
-              "apikey": serviceRoleKey,
-            },
-            body: JSON.stringify({ action: "requery_transaction", transaction_id: transactionId }),
-          });
-          const raw = await response.text();
-          let result: any;
-          try { result = JSON.parse(raw); } catch { result = { success: false, error: raw }; }
-          if (!response.ok) throw new Error(result?.error || "Provider requery failed.");
-          return result;
-        },
-      }, body.transaction_id);
-    }
-
-        if (body.action === "transaction_history" || body.action === "last_transaction" || body.action === "transaction_status") {
-      return await handleTransactionActions({ supabase, userId, corsHeaders }, body);
-    }
-
-    // FUNDING ACTIONS
-    // ==========================================
-    if ([
-      "fund_wallet",
-      "manual_funding_request",
-      "manual_funding_submit",
-      "manual_funding_history",
-      "manual_funding_requests",
-      "manual_funding_approve",
-      "manual_funding_reject",
-      "manual_funding_settings_get",
-      "manual_funding_settings_save",
-      "manual_fund",
-    ].includes(body.action)) {
-      return await handleFundingActions({ supabase, userId, isAdmin, corsHeaders }, body);
-    }
+        bindawasubUser,
+        originalMessage,
+        conversationId,
+        channel,
+        persistAssistantMessage,
+      },
+      body,
+      "normal",
+    );
+    if (routedAction) return routedAction;
 
     // ==========================================
     // CONFIRMATION OF A PENDING PURCHASE
@@ -512,7 +348,7 @@ if (body.action === "customer_search") {
           originalMessage,
           corsHeaders,
           executeViaProviderExecution,
-          loadCustomerTransaction,
+          loadCustomerTransaction: (transactionId: string) => loadCustomerTransaction(supabase, userId, transactionId),
           buildPurchaseConfirmation,
           persistAssistantMessage,
           logAiActivity,
@@ -534,204 +370,14 @@ if (body.action === "customer_search") {
           originalMessage,
           corsHeaders,
           executeViaProviderExecution,
-          loadCustomerTransaction,
+          loadCustomerTransaction: (transactionId: string) => loadCustomerTransaction(supabase, userId, transactionId),
           buildPurchaseConfirmation,
           persistAssistantMessage,
           logAiActivity,
         });
     }
 
-    // ==========================================
-    // DETERMINISTIC CUSTOMER ACCOUNT INTENTS
-    // Keep account-history requests out of Gemini.
-    // ==========================================
 
-    const normalizedFundingMessage = originalMessage.trim().toLowerCase();
-
-    const wantsFundingHistory =
-      normalizedFundingMessage.includes("funding history") ||
-      normalizedFundingMessage.includes("funding histories") ||
-      normalizedFundingMessage.includes("show my funding") ||
-      normalizedFundingMessage.includes("my funding") ||
-      normalizedFundingMessage.includes("wallet funding") ||
-      normalizedFundingMessage.includes("funding transactions") ||
-      normalizedFundingMessage.includes("deposit history") ||
-      normalizedFundingMessage.includes("deposit histories") ||
-      normalizedFundingMessage.includes("show my deposits") ||
-      normalizedFundingMessage.includes("my deposits") ||
-      normalizedFundingMessage.includes("how did i fund my wallet") ||
-      normalizedFundingMessage.includes("how did i fund") ||
-      normalizedFundingMessage.includes("tarihin funding") ||
-      normalizedFundingMessage.includes("tarihin kudin wallet") ||
-      normalizedFundingMessage.includes("yadda na saka kudi") ||
-      normalizedFundingMessage.includes("kudin da na saka") ||
-      normalizedFundingMessage.includes("yadda na cika wallet") ||
-      normalizedFundingMessage.includes("cikawa wallet");
-
-    const wantsTransactionHistory =
-      /\b(transaction history|transaction histories|show my transactions|show my transaction|my transactions|my transaction history|purchase history|purchase histories|show my purchases|my purchases|show transactions|history)\b/i.test(originalMessage) ||
-      /\b(taarihin ciniki|tarihin ciniki|tarihin sayayya|abubuwan da na saya|abinda na saya)\b/i.test(originalMessage);
-
-    const wantsLastTransaction =
-      /\b(last transaction|latest transaction|last purchase|latest purchase|most recent purchase|most recent transaction)\b/i.test(originalMessage) ||
-      /\b(sayayyata ta karshe|sayan da na yi na karshe|ciniki na karshe)\b/i.test(originalMessage);
-
-    const wantsTransactionStatus =
-      /\b(transaction status|purchase status|did my last purchase go through|was my last purchase successful|is my purchase successful|is my transaction successful)\b/i.test(originalMessage) ||
-      /\b(sayayyata ta yi nasara|sayayyata ta samu|ciniki na yi nasara)\b/i.test(originalMessage);
-
-    if (!wantsFundingHistory && (wantsTransactionHistory || wantsLastTransaction || wantsTransactionStatus)) {
-      const accountAction = wantsTransactionHistory
-        ? "transaction_history"
-        : wantsLastTransaction
-          ? "last_transaction"
-          : "transaction_status";
-
-      const { data: recentTransactions, error: transactionError } =
-        await supabase
-          .from("transactions")
-          .select(`
-            id, created_at, phone_number, amount, status, provider, provider_reference,
-            product_id, products (product_name, volume, validity_type, validity_value, validity_unit, service_networks(code,name))
-          `)
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(accountAction === "transaction_history" ? 5 : 1);
-
-      if (transactionError) {
-        console.error("Deterministic transaction history error:", transactionError);
-        throw transactionError;
-      }
-
-      const rows = recentTransactions || [];
-      const maskPhone = (phone: string | null) => {
-        if (!phone) return "—";
-        const digits = phone.replace(/\D/g, "");
-        if (digits.length < 7) return phone;
-        return digits.slice(0, 4) + "****" + digits.slice(-3);
-      };
-
-      const normalizeProduct = (product: any) =>
-        Array.isArray(product) ? product[0] : product;
-
-      const formatted = rows.map((tx: any) => {
-        const product = normalizeProduct(tx.products);
-        return {
-          id: tx.id,
-          date: tx.created_at,
-          product_name: product?.product_name || "Purchase",
-          network: product?.network || null,
-          volume: product?.volume || null,
-          duration: product?.duration || null,
-          phone_number: maskPhone(tx.phone_number),
-          amount: Number(tx.amount || 0),
-          status: tx.status,
-          provider: tx.provider,
-          provider_reference: tx.provider_reference || null,
-        };
-      });
-
-      if (formatted.length === 0) {
-        return new Response(JSON.stringify({
-          success: true,
-          intent: accountAction,
-          transactions: accountAction === "transaction_history" ? [] : undefined,
-          transaction: accountAction === "transaction_history" ? undefined : null,
-          answer: "You do not have any purchases yet.",
-          ai_powered: false,
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      if (accountAction === "transaction_history") {
-        return new Response(JSON.stringify({
-          success: true,
-          intent: "transaction_history",
-          transactions: formatted,
-          answer: "Here are your latest " + formatted.length + " purchase" + (formatted.length === 1 ? "" : "s") + ".",
-          ai_powered: false,
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-
-      const latest = formatted[0];
-      let answer =
-        "Your latest purchase is " + latest.product_name +
-        " for ₦" + latest.amount.toLocaleString() +
-        " to " + latest.phone_number +
-        ". Status: " + latest.status + ".";
-
-      if (accountAction === "transaction_status") {
-        if (latest.status === "successful") {
-          answer = "Yes. Your latest purchase, " + latest.product_name + ", was successful.";
-        } else if (latest.status === "failed") {
-          answer = "Your latest purchase, " + latest.product_name + ", failed.";
-        } else {
-          answer = "Your latest purchase, " + latest.product_name + ", is currently " + latest.status + ".";
-        }
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        intent: accountAction,
-        transaction: latest,
-        answer,
-        ai_powered: false,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // ==========================================
-    // CUSTOMER FUNDING HISTORY
-    // Keep funding-history requests deterministic so Gemini cannot invent deposits.
-    // ==========================================
-
-
-
-    if (wantsFundingHistory) {
-      const requestedLimit = Math.min(Math.max(Number(body.limit || 5), 1), 10);
-
-      const { data: fundingRows, error: fundingError } = await supabase
-        .from("wallet_funding")
-        .select("id, amount, reference, billstack_reference, status, payment_method, created_at, completed_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(requestedLimit);
-
-      if (fundingError) {
-        console.error("Funding history error:", fundingError);
-        throw fundingError;
-      }
-
-      const formattedFunding = (fundingRows || []).map((funding: any) => ({
-        id: funding.id,
-        amount: Number(funding.amount || 0),
-        reference: funding.reference || null,
-        billstack_reference: funding.billstack_reference || null,
-        status: funding.status || "unknown",
-        payment_method: funding.payment_method || null,
-        date: funding.completed_at || funding.created_at,
-      }));
-
-      return new Response(JSON.stringify({
-        success: true,
-        intent: "funding_history",
-        funding: formattedFunding,
-        answer: formattedFunding.length > 0
-          ? `Here are your latest ${formattedFunding.length} wallet funding transaction${formattedFunding.length === 1 ? "" : "s"}.`
-          : "You do not have any wallet funding records yet.",
-        ai_powered: false,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
 
     // ==========================================
     // GREETINGS
@@ -786,151 +432,15 @@ if (body.action === "customer_search") {
     const shouldUseGeminiFirst =
       hasPhoneNumber && hasPurchaseLanguage;
 
-    // ==========================================
-    // PRODUCT ENQUIRY
-    // Product specification is resolved deterministically from the live
-    // catalog: network -> data type -> plans.
-    // ==========================================
-
-    if (
-      !shouldUseGeminiFirst &&
-      (
-        message.includes("data") ||
-        message.includes("package") ||
-        message.includes("plan") ||
-        /\b(mtn|airtel|glo|9mobile|t2)\b/i.test(message)
-      )
-    ) {
-      const requestedNetwork =
-        /\bmtn\b/i.test(originalMessage) ? "mtn" :
-        /\bairtel\b/i.test(originalMessage) ? "airtel" :
-        /\bglo\b/i.test(originalMessage) ? "glo" :
-        /\b(?:9mobile|t2)\b/i.test(originalMessage) ? "9mobile" :
-        normalizeCatalogToken(conversationContext?.network) || null;
-
-      const requestedVariant =
-        /\b(?:sme|sme data|normal data)\b/i.test(originalMessage) ? "smedata" :
-        /\b(?:social|social data)\b/i.test(originalMessage) ? "social" :
-        /\b(?:gifting|gift|gift data)\b/i.test(originalMessage) ? "gifting" :
-        /\bawoop\b/i.test(originalMessage) ? "awoop" :
-        normalizeCatalogToken(conversationContext?.variant) || null;
-
-      const activeDataProducts = await getActiveDataCatalog(supabase);
-
-      const networkProducts = requestedNetwork
-        ? activeDataProducts.filter((product:any) => {
-            const network = Array.isArray(product.service_networks)
-              ? product.service_networks[0]
-              : product.service_networks;
-            return normalizeCatalogToken(network?.code) === requestedNetwork ||
-              normalizeCatalogToken(network?.name) === requestedNetwork;
-          })
-        : activeDataProducts;
-
-      const variantProducts = requestedVariant
-        ? networkProducts.filter((product:any) => {
-            const variant = Array.isArray(product.service_variants)
-              ? product.service_variants[0]
-              : product.service_variants;
-            return normalizeCatalogToken(variant?.code) === requestedVariant ||
-              normalizeCatalogToken(variant?.name) === requestedVariant;
-          })
-        : networkProducts;
-
-      const networkLabel = requestedNetwork === "9mobile"
-        ? "9mobile (T2)"
-        : requestedNetwork
-          ? requestedNetwork.toUpperCase()
-          : null;
-
-      if (requestedNetwork && networkProducts.length === 0) {
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_enquiry",
-          service_type:"data",
-          network:requestedNetwork,
-          products:[],
-          available:false,
-          answer:"There are currently no active data plans for " + networkLabel + "."
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      // Network selected without a specific data type:
-      // return ALL active plans for that network. The customer UI groups them
-      // under each Data Type heading, so the customer can compare packages
-      // across SME, Social, Gifting, Awoop, etc. without another step.
-      if (requestedNetwork && !requestedVariant) {
-        const groupedTypes = Array.from(
-          new Map(
-            networkProducts.map((product:any) => {
-              const variant = Array.isArray(product.service_variants)
-                ? product.service_variants[0]
-                : product.service_variants;
-              const key = normalizeCatalogToken(variant?.code || variant?.name) || "data";
-              return [key, {
-                code: variant?.code || null,
-                name: variant?.name || variant?.code || "Data",
-                plan_count: 0
-              }];
-            })
-          ).values()
-        ).map((type:any) => ({
-          ...type,
-          plan_count: networkProducts.filter((product:any) => {
-            const variant = Array.isArray(product.service_variants)
-              ? product.service_variants[0]
-              : product.service_variants;
-            return normalizeCatalogToken(variant?.code || variant?.name) ===
-              normalizeCatalogToken(type.code || type.name);
-          }).length
-        }));
-
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_enquiry",
-          service_type:"data",
-          network:requestedNetwork,
-          network_name:networkLabel,
-          data_types:groupedTypes,
-          products:networkProducts,
-          grouped_by:"data_type",
-          answer:"Here are all available " + networkLabel + " data plans, grouped by data type."
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      if (requestedNetwork && requestedVariant && variantProducts.length === 0) {
-        const variantLabel =
-          requestedVariant === "smedata" ? "SME Data" :
-          requestedVariant === "social" ? "Social Data" :
-          requestedVariant === "gifting" ? "Gifting" :
-          requestedVariant;
-
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_enquiry",
-          service_type:"data",
-          network:requestedNetwork,
-          network_name:networkLabel,
-          variant:requestedVariant,
-          products:[],
-          available:false,
-          answer:variantLabel + " is currently not available on " + networkLabel + "."
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      return new Response(JSON.stringify({
-        success:true,
-        intent:"product_enquiry",
-        service_type:"data",
-        network:requestedNetwork,
-        network_name:networkLabel,
-        variant:requestedVariant,
-        products:variantProducts,
-        answer:requestedVariant
-          ? "Here are the available " + (requestedVariant === "smedata" ? "SME Data" : requestedVariant === "social" ? "Social Data" : requestedVariant === "gifting" ? "Gifting" : requestedVariant) + " plans on " + networkLabel + "."
-          : "Here are the available Bindawasub data plans."
-      }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-    }
+    const productEnquiry = await handleProductEnquiry({
+      supabase,
+      originalMessage,
+      message,
+      conversationContext,
+      corsHeaders,
+      shouldUseGeminiFirst,
+    });
+    if (productEnquiry) return productEnquiry;
 
     // ==========================================
     // UNIVERSAL SERVICE CATALOG
@@ -1000,23 +510,7 @@ if (body.action === "customer_search") {
       }
     }
 
-    // ==========================================
-        // CUSTOMER QUICK ACTIONS: deterministic account data, no Gemini needed.
-    if (body.action === "wallet_balance") {
-      const { data: walletData, error: walletError } = await supabase.rpc("get_my_balance", { p_user_id: userId });
-      if (walletError) throw walletError;
-      const wallet = walletData?.[0];
-      await persistAssistantMessage(supabase, conversationId, `Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, "wallet_balance", "backend");
-      return new Response(JSON.stringify({ success:true, intent:"wallet_balance", balance:wallet?.balance ?? 0, currency:wallet?.currency ?? "NGN", answer:`Your wallet balance is ₦${Number(wallet?.balance ?? 0).toLocaleString()}.`, ai_powered:false, quick_action:true }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-    }
-
-    if (body.action === "transaction_history") {
-      const { data: rows, error } = await supabase.from("transactions").select(`id,created_at,phone_number,amount,status,provider,provider_reference,products(product_name,volume,validity_value,validity_unit,validity_type,service_networks(code,name))`).eq("user_id",userId).order("created_at",{ascending:false}).limit(5);
-      if (error) throw error;
-      const transactions=(rows||[]).map((tx:any)=>{ const p=Array.isArray(tx.products)?tx.products[0]:tx.products; const n=Array.isArray(p?.service_networks)?p.service_networks[0]:p?.service_networks; const d=p?.validity_type==="fixed"&&p?.validity_value!=null&&p?.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):(p?.validity_type==="unlimited"?"Unlimited":""); const digits=String(tx.phone_number||"").replace(/\\D/g,""); return {id:tx.id,date:tx.created_at,product_name:p?.product_name||"Purchase",network:n?.code||null,network_name:n?.name||null,volume:p?.volume||null,duration:d,phone_number:digits.length>=7?`${digits.slice(0,4)}****${digits.slice(-3)}`:"—",amount:Number(tx.amount||0),status:tx.status,provider:tx.provider,provider_reference:tx.provider_reference||null}; });
-      await persistAssistantMessage(supabase, conversationId, transactions.length ? `Here are your latest ${transactions.length} purchases.` : "You do not have any purchases yet.", "transaction_history", "backend");
-      return new Response(JSON.stringify({success:true,intent:"transaction_history",transactions,answer:transactions.length?`Here are your latest ${transactions.length} purchases.`:"You do not have any purchases yet.",ai_powered:false,quick_action:true}),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-    }
+    // Deterministic account actions are routed through the action router above.
 
 // Deterministic Airtime amount follow-up.
     // At this point conversationContext has already been loaded.
@@ -1285,15 +779,44 @@ if (body.action === "customer_search") {
 
       const recentTransactionsForAI = (recentTransactionRows || []).map(formatTransactionForAI);
 
-      const ai = await classifyIntent(
+      // Exact data-price requests are resolved from the live catalog before Gemini.
+      // This prevents AI wording from inventing or selecting the wrong price.
+      const deterministicPrice = handleDeterministicDataPriceQuery(
         originalMessage,
-        activeProducts.map(formatCatalogProduct),
+        activeProducts,
+      );
+      if (deterministicPrice) {
+        await persistAssistantMessage(
+          supabase,
+          conversationId,
+          deterministicPrice.answer,
+          "product_price",
+          "backend",
+        );
+        return new Response(JSON.stringify({
+          success: true,
+          intent: "product_price",
+          service_type: "data",
+          product: deterministicPrice.product || null,
+          products: deterministicPrice.products || undefined,
+          answer: deterministicPrice.answer,
+          ai_powered: false,
+          quick_action: true,
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const ai = await classifyIntent({
+        userMessage: originalMessage,
+        availableProducts: activeProducts.map(formatCatalogProduct),
         serviceCatalog,
         conversationHistory,
-        String(aiConfig?.default_language || "english").toLowerCase() === "hausa" ? "hausa" : "english",
+        defaultLanguage:
+          String(aiConfig?.default_language || "english").toLowerCase() === "hausa"
+            ? "hausa"
+            : "english",
         conversationContext,
-        recentTransactionsForAI
-      );
+        recentTransactions: recentTransactionsForAI,
+      });
 
       // If a requested data network or data type has no active plans, say so explicitly.
       const dataAvailabilityIntent = new Set(["product_enquiry","product_price","purchase_intent"]);
@@ -1457,506 +980,26 @@ if (body.action === "customer_search") {
         { ai_powered: true }
       );
 
-      if (ai.intent === "product_price") {
-        const matchedProduct = resolveCatalogProduct(ai, aiProducts || []);
-        if (matchedProduct) {
-          const price = Number(matchedProduct.selling_price || 0);
-          return new Response(JSON.stringify({
-            success:true,
-            intent:"product_price",
-            product:formatCatalogProduct(matchedProduct),
-            answer:ai.reply || `${matchedProduct.product_name} is ₦${price.toLocaleString("en-NG")}.`,
-            ai_powered:true
-          }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-        }
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"product_price",
-          products:(aiProducts || []).map(formatCatalogProduct),
-          answer:ai.reply || "Tell me the network and package you want the price for.",
-          ai_powered:true
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      if (ai.intent === "product_enquiry") {
-        const networkLabel = requestedNetworkToken
-          ? (requestedNetworkToken === "9mobile" ? "9mobile" : requestedNetworkToken.toUpperCase())
-          : null;
-
-        // Once a network is selected, show ALL active plans on that network.
-        // The customer UI groups these plans under their Data Type headings.
-        if (requestedNetworkToken) {
-          const networkPlans = networkFilteredProducts.map(formatCatalogProduct);
-
-          return new Response(
-            JSON.stringify({
-              success: true,
-              intent: "product_enquiry",
-              network: requestedNetworkToken,
-              network_name: networkLabel,
-              data_types: availableDataTypes,
-              products: networkPlans,
-              answer: networkPlans.length
-                ? `Here are the available ${networkLabel} data plans, grouped by Data Type.`
-                : `There are currently no active data plans for ${networkLabel}.`,
-              ai_powered: true,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            intent: "product_enquiry",
-            network: requestedNetworkToken || null,
-            variant: requestedVariantText || null,
-            products: (aiProductsForAI || []).map(formatCatalogProduct),
-            answer: ai.reply || "Here are the available plans.",
-            ai_powered: true,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      if (ai.intent === "purchase_intent") {
-        // Resolve purchases only against the already network/data-type-filtered catalog.
-        const purchaseCatalog = requestedVariantText
-          ? variantFilteredProducts
-          : networkFilteredProducts;
-
-        // Product specification is resolved from the live catalog, never from Gemini's
-        // product identity alone. An exact product ID is accepted only if it belongs to
-        // the already-filtered catalog.
-        const specificationCandidates = filterCatalogBySpecification(ai, purchaseCatalog);
-        const matchedById = String(ai?.product_id||"").trim()
-          ? specificationCandidates.find((p:any)=>p.id===String(ai.product_id).trim())
-          : null;
-        const matchedProduct = matchedById || (
-          specificationCandidates.length === 1
-            ? specificationCandidates[0]
-            : null
-        );
-
-        const serviceType = String(ai.service_type || matchedProduct?.service_type || "").trim().toLowerCase();
-        const catalogService = serviceCatalog.find((s:any) => s.code === serviceType);
-        const customerInput = {
-          ...(ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {})
-        };
-
-        if (ai.phone_number && !customerInput.phone) customerInput.phone = ai.phone_number;
-        if (ai.network && !customerInput.network) customerInput.network = ai.network;
-        if (ai.amount && Number(ai.amount) > 0 && !customerInput.amount) customerInput.amount = Number(ai.amount);
-
-        const requiredFields = (catalogService?.fields || [])
-          .filter((field:any) => field.required)
-          .map((field:any) => field.key);
-        const missingFields = requiredFields.filter((key:string) =>
-          customerInput[key] === undefined ||
-          customerInput[key] === null ||
-          String(customerInput[key]).trim() === ""
-        );
-
-        if (!matchedProduct) {
-          if (specificationCandidates.length > 1) {
-            const choices = specificationCandidates.slice(0, 12).map(productSpecification);
-            return new Response(JSON.stringify({
-              success:true,
-              intent:"purchase_intent",
-              service_type:serviceType || null,
-              product:null,
-              products:choices,
-              customer_input:customerInput,
-              missing_fields:missingFields,
-              answer:ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want.",
-              requires_confirmation:false,
-              ai_powered:true
-            }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-          }
-
-          return new Response(JSON.stringify({
-            success:true,
-            intent:"purchase_intent",
-            service_type:serviceType || null,
-            product:null,
-            products:[],
-            customer_input:customerInput,
-            missing_fields:missingFields,
-            answer:ai.reply || "That product is not currently available. Please choose an available product from the catalog.",
-            requires_confirmation:false,
-            ai_powered:true
-          }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-        }
-
-        const price=Number(matchedProduct.selling_price||0);
-        if (missingFields.length>0) {
-          return new Response(JSON.stringify({
-            success:true,
-            intent:"purchase_intent",
-            service_type:serviceType,
-            product:matchedProduct,
-            customer_input:customerInput,
-            missing_fields:missingFields,
-            answer:ai.reply || `I found ${matchedProduct.product_name} for ₦${price.toLocaleString("en-NG")}. Please provide: ${missingFields.join(", ")}.`,
-            requires_confirmation:false,
-            ai_powered:true
-          }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-        }
-
-        if (conversationId) {
-          conversationContext = {
-            ...(conversationContext || {}),
-            last_intent: "purchase_intent",
-            service_type: serviceType || matchedProduct.service_type || null,
-            product_id: matchedProduct.id,
-            phone_number: ai.phone_number || customerInput.phone || conversationContext?.phone_number || null,
-            network: ai.network || customerInput.network || conversationContext?.network || null,
-            volume: ai.volume || matchedProduct.volume || conversationContext?.volume || null,
-            language: ai.language || conversationContext?.language || "english",
-            updated_at: new Date().toISOString()
-          };
-
-          const newPendingIdempotencyKey=`AI-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-          await supabase.from("ai_conversations").update({
-            pending_product_id:matchedProduct.id,
-            pending_phone_number:ai.phone_number || customerInput.phone || null,
-            pending_at:new Date().toISOString(),
-            last_message_at:new Date().toISOString(),
-            pending_service_type:serviceType || matchedProduct.service_type || null,
-            pending_airtime_amount:null,
-            pending_network:ai.network || customerInput.network || null,
-            pending_idempotency_key:newPendingIdempotencyKey,
-            pending_customer_input:customerInput,
-            conversation_context:conversationContext,
-            language:ai.language || conversationContext.language || "english"
-          }).eq("id",conversationId);
-        }
-
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"purchase_intent",
-          service_type:serviceType,
-          product:matchedProduct,
-          customer_input:customerInput,
-          phone_number:ai.phone_number || customerInput.phone || null,
-          network:ai.network || customerInput.network || null,
-          volume:ai.volume || null,
-          answer:ai.reply || `You selected ${matchedProduct.product_name} for ₦${price.toLocaleString("en-NG")}. Please confirm before purchase.`,
-          requires_confirmation:true,
-          ai_powered:true
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
-      if (ai.intent === "airtime_purchase") {
-        const network = String(ai.network || "").trim().toUpperCase();
-        const amount = Number(ai.amount);
-        const phoneNumber = ai.phone_number;
-
-        const { data: airtimeService } = await supabase
-          .from("service_definitions")
-          .select("id")
-          .eq("code", "airtime")
-          .eq("active", true)
-          .maybeSingle();
-        const { data: airtimeNetworks } = airtimeService
-          ? await supabase.from("service_networks").select("code,name").eq("service_id", airtimeService.id).eq("active", true)
-          : { data: [] };
-        const networkConfigured = (airtimeNetworks || []).some((n:any) =>
-          String(n.code || "").trim().toUpperCase() === network ||
-          String(n.name || "").trim().toUpperCase() === network
-        );
-
-        if (!networkConfigured || !Number.isFinite(amount) || amount <= 0 || !phoneNumber) {
-          return new Response(JSON.stringify({
-            success: true,
-            intent: "airtime_purchase",
-            answer: "Sure. Please provide the network, airtime amount, and recipient phone number.",
-            ai_powered: true
-          }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-
-        if (conversationId) {
-          const newPendingIdempotencyKey = `AI-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          await supabase.from("ai_conversations").update({
-            pending_product_id: null,
-            pending_phone_number: phoneNumber,
-            pending_at: new Date().toISOString(),
-            pending_service_type: "airtime",
-            pending_airtime_amount: amount,
-            pending_network: network,
-            pending_idempotency_key: newPendingIdempotencyKey,
-          }).eq("id", conversationId)
-          .eq("user_id", userId)
-          .eq("channel", channel);
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          intent: "airtime_purchase",
-          answer: `You want to buy ${network} airtime worth ₦${amount.toLocaleString("en-NG")} for ${phoneNumber}. Please confirm to proceed with your purchase.`,
-          ai_powered: true,
-          requires_confirmation: true,
-          airtime: { network, amount, phone_number: phoneNumber }
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      if (ai.intent === "wallet_balance") {
-        const wallet = await getWalletBalance(supabase, userId);
-        return new Response(JSON.stringify({
-          success: true,
-          intent: "wallet_balance",
-          balance: wallet.balance,
-          currency: wallet.currency,
-          answer: `Your wallet balance is ₦${wallet.balance.toLocaleString()}.`,
-          ai_powered: true,
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      if (
-        ai.intent === "transaction_history" ||
-        ai.intent === "last_transaction" ||
-        ai.intent === "transaction_status"
-      ) {
-        const accountAction = ai.intent;
-
-        const recentTransactions = await getCustomerTransactions(supabase, userId, ai.transaction_id || null, accountAction);
-        const rows = recentTransactions || [];
-
-        const maskPhone = (phone: string | null) => {
-          if (!phone) return "—";
-          const digits = phone.replace(/\\D/g, "");
-          if (digits.length < 7) return phone;
-          return `${digits.slice(0, 4)}****${digits.slice(-3)}`;
-        };
-
-        const normalizeProduct = (product: any) =>
-          Array.isArray(product) ? product[0] : product;
-
-        const formatted = rows.map((tx: any) => {
-          const product = normalizeProduct(tx.products);
-          const networkInfo = Array.isArray(product?.service_networks) ? product.service_networks[0] : product?.service_networks;
-          const duration = product?.validity_type === "fixed" && product?.validity_value != null && product?.validity_unit
-            ? String(product.validity_value) + " " + String(product.validity_unit)
-            : (product?.validity_type === "unlimited" ? "Unlimited" : "");
-          return {
-            id: tx.id,
-            date: tx.created_at,
-            product_name: product?.product_name || "Purchase",
-            network: networkInfo?.code || null,
-            network_name: networkInfo?.name || null,
-            volume: product?.volume || null,
-            duration,
-            phone_number: maskPhone(tx.phone_number),
-            amount: Number(tx.amount || 0),
-            status: tx.status,
-            provider: tx.provider,
-            provider_reference: tx.provider_reference || null,
-          };
-        });
-
-        if (formatted.length === 0) {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              intent: accountAction,
-              transactions: accountAction === "transaction_history" ? [] : undefined,
-              transaction: accountAction === "transaction_history" ? undefined : null,
-              answer: "You do not have any purchases yet.",
-              ai_powered: true,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        if (accountAction === "transaction_history") {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              intent: "transaction_history",
-              transactions: formatted,
-              answer: `Here are your latest ${formatted.length} purchase${formatted.length === 1 ? "" : "s"}.`,
-              ai_powered: true,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        let latest = formatted[0];
-
-        // A status request on a pending transaction should perform one safe
-        // provider requery before reporting the state. Requery never creates
-        // a new purchase and provider-execution is responsible for exactly-once
-        // finalization/refund behavior.
-        if (accountAction === "transaction_status" && latest.status === "pending" && latest.id) {
-          try {
-            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-            const supabaseUrl = Deno.env.get("SUPABASE_URL");
-            if (serviceRoleKey && supabaseUrl) {
-              const requeryResponse = await fetch(
-                `${supabaseUrl}/functions/v1/provider-execution`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${serviceRoleKey}`,
-                    "apikey": serviceRoleKey,
-                  },
-                  body: JSON.stringify({
-                    action: "requery_transaction",
-                    transaction_id: latest.id,
-                  }),
-                }
-              );
-
-              if (requeryResponse.ok) {
-                const requeryRaw = await requeryResponse.text();
-                let requeryResult: any = null;
-                try { requeryResult = JSON.parse(requeryRaw); } catch {}
-
-                const refreshed = await getCustomerTransactions(
-                  supabase,
-                  userId,
-                  latest.id,
-                  "transaction_status"
-                );
-                if (refreshed?.length) {
-                  const refreshedTx = refreshed[0];
-                  const refreshedProduct = normalizeProduct(refreshedTx.products);
-                  const refreshedNetwork = Array.isArray(refreshedProduct?.service_networks)
-                    ? refreshedProduct.service_networks[0]
-                    : refreshedProduct?.service_networks;
-                  latest = {
-                    ...latest,
-                    status: refreshedTx.status,
-                    provider: refreshedTx.provider,
-                    provider_reference: refreshedTx.provider_reference || latest.provider_reference,
-                    product_name: refreshedProduct?.product_name || latest.product_name,
-                    network: refreshedNetwork?.code || latest.network,
-                    network_name: refreshedNetwork?.name || latest.network_name,
-                    volume: refreshedProduct?.volume || latest.volume,
-                  };
-                } else if (requeryResult?.status) {
-                  latest = { ...latest, status: requeryResult.status };
-                }
-              }
-            }
-          } catch (requeryError) {
-            console.error("Customer transaction status requery error:", requeryError);
-            // Do not turn a provider requery error into a false failure.
-            // The transaction remains pending and the normal status response
-            // below tells the customer the current known state.
-          }
-        }
-
-        if (conversationId) {
-          const txContext = {
-            ...(conversationContext || {}),
-            last_transaction_id: latest.id,
-            last_transaction_status: latest.status,
-            last_transaction_product: latest.product_name,
-            last_transaction_amount: latest.amount,
-            last_transaction_network: latest.network,
-            updated_at: new Date().toISOString()
-          };
-          conversationContext = txContext;
-          await supabase.from("ai_conversations")
-            .update({ conversation_context: txContext, last_message_at: new Date().toISOString() })
-            .eq("id", conversationId)
-        .eq("user_id", userId)
-        .eq("channel", channel);
-        }
-
-        let answer =
-          `Your latest purchase is ${latest.product_name} for ₦${latest.amount.toLocaleString()} to ${latest.phone_number}. Status: ${latest.status}.`;
-
-        if (accountAction === "transaction_status") {
-          if (latest.status === "successful") {
-            answer = `Yes. Your latest purchase, ${latest.product_name}, was successful.`;
-          } else if (latest.status === "failed") {
-            answer = `Your latest purchase, ${latest.product_name}, failed.`;
-          } else {
-            answer = `Your latest purchase, ${latest.product_name}, is currently ${latest.status}.`;
-          }
-        }
-
-        await persistAssistantMessage(supabase, conversationId, answer, accountAction, "backend");
-        return new Response(
-          JSON.stringify({
-            success: true,
-            intent: accountAction,
-            transaction: latest,
-            answer,
-            ai_powered: true,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      if (ai.intent === "fund_wallet") {
-        const { data: currentWallet, error: currentWalletError } = await supabase
-          .from("wallets")
-          .select("balance, currency")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (currentWalletError) throw currentWalletError;
-
-        const currentBalance = Number(currentWallet?.balance ?? 0);
-        const currentCurrency = currentWallet?.currency || "NGN";
-
-        const amountMatch = String(originalMessage || "").match(/(?:₦|ngn|naira|fund(?:\s+my)?(?:\s+wallet)?\s*(?:with|by|of)?\s*)([0-9,]+(?:\.\d+)?)/i);
-        const parsedAmount = amountMatch ? Number(String(amountMatch[1]).replace(/,/g, "")) : 0;
-
-        if (parsedAmount > 0) {
-          const funding = await createManualFundingRequest(supabase, userId, parsedAmount);
-
-          if (!funding.success) {
-            return new Response(JSON.stringify({
-              success:false,
-              intent:"fund_wallet",
-              error:funding.error
-            }), { status:400, headers:{...corsHeaders,"Content-Type":"application/json"} });
-          }
-
-          return new Response(JSON.stringify({
-            success:true,
-            intent:"fund_wallet",
-            funding_mode:"manual",
-            requires_payment:true,
-            request:funding.request,
-            bank_account:funding.bank_account,
-            instructions:funding.instructions,
-            answer:funding.bank_account
-              ? `Funding request created for ₦${parsedAmount.toLocaleString("en-NG")}. Your current wallet balance is ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${currentBalance.toLocaleString("en-NG")}. If approved, your balance will become ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${(currentBalance + parsedAmount).toLocaleString("en-NG")}. Transfer the exact amount to the account shown, then send your transfer reference.`
-              : `Funding request ${funding.request.reference} created for ₦${parsedAmount.toLocaleString("en-NG")}. Your current wallet balance is ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${currentBalance.toLocaleString("en-NG")}. Bank transfer details are not configured yet.`,
-            ai_powered:true
-          }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-        }
-
-        return new Response(JSON.stringify({
-          success:true,
-          intent:"fund_wallet",
-          funding_mode:"manual",
-          requires_amount:true,
-          answer:`Sure. Your current wallet balance is ${currentCurrency === "NGN" ? "₦" : currentCurrency + " "}${currentBalance.toLocaleString("en-NG")}. How much would you like to add to your wallet? For example: Fund my wallet with ₦5,000.`,
-          ai_powered:true
-        }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
-      }
-
+      const aiIntentResponse = await routeAiIntent({
+        ai,
+        aiProducts: aiProducts || [],
+        purchaseCatalog: requestedVariantText ? variantFilteredProducts : networkFilteredProducts,
+        variantFilteredProducts,
+        networkFilteredProducts,
+        requestedNetworkToken,
+        requestedVariantText,
+        availableDataTypes,
+        serviceCatalog,
+        supabase,
+        userId,
+        conversationId,
+        conversationContext,
+        channel,
+        originalMessage,
+        corsHeaders,
+        persistAssistantMessage,
+      });
+      if (aiIntentResponse) return aiIntentResponse;
       return new Response(
         JSON.stringify({
           success: true,
