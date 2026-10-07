@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-import { formatCatalogProduct, productSpecification } from "./catalog/format.ts";
-import { getActiveDataCatalog, normalizeCatalogToken } from "./catalog/list.ts";
+import { formatCatalogProduct } from "./catalog/format.ts";
+import { normalizeCatalogToken } from "./catalog/list.ts";
 import { handleProductEnquiry } from "./catalog/handler.ts";
 import { normalizeLookup, resolveCatalogProduct, filterCatalogBySpecification } from "./catalog/lookup.ts";
 import { maskTransactionPhone, formatTransactionForAI } from "./transactions/format.ts";
