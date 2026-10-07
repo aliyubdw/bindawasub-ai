@@ -1,4 +1,4 @@
-import { formatCatalogProduct } from "../catalog/format.ts";
+import { formatCatalogProduct, productSpecification } from "../catalog/format.ts";
 import { resolveCatalogProduct, filterCatalogBySpecification } from "../catalog/lookup.ts";
 import { getWalletBalance } from "../wallet/balance.ts";
 import { getCustomerTransactions } from "../transactions/handler.ts";
@@ -90,7 +90,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             intent: "product_enquiry",
             network: requestedNetworkToken || null,
             variant: requestedVariantText || null,
-            products: (aiProductsForAI || []).map(formatCatalogProduct),
+            products: (aiProducts || []).map(formatCatalogProduct),
             answer: ai.reply || "Here are the available plans.",
             ai_powered: true,
           }),
