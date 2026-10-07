@@ -1,9 +1,8 @@
 import { formatCatalogProduct } from "../catalog/format.ts";
-import { resolveCatalogProduct, filterCatalogBySpecification, productSpecification } from "../catalog/lookup.ts";
+import { resolveCatalogProduct, filterCatalogBySpecification } from "../catalog/lookup.ts";
 import { getWalletBalance } from "../wallet/balance.ts";
 import { getCustomerTransactions } from "../transactions/handler.ts";
 import { createManualFundingRequest } from "../wallet/funding.ts";
-import { jsonResponse } from "./response.ts";
 
 export type AiIntentRouterContext = {
   ai: any;
