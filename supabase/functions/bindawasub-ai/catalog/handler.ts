@@ -22,6 +22,11 @@ export async function handleProductEnquiry({
   corsHeaders: Record<string, string>;
   shouldUseGeminiFirst: boolean;
 }): Promise<Response | null> {
+  const isPriceQuery =
+    /\b(?:how\s+much|price|cost|what(?:'s| is)\s+the\s+price)\b/i.test(originalMessage) &&
+    /\b[0-9]+(?:\.[0-9]+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
+  if (isPriceQuery) return null;
+
   if (
     shouldUseGeminiFirst ||
     !(
