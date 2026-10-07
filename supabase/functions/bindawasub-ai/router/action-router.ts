@@ -14,6 +14,7 @@ import { handleCheckWallet, handleTransactionActions, handlePendingRequery } fro
 import { handleStartAirtime, handleFundingActions } from "../funding/handler.ts";
 import { handleFundingHistory } from "../funding/history-handler.ts";
 import { handleWalletBalance } from "../wallet/balance-handler.ts";
+import { detectTransactionAction } from "../transactions/intent.ts";
 
 export type ActionRouterContext = {
   supabase: any;
@@ -99,6 +100,23 @@ export async function routeExplicitAction(
       persistAssistantMessage,
     );
   }
+  const transactionAction = detectTransactionAction(originalMessage);
+  if (transactionAction) {
+    return await handleTransactionActions(
+      { supabase, userId, corsHeaders },
+      { ...body, action: transactionAction },
+    );
+  }
+
+  const fundingMessage = String(originalMessage || "").trim().toLowerCase();
+  const asksHowToFund = /^(?:how\s+(?:do|can)\s+i\s+fund(?:\s+my)?\s+wallet|how\s+do\s+i\s+add\s+money(?:\s+to\s+my\s+wallet)?|how\s+can\s+i\s+add\s+money(?:\s+to\s+my\s+wallet)?|fund(?:\s+my)?\s+wallet|i\s+want\s+to\s+fund(?:\s+my)?\s+wallet|i\s+want\s+to\s+add\s+money(?:\s+to\s+my\s+wallet)?|ta\s+yaya\s+zan\s+yi\s+funding|yaya\s+zan\s+kara\s+kudi(?:\s+a\s+wallet)?|ina\s+son\s+na\s+sa\s+kudi(?:\s+a\s+wallet)?)$/i.test(fundingMessage);
+  if (asksHowToFund) {
+    return await handleFundingActions(
+      { supabase, userId, isAdmin, corsHeaders, persistAssistantMessage },
+      { ...body, action: "fund_wallet" },
+    );
+  }
+
   if (body.action === "start_airtime") {
     return await handleStartAirtime(
       {
