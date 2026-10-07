@@ -15,6 +15,8 @@ import { recoverFundingAmountFromConversation } from "./funding/context.ts";
 import { createManualFundingRequest } from "./wallet/funding.ts";
 import { handleAirtimePurchase, handleDataPurchase } from "./purchase/handler.ts";
 import { classifyIntent } from "./ai/intent.ts";
+import { loadAiConfig, isChannelAllowed } from "./ai/config.ts";
+import { jsonResponse } from "./ai/response.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
@@ -164,12 +166,8 @@ Deno.serve(async (req) => {
     if (earlyAction) return earlyAction;
 
     // Load live AI controls before processing customer requests.
-    const { data: aiConfig, error: aiConfigError } = await supabase
-      .from("ai_settings")
-      .select("enabled, gemini_enabled, require_purchase_confirmation, max_purchase_amount, default_language, allowed_channels, fallback_message")
-      .limit(1)
-      .maybeSingle();
-    if (aiConfigError) throw aiConfigError;
+    const aiConfig = await loadAiConfig(supabase);
+
 
     if (aiConfig && aiConfig.enabled === false) {
       return new Response(JSON.stringify({
@@ -181,12 +179,12 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const allowedChannels = Array.isArray(aiConfig?.allowed_channels) ? aiConfig.allowed_channels.map((x:any)=>String(x).toLowerCase()) : ["web","app","whatsapp","telegram"];
-    if (!allowedChannels.includes(channel)) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "This AI channel is currently disabled."
-      }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!isChannelAllowed(aiConfig, channel)) {
+      return jsonResponse(
+        { success: false, error: "This AI channel is currently disabled." },
+        corsHeaders,
+        403,
+      );
     }
 
     {
@@ -381,46 +379,7 @@ Deno.serve(async (req) => {
         });
     }
 
-    // Deterministic account intents stay out of Gemini.
-    const fundingHistoryRequested = isFundingHistoryRequest(originalMessage);
-    if (fundingHistoryRequested) {
-      body.action = "funding_history";
-      const fundingHistoryAction = await routeExplicitAction(
-        {
-          supabase,
-          userId,
-          isAdmin,
-          corsHeaders,
-          bindawasubUser,
-          originalMessage,
-          conversationId,
-          channel,
-        },
-        body,
-        "normal",
-      );
-      if (fundingHistoryAction) return fundingHistoryAction;
-    }
 
-    const transactionAction = detectTransactionAction(originalMessage);
-    if (transactionAction) {
-      body.action = transactionAction;
-      const transactionIntentAction = await routeExplicitAction(
-        {
-          supabase,
-          userId,
-          isAdmin,
-          corsHeaders,
-          bindawasubUser,
-          originalMessage,
-          conversationId,
-          channel,
-        },
-        body,
-        "normal",
-      );
-      if (transactionIntentAction) return transactionIntentAction;
-    }
 
     // ==========================================
     // GREETINGS
