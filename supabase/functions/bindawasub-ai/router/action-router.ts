@@ -105,7 +105,6 @@ export async function routeExplicitAction(
         channel,
       },
       body,
-      originalMessage,
     );
   }
   if (body.action === "customer_search") {
