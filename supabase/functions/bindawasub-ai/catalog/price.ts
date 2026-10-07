@@ -42,7 +42,7 @@ export function handleDeterministicDataPriceQuery(message: string, products: any
   if (!network || requestedMb == null) return null;
   let candidates = (Array.isArray(products) ? products : []).filter((product: any) =>
     String(product?.service_type || "").toLowerCase() === "data" &&
-    Math.abs(Number(volumeInMb(product?.volume)) - requestedMb) < 0.01 &&
+    Math.abs(Number(volumeInMb(product?.product_name)) - requestedMb) < 0.01 &&
     productNetwork(product) === network,
   );
   const variantToken =
