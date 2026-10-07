@@ -39,11 +39,11 @@ export function handleDeterministicDataPriceQuery(message: string, products: any
   if (!/\b(?:how\s+much|price|cost|what(?:\x27s| is)\s+the\s+price)\b/i.test(text)) return null;
   const network = networkFromMessage(text);
   const requestedMb = requestedVolumeInMb(text);
-  if (!network || requestedMb == null) return null;
+  if (requestedMb == null) return null;
   let candidates = (Array.isArray(products) ? products : []).filter((product: any) =>
     String(product?.service_type || "").toLowerCase() === "data" &&
     Math.abs(Number(volumeInMb(product?.product_name)) - requestedMb) < 0.01 &&
-    productNetwork(product) === network,
+    (!network || productNetwork(product) === network),
   );
   const variantToken =
     /\b(?:sme|sme\s+data)\b/i.test(text) ? "smedata" :
@@ -61,11 +61,17 @@ export function handleDeterministicDataPriceQuery(message: string, products: any
   }
   if (candidates.length > 1 && !variantToken) {
     const label = requestedMb >= 1024 ? (requestedMb / 1024) + "GB" : requestedMb + "MB";
+    const title = network ? "📦 " + label + " " + network.toUpperCase() + " Options" : "📦 " + label + " Options";
     const choices = candidates.map((product: any) => {
       const formatted = formatCatalogProduct(product);
-      return (formatted.variant_name || "Data") + ": ₦" + Number(product.selling_price || 0).toLocaleString("en-NG");
+      const networkInfo = Array.isArray(product?.service_networks) ? product.service_networks[0] : product?.service_networks;
+      const variantInfo = Array.isArray(product?.service_variants) ? product.service_variants[0] : product?.service_variants;
+      const networkLabel = String(networkInfo?.name || networkInfo?.code || "").trim();
+      const variantLabel = formatted.variant_name || variantInfo?.name || variantInfo?.code || "Data";
+      const prefix = network ? "" : networkLabel + " ";
+      return "• " + prefix + variantLabel + " — ₦" + Number(product.selling_price || 0).toLocaleString("en-NG");
     });
-    return { type: "multiple" as const, products: candidates.map(formatCatalogProduct), answer: "There are " + candidates.length + " " + label + " " + network.toUpperCase() + " options. " + choices.join(" | ") + ". Tell me the data type you want." };
+    return { type: "multiple" as const, products: candidates.map(formatCatalogProduct), answer: title + "\n" + choices.join("\n") + "\n\nWhich one would you like?" };
   }
   return null;
 }
