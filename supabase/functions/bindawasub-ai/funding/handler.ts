@@ -6,6 +6,7 @@ export type FundingAirtimeContext = {
   originalMessage?: string;
   conversationId?: string | null;
   channel?: string;
+  persistAssistantMessage?: (...args: any[]) => Promise<void>;
 };
 
 export async function handleStartAirtime(ctx: FundingAirtimeContext, body: any) {
@@ -64,7 +65,7 @@ export async function handleStartAirtime(ctx: FundingAirtimeContext, body: any) 
           });
         }
 
-        conversationContext = ownedConversation.conversation_context &&
+        let conversationContext = ownedConversation.conversation_context &&
           typeof ownedConversation.conversation_context === "object"
           ? ownedConversation.conversation_context
           : {};
@@ -94,7 +95,9 @@ export async function handleStartAirtime(ctx: FundingAirtimeContext, body: any) 
       }
 
       const answer = `You selected ${networkName} airtime. How much airtime do you want to buy?`;
-      await persistAssistantMessage(supabase, conversationId, answer, "airtime_purchase", "backend");
+      if (ctx.persistAssistantMessage) {
+        await ctx.persistAssistantMessage(supabase, conversationId, answer, "airtime_purchase", "backend");
+      }
 
       return new Response(JSON.stringify({
         success: true,
