@@ -1089,7 +1089,7 @@ Deno.serve(async(req)=>{
         }
       }catch(notificationError){
         console.error("Telegram transaction notification:",notificationError);
-        if(!String(d?.answer||"").trim()) await send(chatId,"❌ The transaction result could not be delivered right now. Please check your transaction history.",true);
+        await send(chatId,aiAnswer,true);
       }
     }else{
       await send(chatId,aiAnswer,true);
