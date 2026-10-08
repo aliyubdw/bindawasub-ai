@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
       const pendingIsAirtime=pendingConversation?.pending_service_type==="airtime" &&
         !!pendingConversation?.pending_airtime_amount && !!pendingConversation?.pending_network && !!pendingConversation?.pending_phone_number;
 
-      const pendingIsProductPurchase=!!pendingConversation?.pending_product_id && Object.keys(pendingInput).length>0;
+      const pendingIsProductPurchase=!!pendingConversation?.pending_product_id && !!pendingConversation?.pending_phone_number;
 
       const hasPendingPurchase = pendingIsProductPurchase || pendingIsAirtime;
       const pendingIsFresh=!!pendingConversation?.pending_at &&
