@@ -324,6 +324,7 @@ Deno.serve(async (req) => {
           body.idempotency_key=pendingIdempotencyKey;
         }
       }else if(affirmativeConfirmation){
+        await clearPending();
         await persistAssistantMessage(supabase, conversationId, "That purchase confirmation has expired. Please start the purchase again.", "purchase_confirmation_expired", "backend");
         return new Response(JSON.stringify({
           success:true,intent:"purchase_confirmation_expired",
