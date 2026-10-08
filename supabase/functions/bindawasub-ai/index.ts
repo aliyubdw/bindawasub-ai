@@ -596,7 +596,7 @@ Deno.serve(async (req) => {
 
       conversationContext = nextContext;
       const pendingIdempotencyKey =
-        `AI-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        `AI-${conversationId}-${crypto.randomUUID()}`;
 
       await supabase.from("ai_conversations").update({
         conversation_context: nextContext,
