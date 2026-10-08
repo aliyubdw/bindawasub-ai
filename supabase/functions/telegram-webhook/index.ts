@@ -34,6 +34,50 @@ const savedNumbersKeyboard={keyboard:[
   [{text:"↩️ Main Menu"}]
 ],resize_keyboard:true,is_persistent:false};
 async function send(chatId:number,text:string,showMenu=false,replyMarkup?:Record<string,unknown>){return tg("sendMessage",{chat_id:chatId,text:cleanTelegramText(text).slice(0,4096),disable_web_page_preview:true,...(replyMarkup?{reply_markup:replyMarkup}:(showMenu?{reply_markup:menuKeyboard}:{}))})}
+async function claimTelegramNotification(db:any,transactionId:string){
+  const now=new Date();
+  const stale=new Date(now.getTime()-10*60*1000).toISOString();
+  const {data,error}=await db.from("transactions")
+    .select("notification_attempts,status,source")
+    .eq("id",transactionId)
+    .eq("source","telegram")
+    .in("status",["successful","failed","reversed"])
+    .is("customer_notified_at",null)
+    .or("notification_claimed_at.is.null,notification_claimed_at.lt."+stale)
+    .maybeSingle();
+  if(error) throw error;
+  if(!data) return null;
+  const attempts=Number(data.notification_attempts||0);
+  const {data:claimed,error:claimError}=await db.from("transactions")
+    .update({
+      notification_claimed_at:now.toISOString(),
+      notification_attempts:attempts+1
+    })
+    .eq("id",transactionId)
+    .eq("source","telegram")
+    .in("status",["successful","failed","reversed"])
+    .is("customer_notified_at",null)
+    .eq("notification_attempts",attempts)
+    .or("notification_claimed_at.is.null,notification_claimed_at.lt."+stale)
+    .select("notification_attempts")
+    .maybeSingle();
+  if(claimError) throw claimError;
+  return claimed||null;
+}
+async function completeTelegramNotification(db:any,transactionId:string){
+  const {error}=await db.from("transactions").update({
+    customer_notified_at:new Date().toISOString(),
+    notification_claimed_at:null,
+    last_notification_error:null
+  }).eq("id",transactionId).eq("source","telegram").is("customer_notified_at",null);
+  if(error) throw error;
+}
+async function releaseTelegramNotificationClaim(db:any,transactionId:string,errorMessage:string){
+  await db.from("transactions").update({
+    notification_claimed_at:null,
+    last_notification_error:errorMessage
+  }).eq("id",transactionId).eq("source","telegram").is("customer_notified_at",null);
+}
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:{"Access-Control-Allow-Origin":"*"}});
  try{
@@ -1029,7 +1073,29 @@ Deno.serve(async(req)=>{
     aiAnswer=rows.length
       ?"Here are your latest "+rows.length+" purchases:\\n\\n"+rows.join("\\n")
       :"You do not have any purchases yet.";
-  }const telegramAirtimeIntent=/\b(?:airtime|airtime\s+credit|recharge)\b/i.test(effectiveText)&&/\b(?:buy|purchase|get|want|need|send|give|recharge|airtime|saya|siya)\b/i.test(effectiveText);if(telegramAirtimeIntent){const airtimeUnavailable="📱 Airtime purchases are temporarily unavailable.\n\nWe’re working on connecting a reliable airtime provider.\n\nCustomer Care: @Aliyubdw";await send(chatId,airtimeUnavailable,true);return}const confused=/\b(i (?:do not|don.?t) understand|i(?:\s+)?didn.?t understand|not sure what you mean|cannot understand|can.?t understand|unable to understand|couldn.?t understand|please rephrase|rephrase your request|i can.?t help with that)\b/i.test(aiAnswer);if(aiAnswer&&!confused)await send(chatId,aiAnswer,true);if(confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true);if(!["product_price","purchase_intent"].includes(String(d?.intent||"").toLowerCase())&&Array.isArray(d?.products)&&d.products.length){const lines=d.products.map((p:any,i:number)=>{const network=p.network_name||p.network||"";const duration=p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"");const details=[network,p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"")});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n"),true)}else if(!aiAnswer||confused){if(!confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true)}}catch(e){console.error("Telegram background AI:",e);await send(chatId,"❌ The request could not be completed right now. Please check your transaction status before trying again.",true)}};
+  }const telegramAirtimeIntent=/\b(?:airtime|airtime\s+credit|recharge)\b/i.test(effectiveText)&&/\b(?:buy|purchase|get|want|need|send|give|recharge|airtime|saya|siya)\b/i.test(effectiveText);if(telegramAirtimeIntent){const airtimeUnavailable="📱 Airtime purchases are temporarily unavailable.\n\nWe’re working on connecting a reliable airtime provider.\n\nCustomer Care: @Aliyubdw";await send(chatId,airtimeUnavailable,true);return}const confused=/\b(i (?:do not|don.?t) understand|i(?:\s+)?didn.?t understand|not sure what you mean|cannot understand|can.?t understand|unable to understand|couldn.?t understand|please rephrase|rephrase your request|i can.?t help with that)\b/i.test(aiAnswer);if(aiAnswer&&!confused){
+    const transactionId=String(d?.transaction_id||"").trim();
+    if(transactionId){
+      try{
+        const claim=await claimTelegramNotification(db,transactionId);
+        if(claim){
+          try{
+            await send(chatId,aiAnswer,true);
+            await completeTelegramNotification(db,transactionId);
+          }catch(notificationError){
+            await releaseTelegramNotificationClaim(db,transactionId,notificationError instanceof Error?notificationError.message:String(notificationError));
+            throw notificationError;
+          }
+        }
+      }catch(notificationError){
+        console.error("Telegram transaction notification:",notificationError);
+        if(!String(d?.answer||"").trim()) await send(chatId,"❌ The transaction result could not be delivered right now. Please check your transaction history.",true);
+      }
+    }else{
+      await send(chatId,aiAnswer,true);
+    }
+  }
+  if(confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true);if(!["product_price","purchase_intent"].includes(String(d?.intent||"").toLowerCase())&&Array.isArray(d?.products)&&d.products.length){const lines=d.products.map((p:any,i:number)=>{const network=p.network_name||p.network||"";const duration=p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"");const details=[network,p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"")});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n"),true)}else if(!aiAnswer||confused){if(!confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true)}}catch(e){console.error("Telegram background AI:",e);await send(chatId,"❌ The request could not be completed right now. Please check your transaction status before trying again.",true)}};
   const affirmative=/^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh)\b/i.test(effectiveText);let hasPendingPurchase=false;let pendingConversationId:string|null=null;
   if(affirmative){const {data:pending,error:pendingError}=await db.from("ai_conversations").select("id").eq("user_id",acct.user_id).not("pending_at","is",null).gt("pending_at",new Date(Date.now()-15*60*1000).toISOString()).or("pending_product_id.not.is.null,pending_airtime_amount.not.is.null").order("pending_at",{ascending:false}).limit(1).maybeSingle();if(pendingError)console.error("Telegram pending purchase lookup:",pendingError);hasPendingPurchase=!!pending;pendingConversationId=pending?.id||null}
   if(hasPendingPurchase){await send(chatId,"⏳ Your purchase is being processed. I’ll send you the final result here. Please don’t send the confirmation again.",true);if(typeof EdgeRuntime!=="undefined"&&typeof EdgeRuntime.waitUntil==="function")EdgeRuntime.waitUntil(runAi());else await runAi();return out({success:true,linked:true,processing:true})}
