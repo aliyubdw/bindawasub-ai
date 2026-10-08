@@ -351,8 +351,10 @@ Deno.serve(async (req) => {
           executeViaProviderExecution,
           loadCustomerTransaction: (transactionId: string) => loadCustomerTransaction(supabase, userId, transactionId),
           buildPurchaseConfirmation,
-          persistAssistantMessage,
-          logAiActivity,
+          persistAssistantMessage: (answer: any, intent: string | null, toolCalled: string | null = null) =>
+            persistAssistantMessage(supabase, conversationId, answer, intent, toolCalled),
+          logAiActivity: (...args: any[]) =>
+            (logAiActivity as any)(supabase, userId, conversationId, channel, ...args),
         });
     }
 
@@ -373,8 +375,10 @@ Deno.serve(async (req) => {
           executeViaProviderExecution,
           loadCustomerTransaction: (transactionId: string) => loadCustomerTransaction(supabase, userId, transactionId),
           buildPurchaseConfirmation,
-          persistAssistantMessage,
-          logAiActivity,
+          persistAssistantMessage: (answer: any, intent: string | null, toolCalled: string | null = null) =>
+            persistAssistantMessage(supabase, conversationId, answer, intent, toolCalled),
+          logAiActivity: (...args: any[]) =>
+            (logAiActivity as any)(supabase, userId, conversationId, channel, ...args),
         });
     }
 
