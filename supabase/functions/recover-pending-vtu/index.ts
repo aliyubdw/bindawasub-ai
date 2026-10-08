@@ -174,7 +174,28 @@ async function notifyCustomer(db: any, transactionId: string) {
   }
 }
 
+async function hasHistoricalProviderEvidence(db: any, transactionId: string) {
+  const { data, error } = await db
+    .from("transaction_events")
+    .select("id")
+    .eq("transaction_id", transactionId)
+    .not("provider_reference", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
 async function refundPreProvider(db: any, transactionId: string) {
+  const historicalProviderEvidence = await hasHistoricalProviderEvidence(db, transactionId);
+  if (historicalProviderEvidence) {
+    return {
+      status: "pending",
+      skipped: true,
+      reason: "historical_provider_reference_exists",
+    };
+  }
+
   const { data: tx, error } = await db
     .from("transactions")
     .select("id,status,amount,provider_reference,execution_attempts,processing_at,created_at")
