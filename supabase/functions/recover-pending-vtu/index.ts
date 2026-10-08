@@ -39,34 +39,32 @@ function maskPhone(v: string) {
 
 async function claimNotification(db: any, transactionId: string) {
   const stale = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: current, error: readError } = await db
+    .from("transactions")
+    .select("notification_attempts")
+    .eq("id", transactionId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) return null;
+
+  const nextAttempts = Number(current.notification_attempts || 0) + 1;
   const { data, error } = await db
     .from("transactions")
     .update({
       notification_claimed_at: new Date().toISOString(),
-      notification_attempts: 1,
+      notification_attempts: nextAttempts,
     })
     .eq("id", transactionId)
     .in("status", ["successful", "failed", "reversed"])
     .is("customer_notified_at", null)
+    .eq("notification_attempts", Number(current.notification_attempts || 0))
     .or("notification_claimed_at.is.null,notification_claimed_at.lt." + stale)
     .select("notification_attempts")
     .maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
-
-  // Increment rather than overwrite when this is a retry.
-  const { data: current } = await db
-    .from("transactions")
-    .select("notification_attempts")
-    .eq("id", transactionId)
-    .maybeSingle();
-
-  if (current && Number(current.notification_attempts) <= 1) {
-    return { attempts: 1 };
-  }
-
-  return { attempts: Number(current?.notification_attempts || 1) };
+  return { attempts: Number(data.notification_attempts || nextAttempts) };
 }
 
 async function notifyCustomer(db: any, transactionId: string) {
@@ -79,7 +77,7 @@ async function notifyCustomer(db: any, transactionId: string) {
 
     const { data: tx, error: txError } = await db
       .from("transactions")
-      .select("id,user_id,amount,phone_number,description,service_type,provider_reference,status,products(product_name,volume,service_networks(code,name))")
+      .select("id,user_id,amount,phone_number,description,service_type,provider_reference,status,completed_at,products(product_name,volume,service_networks(code,name))")
       .eq("id", transactionId)
       .maybeSingle();
     if (txError) throw txError;
