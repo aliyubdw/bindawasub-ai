@@ -310,6 +310,7 @@ Deno.serve(async (req) => {
     const { data: notifications, error: notificationError } = await db
       .from("transactions")
       .select("id,status,completed_at")
+      .eq("source", "telegram")
       .in("status", ["successful", "failed", "reversed"])
       .is("customer_notified_at", null)
       .gt("completed_at", cutoff)
