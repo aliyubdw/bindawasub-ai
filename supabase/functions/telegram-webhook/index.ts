@@ -580,7 +580,7 @@ Deno.serve(async(req)=>{
       await send(chatId,"Please enter a valid Nigerian phone number, for example: 08012345678.",false,{keyboard:[[ {text:"↩️ Main Menu" }]],resize_keyboard:true,is_persistent:false});
       return out({success:true,linked:true,state:"awaiting_airtime_recipient"});
     }
-    await saveState("awaiting_airtime_confirmation",{network_code:context.network_code,network_name:context.network_name,amount:context.amount,phone_number:normalizedPhone});
+    await saveState("awaiting_airtime_confirmation",{network_code:context.network_code,network_name:context.network_name,amount:context.amount,phone_number:normalizedPhone,idempotency_key:"TG-AIR-"+acct.user_id+"-"+crypto.randomUUID()});
     await send(chatId,
       "📱 Confirm Airtime Purchase\n\nNetwork: "+String(context.network_name||context.network_code)+
       "\nAmount: ₦"+Number(context.amount||0).toLocaleString("en-NG")+
@@ -608,7 +608,7 @@ Deno.serve(async(req)=>{
       amount:Number(context.amount||0),
       phone_number:String(context.phone_number||""),
       reference:purchaseReference,
-      idempotency_key:"TG-AIR-"+acct.user_id+"-"+String(context.network_code||"")+"-"+String(context.amount||0)+"-"+String(context.phone_number||"")
+      idempotency_key:String(context.idempotency_key||("TG-AIR-"+acct.user_id+"-"+String(context.network_code||"")+"-"+String(context.amount||0)+"-"+String(context.phone_number||"")))
     };
     const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify(payload)});
     const d=await ai.json().catch(()=>({}));
@@ -684,7 +684,7 @@ Deno.serve(async(req)=>{
     if(walletBeforeError) throw walletBeforeError;
     const walletBefore=Number(walletBeforeData?.[0]?.balance??0);
     const price=Number(context.price||0);
-    await saveState("awaiting_data_confirmation",{...context,phone_number:normalizedPhone,wallet_before:walletBefore,price});
+    await saveState("awaiting_data_confirmation",{...context,phone_number:normalizedPhone,wallet_before:walletBefore,price,idempotency_key:"TG-"+acct.user_id+"-"+crypto.randomUUID()});
     await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+String(context.network_name||context.network_code||"—")+"\nPlan: "+String(context.product_name||context.volume||"Data plan")+"\nRecipient: "+normalizedPhone+"\nPrice: ₦"+price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
     return out({success:true,linked:true,state:"awaiting_data_confirmation"});
   }
@@ -727,7 +727,7 @@ Deno.serve(async(req)=>{
     const walletBefore=Number(context.wallet_before||0);
     const price=Number(context.price||0);
     const purchaseReference="TG-"+Date.now()+"-"+Math.random().toString(36).slice(2,8);
-    const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify({user_id:acct.user_id,channel:"telegram",action:"purchase",product_id:String(context.product_id||""),phone_number:String(context.phone_number||""),customer_input:{phone:String(context.phone_number||"")},reference:purchaseReference,idempotency_key:"TG-"+acct.user_id+"-"+String(context.product_id||"")+"-"+String(context.phone_number||"")+"-"+String(context.wallet_before||"")+"-"+String(context.price||"")})});
+    const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify({user_id:acct.user_id,channel:"telegram",action:"purchase",product_id:String(context.product_id||""),phone_number:String(context.phone_number||""),customer_input:{phone:String(context.phone_number||"")},reference:purchaseReference,idempotency_key:String(context.idempotency_key||("TG-"+acct.user_id+"-"+String(context.product_id||"")+"-"+String(context.phone_number||"")+"-"+String(context.wallet_before||"")+"-"+String(context.price||"")))})});
     const d=await ai.json().catch(()=>({}));
     const {data:walletAfterData,error:walletAfterError}=await db.rpc("get_my_balance",{p_user_id:acct.user_id});
     if(walletAfterError) throw walletAfterError;
