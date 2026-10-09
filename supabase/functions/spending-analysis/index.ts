@@ -21,7 +21,8 @@ function lagosBounds(period:string){
   const y=Number(parts.find(p=>p.type==="year")?.value);
   const mo=Number(parts.find(p=>p.type==="month")?.value);
   const day=Number(parts.find(p=>p.type==="day")?.value);
-  const utcStart=(yy:number,mm:number,dd:number)=>new Date(Date.UTC(yy,mm-1,dd));
+  // Africa/Lagos is UTC+1 year-round: local midnight is 23:00 UTC on the previous day.
+  const utcStart=(yy:number,mm:number,dd:number)=>new Date(Date.UTC(yy,mm-1,dd)-60*60*1000);
   if(period==="all") return {start:null,end:null,label:"all time"};
   if(period==="today"){
     const start=utcStart(y,mo,day);
@@ -72,7 +73,8 @@ Deno.serve(async(req)=>{
       if(error) throw error;
       const page=data||[];
       rows.push(...page);
-      if(page.length<1000 || from>=20000) break;
+      // Continue until a short page proves that all matching rows have been fetched.
+      if(page.length<1000) break;
     }
 
     const total=rows.reduce((s,r)=>s+Number(r.amount||0),0);
