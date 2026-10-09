@@ -162,8 +162,9 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
               product:null,
               products:choices,
               customer_input:customerInput,
+              phone_number: ai.phone_number || customerInput.phone || null,
               missing_fields:missingFields,
-              answer:ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want.",
+              answer:ai.reply || "I found several matching plans across networks. Please choose the network and package you prefer.",
               requires_confirmation:false,
               ai_powered:true
             }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
