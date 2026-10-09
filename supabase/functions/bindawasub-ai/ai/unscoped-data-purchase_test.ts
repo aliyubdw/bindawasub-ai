@@ -58,7 +58,7 @@ Deno.test("new unscoped request ignores previous MTN context", () => {
 });
 
 Deno.test("production routing source retains the safety guards", async () => {
-  const root = new URL("../../", import.meta.url);
+  const root = new URL("../../../../", import.meta.url);
   const router = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/ai/intent-router.ts", root));
   const index = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/index.ts", root));
   const catalog = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/catalog/handler.ts", root));
