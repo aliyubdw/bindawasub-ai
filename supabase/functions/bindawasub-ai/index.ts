@@ -839,11 +839,15 @@ Deno.serve(async (req) => {
             .select("name,phone_number")
             .eq("user_id", userId);
           if (beneficiaryError) throw beneficiaryError;
-          const normalizeContact = (value:any) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-          const messageToken = normalizeContact(originalMessage);
+          const messageWords = String(originalMessage || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
           const matchedBeneficiaries = (beneficiaries || []).filter((item:any) => {
-            const nameToken = normalizeContact(item.name);
-            return nameToken.length >= 2 && messageToken.includes(nameToken) && /^0[789]\d{9}$/.test(String(item.phone_number || ""));
+            const name = String(item.name || "").trim();
+            if (name.length < 2 || !/^0[789]\d{9}$/.test(String(item.phone_number || ""))) return false;
+            const nameWords = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+            if (!nameWords.length) return false;
+            return messageWords.some((_, start:number) =>
+              nameWords.every((word:string, offset:number) => messageWords[start + offset] === word)
+            );
           });
           if (matchedBeneficiaries.length === 1) {
             const contactPhone = String(matchedBeneficiaries[0].phone_number);
