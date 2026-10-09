@@ -94,7 +94,7 @@ Deno.test("production routing source retains the safety guards", async () => {
   assert(catalogHandler.includes("if (hasPurchaseVerbAndDataSize && !namesNetwork) return null;"), "catalog enquiry must yield unscoped purchase to purchase router");
   assert(telegram.includes("awaiting_natural_language_product_selection"), "Telegram must wait for a plan selection");
   assert(telegram.includes("awaiting_data_confirmation"), "Telegram plan selection must continue to explicit confirmation");
-  assert(telegram.includes('idempotency_key: "TG-"+acct.user_id+"-"+crypto.randomUUID()'), "Telegram confirmation must have a fresh transaction reference");
+  assert(/idempotency_key\s*:\s*"TG-"\s*\+\s*acct\.user_id\s*\+\s*"-"\s*\+\s*crypto\.randomUUID\(\)/.test(telegram), "Telegram confirmation must have a fresh transaction reference");
   assert(telegram.includes("if(!confirmed)"), "Telegram must gate execution on confirmation");
   assert(telegram.includes("duplicate_confirmation:true"), "duplicate confirmations must be guarded");
   assert(telegram.includes("p.product_name||p.volume"), "Telegram labels must prefer full product name over unit-only volume");
