@@ -1073,7 +1073,7 @@ Deno.serve(async(req)=>{
     aiAnswer=rows.length
       ?"Here are your latest "+rows.length+" purchases:\\n\\n"+rows.join("\\n")
       :"You do not have any purchases yet.";
-  }const telegramAirtimeIntent=/\b(?:airtime|airtime\s+credit|recharge)\b/i.test(effectiveText)&&/\b(?:buy|purchase|get|want|need|send|give|recharge|airtime|saya|siya)\b/i.test(effectiveText);if(telegramAirtimeIntent){const airtimeUnavailable="📱 Airtime purchases are temporarily unavailable.\n\nWe’re working on connecting a reliable airtime provider.\n\nCustomer Care: @Aliyubdw";await send(chatId,airtimeUnavailable,true);return}const confused=/\b(i (?:do not|don.?t) understand|i(?:\s+)?didn.?t understand|not sure what you mean|cannot understand|can.?t understand|unable to understand|couldn.?t understand|please rephrase|rephrase your request|i can.?t help with that)\b/i.test(aiAnswer);if(aiAnswer&&!confused){
+  }const confused=/\b(i (?:do not|don.?t) understand|i(?:\s+)?didn.?t understand|not sure what you mean|cannot understand|can.?t understand|unable to understand|couldn.?t understand|please rephrase|rephrase your request|i can.?t help with that)\b/i.test(aiAnswer);if(aiAnswer&&!confused){
     const transactionId=String(d?.transaction_id||"").trim();
     if(transactionId){
       try{
