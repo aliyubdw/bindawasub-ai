@@ -1071,7 +1071,7 @@ Deno.serve(async(req)=>{
   }
 
   if(state==="awaiting_natural_language_product_selection"){
-    if(cancelRequest || text==="↩️ Main Menu"){
+    if(cancelRequest || /^❌\s*cancel$/i.test(text) || text==="↩️ Main Menu"){
       await clearState();
       await send(chatId,"Plan selection cancelled. What would you like to do next?",true);
       return out({success:true,linked:true,state:"idle"});
