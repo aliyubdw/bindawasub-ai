@@ -2,6 +2,27 @@ export function normalizeLookup(value:any){
   return String(value??"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 }
 
+// products.volume stores only the unit (for example, "GB"); the size is in product_name.
+// Compare normalized sizes so 1GB matches "1 GB" without matching 10GB or 1.5GB.
+function sizeInMb(value:any):number|null{
+  const m=String(value??"").toLowerCase().match(/(\d+(?:\.\d+)?)\s*(kb|mb|gb|tb)\b/);
+  if(!m)return null;
+  const n=Number(m[1]);
+  if(!Number.isFinite(n))return null;
+  const mult:any={kb:1/1024,mb:1,gb:1024,tb:1024*1024};
+  return Math.round(n*mult[m[2]]*1000)/1000;
+}
+
+export function productMatchesVolume(p:any,requestedVolume:any):boolean{
+  const wanted=normalizeLookup(requestedVolume);
+  if(!wanted)return true;
+  if(normalizeLookup(p?.volume)===wanted)return true;
+  const wantedMb=sizeInMb(requestedVolume);
+  if(wantedMb===null)return false;
+  const have=sizeInMb(p?.product_name)??sizeInMb(p?.volume)??sizeInMb(p?.sku);
+  return have!==null&&have===wantedMb;
+}
+
 export function resolveCatalogProduct(ai:any, products:any[]){
   const list=Array.isArray(products)?products:[];
   const id=String(ai?.product_id||"").trim();
@@ -22,7 +43,7 @@ export function resolveCatalogProduct(ai:any, products:any[]){
     const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;
     return normalizeLookup(n?.code)===network||normalizeLookup(n?.name)===network;
   });
-  if(volume)candidates=candidates.filter((p:any)=>normalizeLookup(p.volume)===volume);
+  if(volume)candidates=candidates.filter((p:any)=>productMatchesVolume(p,ai?.volume));
   if(variant)candidates=candidates.filter((p:any)=>{
     const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants;
     return normalizeLookup(v?.code)===variant||normalizeLookup(v?.name)===variant;
@@ -55,7 +76,7 @@ export function filterCatalogBySpecification(ai:any, products:any[]){
     const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
     return normalizeLookup(v?.code)===requested.variant||normalizeLookup(v?.name)===requested.variant;
   });
-  if(requested.volume)candidates=candidates.filter((p:any)=>normalizeLookup(p?.volume)===requested.volume);
+  if(requested.volume)candidates=candidates.filter((p:any)=>productMatchesVolume(p,requested.volume));
   if(requested.product)candidates=candidates.filter((p:any)=>normalizeLookup(p?.product_name)===requested.product);
 
   return candidates;
