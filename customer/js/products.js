@@ -243,7 +243,9 @@ function showConfirmation() {
   box.textContent =
 `Ga bayanan sayayyarka:
 
-${BindawasubCustomerState.selectedProduct.product_name}
+Network: ${BindawasubCustomerState.selectedProduct.network_name || BindawasubCustomerState.selectedProduct.network || (Array.isArray(BindawasubCustomerState.selectedProduct.service_networks) ? BindawasubCustomerState.selectedProduct.service_networks[0]?.name : BindawasubCustomerState.selectedProduct.service_networks?.name) || "—"}
+Plan: ${BindawasubCustomerState.selectedProduct.product_name}
+Validity: ${BindawasubCustomerState.selectedProduct.validity || BindawasubCustomerState.selectedProduct.duration || (BindawasubCustomerState.selectedProduct.validity_value && BindawasubCustomerState.selectedProduct.validity_unit ? BindawasubCustomerState.selectedProduct.validity_value + " " + BindawasubCustomerState.selectedProduct.validity_unit : "Not specified")}
 Farashi: ₦${Number(BindawasubCustomerState.selectedProduct.selling_price).toLocaleString()}
 Lamba: ${BindawasubCustomerState.recipientPhone}
 
