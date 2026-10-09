@@ -139,7 +139,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
           ? specificationCandidates.find((p:any)=>p.id===String(ai.product_id).trim())
           : null;
         const matchedProduct = matchedById || (
-          specificationCandidates.length === 1
+          !unscopedSizePurchase && specificationCandidates.length === 1
             ? specificationCandidates[0]
             : null
         );
@@ -168,7 +168,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
         );
 
         if (!matchedProduct) {
-          if (specificationCandidates.length > 1) {
+          if (specificationCandidates.length > 1 || (unscopedSizePurchase && specificationCandidates.length > 0)) {
             const choices = specificationCandidates.map(productSpecification);
             return new Response(JSON.stringify({
               success:true,
