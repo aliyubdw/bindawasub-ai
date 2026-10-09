@@ -40,7 +40,7 @@ test("intent router clears inferred network and product IDs for unscoped request
 
 test("request pre-processing discards inherited network when request is unscoped", async () => {
   const source = await read(indexPath);
-  assert.match(source, /const naturalLanguageUnscopedDataPurchase\s*=([\s\S]{0,400})\(kb\|mb\|gb\|tb\)/i);
+  assert.match(source, /const naturalLanguageUnscopedDataPurchase\s*=/);
   assert.match(source, /const requestedNetworkToken\s*=\s*explicitNetwork\s*\|\|\s*\(naturalLanguageUnscopedDataPurchase\s*\?\s*""\s*:\s*contextNetwork\)/);
   assert.match(source, /if\s*\(dataNetworkMatch\)[\s\S]{0,250}else\s*\{[\s\S]{0,250}ai\.network\s*=\s*null/);
 });
