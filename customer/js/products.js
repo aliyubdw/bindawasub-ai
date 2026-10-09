@@ -268,6 +268,13 @@ Kana tabbatar da wannan sayayya?`;
   confirm.textContent =
     "✅ Eh, tabbatar da sayayya";
 
+  // Keep one reference for this confirmation screen. If the request times out
+  // after the backend has accepted it, a retry must reuse the same reference.
+  const purchaseReference =
+    "BW-" +
+    Date.now() +
+    "-" +
+    Math.random().toString(36).substring(2, 8);
 
   confirm.onclick =
     async function() {
@@ -298,15 +305,6 @@ Kana tabbatar da wannan sayayya?`;
            CREATE UNIQUE TRANSACTION REFERENCE
         ===================================== */
 
-        const reference =
-          "BW-" +
-          Date.now() +
-          "-" +
-          Math.random()
-            .toString(36)
-            .substring(2, 8);
-
-
         /* =====================================
            PROCESS WALLET PURCHASE
         ===================================== */
@@ -315,7 +313,7 @@ Kana tabbatar da wannan sayayya?`;
           action: "purchase",
           product_id: BindawasubCustomerState.selectedProduct.id,
           phone_number: BindawasubCustomerState.recipientPhone,
-          reference: reference
+          reference: purchaseReference
         });
 
 
