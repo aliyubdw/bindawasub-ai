@@ -27,7 +27,9 @@ test("unscoped size requests are detected in English and Hausa examples", () => 
 
 test("intent router clears inferred network and product IDs for unscoped requests", async () => {
   const source = await read(intentPath);
-  assert.match(source, /const unscopedSizePurchase\\s*=/);\n  assert.match(source, /const literalVariant\\s*=/);\n  assert.match(source, /sme|social|gifting|awoop/);
+  assert.match(source, /const unscopedSizePurchase\s*=/);
+  assert.match(source, /const literalVariant\s*=/);
+  assert.match(source, /sme|social|gifting|awoop/);
   assert.match(source, /network:\s*null/);
   assert.match(source, /product_id:\s*null/);
   assert.match(source, /product_name:\s*null/);
@@ -40,7 +42,7 @@ test("request pre-processing discards inherited network when request is unscoped
   const source = await read(indexPath);
   assert.match(source, /const naturalLanguageUnscopedDataPurchase\s*=([\s\S]{0,400})\(kb\|mb\|gb\|tb\)/i);
   assert.match(source, /const requestedNetworkToken\s*=\s*explicitNetwork\s*\|\|\s*\(naturalLanguageUnscopedDataPurchase\s*\?\s*""\s*:\s*contextNetwork\)/);
-  assert.match(source, /if\s*\(explicitNetwork\)\s*\{[\s\S]{0,300}ai\.network\s*=\s*null/);
+  assert.match(source, /if\s*\(dataNetworkMatch\)[\s\S]{0,250}else\s*\{[\s\S]{0,250}ai\.network\s*=\s*null/);
 });
 
 test("catalog enquiry handler defers unscoped purchase requests to purchase router", async () => {
