@@ -47,7 +47,7 @@ function showDataTypes(dataTypes, networkName) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function showProducts(products) {
+function showProducts(products, purchaseContext = null) {
   const messages = document.getElementById("messages");
   if (!messages || !Array.isArray(products) || !products.length) return;
 
@@ -129,8 +129,16 @@ function showProducts(products) {
         ));
       const price = Number(product.selling_price || 0).toLocaleString();
 
+      const productNetworkName =
+        product.network_name ||
+        product.network ||
+        (Array.isArray(product.service_networks)
+          ? product.service_networks[0]?.name
+          : product.service_networks?.name) ||
+        networkName;
+
       card.innerHTML = `
-        <span class="product-network">${networkName}</span>
+        <span class="product-network">${productNetworkName}</span>
         <span class="product-name">${name}</span>
         <span class="product-details">${duration}</span>
         <span class="product-price">₦${price}</span>
@@ -139,19 +147,38 @@ function showProducts(products) {
 
       card.onclick = function() {
         BindawasubCustomerState.selectedProduct = product;
-        BindawasubCustomerState.waitingForPhone = true;
+        BindawasubCustomerState.waitingForPhone = false;
         BindawasubCustomerState.waitingForConfirmation = false;
 
-        addMessage(`Na zabi ${product.product_name}`, "user");
+        addMessage(\`Na zabi \${product.product_name}\`, "user");
+        productList.remove();
+
+        const resolvedPhone = validatePhone(String(
+          purchaseContext?.phone_number ||
+          purchaseContext?.customer_input?.phone ||
+          ""
+        ));
+        const isPurchaseChoice =
+          String(purchaseContext?.intent || "").toLowerCase() === "purchase_intent";
+
+        if (isPurchaseChoice && resolvedPhone) {
+          BindawasubCustomerState.recipientPhone = resolvedPhone;
+          addMessage("I found the recipient from your saved contact. Please review the details below.", "bot");
+          showConfirmation();
+          return;
+        }
+
+        BindawasubCustomerState.waitingForPhone = true;
         addMessage(
-          `Ka turo min lambar wayar da za a saka data.\\n\\nMisali: 08012345678`,
+          isPurchaseChoice
+            ? "Plan selected. Please send the recipient's phone number to continue.\n\nExample: 08012345678"
+            : "Ka turo min lambar wayar da za a saka data.\n\nMisali: 08012345678",
           "bot"
         );
 
         const input = document.getElementById("messageInput");
         input.placeholder = "Shigar da lambar wayar...";
         input.focus();
-        productList.remove();
       };
 
       grid.appendChild(card);
