@@ -678,8 +678,28 @@ Deno.serve(async(req)=>{
 
   if(state==="awaiting_data_recipient"){
     if(cancelRequest){await clearState();await send(chatId,"Data purchase cancelled. What would you like to do next?",true);return out({success:true,linked:true,state:"idle"});}
-    const digits=String(text||"").replace(/[^0-9]/g,""); const normalizedPhone=digits.startsWith("234")&&digits.length===13?"0"+digits.slice(3):digits;
-    if(!/^0[789][0-9]{9}$/.test(normalizedPhone)){await send(chatId,"Please enter a valid Nigerian mobile number.\n\nExample: 08012345678",false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});return out({success:true,linked:true,state:"awaiting_data_recipient"});}
+    const recipientText=String(text||"").trim();
+    const digits=recipientText.replace(/[^0-9]/g,"");
+    let normalizedPhone=digits.startsWith("234")&&digits.length===13?"0"+digits.slice(3):digits;
+    if(!/^0[789][0-9]{9}$/.test(normalizedPhone)){
+      const targetName=normalizeBeneficiaryName(recipientText).toLowerCase();
+      if(targetName){
+        const {data:savedTargets,error:savedTargetError}=await db.from("saved_beneficiaries").select("name,phone_number").eq("user_id",acct.user_id);
+        if(savedTargetError) throw savedTargetError;
+        const matches=(savedTargets||[]).filter((b:any)=>String(b.name||"").trim().toLowerCase()===targetName&&/^0[789]\d{9}$/.test(String(b.phone_number||"")));
+        if(matches.length===1) normalizedPhone=String(matches[0].phone_number);
+        else {
+          const message=matches.length>1
+            ?"More than one saved contact has that name. Please enter the recipient's phone number."
+            :"Please enter a valid Nigerian mobile number or the exact name of one of your saved contacts.\n\nExample: 08012345678";
+          await send(chatId,message,false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+          return out({success:true,linked:true,state:"awaiting_data_recipient"});
+        }
+      }else{
+        await send(chatId,"Please enter a valid Nigerian mobile number or the exact name of one of your saved contacts.\n\nExample: 08012345678",false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+        return out({success:true,linked:true,state:"awaiting_data_recipient"});
+      }
+    }
     const {data:walletBeforeData,error:walletBeforeError}=await db.rpc("get_my_balance",{p_user_id:acct.user_id});
     if(walletBeforeError) throw walletBeforeError;
     const walletBefore=Number(walletBeforeData?.[0]?.balance??0);
