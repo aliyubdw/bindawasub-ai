@@ -169,7 +169,7 @@ Deno.serve(async(req)=>{
     const lines=selectedRecs.map((p:any,i:number)=>{
       const network=p.network_name||p.network||"";
       const duration=p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+p.validity_unit:p.validity_type==="unlimited"?"Unlimited":"");
-      const details=[network,p.volume,duration].filter(Boolean).join(" • ");
+      const details=[network,p.product_name||p.volume,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
     await saveState("awaiting_recommendation_selection",{recommendations:selectedRecs,products:selectedRecs});
@@ -668,7 +668,7 @@ Deno.serve(async(req)=>{
     const selectedIndex=match?Number(match[1])-1:-1;
     const selectedPlan=selectedIndex>=0?storedPlans[selectedIndex]:null;
     if(!selectedPlan){
-      await send(chatId,"Please select one of the available plans, or tap ↩️ Main Menu.",false,{keyboard:storedPlans.map((p:any,i:number)=>[{text:String(i+1)+". "+(p.volume||p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")}]).concat([[{text:"↩️ Main Menu"}]]),resize_keyboard:true,is_persistent:false});
+      await send(chatId,"Please select one of the available plans, or tap ↩️ Main Menu.",false,{keyboard:storedPlans.map((p:any,i:number)=>[{text:String(i+1)+". "+(p.product_name||p.volume||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")}]).concat([[{text:"↩️ Main Menu"}]]),resize_keyboard:true,is_persistent:false});
       return out({success:true,linked:true,state:"awaiting_plan_selection"});
     }
     await saveState("awaiting_data_recipient",{product_id:selectedPlan.id,product_name:selectedPlan.product_name,network_code:context.network_code,network_name:context.network_name,volume:selectedPlan.volume,price:Number(selectedPlan.selling_price||0),variant_name:selectedPlan.variant_name||"",validity_type:selectedPlan.validity_type||"",validity_value:selectedPlan.validity_value??null,validity_unit:selectedPlan.validity_unit||""});
@@ -853,11 +853,11 @@ Deno.serve(async(req)=>{
 
     const lines=plans.map((p:any,i:number)=>{
       const duration=p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"";
-      const details=[p.volume,duration].filter(Boolean).join(" • ");
+      const details=[p.product_name||p.volume,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
     const planKeyboard={
-      keyboard:plans.map((p:any,i:number)=>[{text:String(i+1)+". "+(p.volume||p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")}]).concat([[{text:"↩️ Main Menu"}]]),
+      keyboard:plans.map((p:any,i:number)=>[{text:String(i+1)+". "+(p.product_name||p.volume||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")}]).concat([[{text:"↩️ Main Menu"}]]),
       resize_keyboard:true,
       is_persistent:false
     };
@@ -1050,7 +1050,7 @@ Deno.serve(async(req)=>{
 
   const normalizedText=effectiveText.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
   const catalogRequest=/\b(show|list|see|view|give|what|which|available|nawa|ina)\b/.test(normalizedText)&&/\b(data|package|packages|plan|plans|mtn|glo|airtel|9mobile)\b/.test(normalizedText)&&!/\b(buy|purchase|send|siya|saya|for|zuwa)\b/.test(normalizedText);
-  const formatProducts=async()=>{const {data:products,error}=await db.from("products").select("id,product_name,service_type,volume,selling_price,validity_type,validity_value,validity_unit,service_networks(code,name),service_variants(code,name)").eq("active",true).order("selling_price",{ascending:true});if(error)throw error;if(!products?.length){await send(chatId,"There are no active data plans available right now.",true);return}const lines=products.map((p:any,i:number)=>{const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;const duration=p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"";const details=[n?.name||n?.code,p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+"\n   "+details});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n")+"\n\nTo buy one, send: buy 1GB for 080xxxxxxxx",true)};
+  const formatProducts=async()=>{const {data:products,error}=await db.from("products").select("id,product_name,service_type,volume,selling_price,validity_type,validity_value,validity_unit,service_networks(code,name),service_variants(code,name)").eq("active",true).order("selling_price",{ascending:true});if(error)throw error;if(!products?.length){await send(chatId,"There are no active data plans available right now.",true);return}const lines=products.map((p:any,i:number)=>{const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;const duration=p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"";const details=[n?.name||n?.code,p.product_name||p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+"\n   "+details});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n")+"\n\nTo buy one, send: buy 1GB for 080xxxxxxxx",true)};
   if(catalogRequest){await saveState("awaiting_network_selection",{});await send(chatId,"📦 Buy Data\n\nWhich network do you want?\n\nSelect MTN, Airtel, Glo or T2.",false,networkKeyboard);return out({success:true,linked:true,state:"awaiting_network_selection"})}
   // Resolve saved beneficiary names before AI purchase routing.
   // Examples: "buy 1GB MTN for Mum", "send 2GB to wife".
@@ -1136,7 +1136,7 @@ Deno.serve(async(req)=>{
     const lines=choices.map((p:any,i:number)=>{
       const network=p.network_name||p.network||"Network";
       const duration=p.validity||(p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":""));
-      const details=[network,p.volume,duration].filter(Boolean).join(" • ");
+      const details=[network,p.product_name||p.volume,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
     const keyboard=choices.map((_:any,i:number)=>[{text:String(i+1)}]).concat([[{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]]);
@@ -1179,7 +1179,7 @@ Deno.serve(async(req)=>{
       await send(chatId,aiAnswer,true);
     }
   }
-  if(confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true);if(!["product_price","purchase_intent"].includes(String(d?.intent||"").toLowerCase())&&Array.isArray(d?.products)&&d.products.length){const lines=d.products.map((p:any,i:number)=>{const network=p.network_name||p.network||"";const duration=p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"");const details=[network,p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"")});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n"),true)}else if(!aiAnswer||confused){if(!confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true)}}catch(e){console.error("Telegram background AI:",e);await send(chatId,"❌ The request could not be completed right now. Please check your transaction status before trying again.",true)}};
+  if(confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true);if(!["product_price","purchase_intent"].includes(String(d?.intent||"").toLowerCase())&&Array.isArray(d?.products)&&d.products.length){const lines=d.products.map((p:any,i:number)=>{const network=p.network_name||p.network||"";const duration=p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":"");const details=[network,p.product_name||p.volume,duration].filter(Boolean).join(" • ");return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"")});await send(chatId,"📦 Available data plans\n\n"+lines.join("\n\n"),true)}else if(!aiAnswer||confused){if(!confused)await send(chatId,"🤔 I didn’t quite understand that.\nPlease choose an option from the menu or rephrase your request.\n\nCustomer Care: @Aliyubdw",true)}}catch(e){console.error("Telegram background AI:",e);await send(chatId,"❌ The request could not be completed right now. Please check your transaction status before trying again.",true)}};
   const affirmative=/^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh)\b/i.test(effectiveText);let hasPendingPurchase=false;let pendingConversationId:string|null=null;
   if(affirmative){const {data:pending,error:pendingError}=await db.from("ai_conversations").select("id").eq("user_id",acct.user_id).not("pending_at","is",null).gt("pending_at",new Date(Date.now()-15*60*1000).toISOString()).or("pending_product_id.not.is.null,pending_airtime_amount.not.is.null").order("pending_at",{ascending:false}).limit(1).maybeSingle();if(pendingError)console.error("Telegram pending purchase lookup:",pendingError);hasPendingPurchase=!!pending;pendingConversationId=pending?.id||null}
   if(hasPendingPurchase){await send(chatId,"⏳ Your purchase is being processed. I’ll send you the final result here. Please don’t send the confirmation again.",true);if(typeof EdgeRuntime!=="undefined"&&typeof EdgeRuntime.waitUntil==="function")EdgeRuntime.waitUntil(runAi());else await runAi();return out({success:true,linked:true,processing:true})}
