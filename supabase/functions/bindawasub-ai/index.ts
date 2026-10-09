@@ -709,7 +709,13 @@ Deno.serve(async (req) => {
         /\b(?:9mobile|t2)\b/i.test(messageForCatalog) ? "9mobile" :
         "";
 
-      const requestedNetworkToken = explicitNetwork || contextNetwork;
+      const naturalLanguageUnscopedDataPurchase =
+        !explicitNetwork &&
+        /\b(?:buy|purchase|send|get|give|need|want|i want|i need)\b/i.test(messageForCatalog) &&
+        /\b\d+(?:\.\d+)?\s*(?:gb|mb)\b/i.test(messageForCatalog);
+      // A fresh request for a data size without a named network must not inherit
+      // an old network choice from the conversation. Show matching plans across networks.
+      const requestedNetworkToken = explicitNetwork || (naturalLanguageUnscopedDataPurchase ? "" : contextNetwork);
 
       const explicitVariant =
         /\b(?:sme|sme data|normal data)\b/i.test(messageForCatalog) ? "smedata" :
@@ -720,7 +726,7 @@ Deno.serve(async (req) => {
 
       // Selecting a network explicitly resets any older Data Type context so
       // the customer sees the complete catalog for that network.
-      const requestedVariantText = explicitVariant || (explicitNetwork ? "" : contextVariant);
+      const requestedVariantText = explicitVariant || (explicitNetwork || naturalLanguageUnscopedDataPurchase ? "" : contextVariant);
 
       const networkFilteredProducts = aiDataProducts.filter((product:any) => {
         if (!requestedNetworkToken) return true;
@@ -822,6 +828,35 @@ Deno.serve(async (req) => {
         conversationContext,
         recentTransactions: recentTransactionsForAI,
       });
+
+      // Resolve a named saved beneficiary to a phone number before purchase routing.
+      // This lookup is customer-scoped and never accepts a phone number from model output
+      // when it is merely a contact name.
+      if (String(ai.intent || "").toLowerCase() === "purchase_intent") {
+        try {
+          const { data: beneficiaries, error: beneficiaryError } = await supabase
+            .from("saved_beneficiaries")
+            .select("name,phone_number")
+            .eq("user_id", userId);
+          if (beneficiaryError) throw beneficiaryError;
+          const normalizeContact = (value:any) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          const messageToken = normalizeContact(originalMessage);
+          const matchedBeneficiaries = (beneficiaries || []).filter((item:any) => {
+            const nameToken = normalizeContact(item.name);
+            return nameToken.length >= 2 && messageToken.includes(nameToken) && /^0[789]\d{9}$/.test(String(item.phone_number || ""));
+          });
+          if (matchedBeneficiaries.length === 1) {
+            const contactPhone = String(matchedBeneficiaries[0].phone_number);
+            ai.phone_number = contactPhone;
+            ai.customer_input = {
+              ...(ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {}),
+              phone: contactPhone
+            };
+          }
+        } catch (beneficiaryLookupError) {
+          console.error("Saved beneficiary resolution failed:", beneficiaryLookupError);
+        }
+      }
 
       // If a requested data network or data type has no active plans, say so explicitly.
       const dataAvailabilityIntent = new Set(["product_enquiry","product_price","purchase_intent"]);
