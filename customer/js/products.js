@@ -47,7 +47,7 @@ function showDataTypes(dataTypes, networkName) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-function showProducts(products) {
+function showProducts(products, purchaseContext = null) {
   const messages = document.getElementById("messages");
   if (!messages || !Array.isArray(products) || !products.length) return;
 
@@ -122,15 +122,23 @@ function showProducts(products) {
 
       const name = String(product.product_name || "Data");
       const duration =
-        String(product.duration || (
+        String(product.duration || product.validity || (
           product.validity_value != null && product.validity_unit
             ? product.validity_value + " " + product.validity_unit
-            : "Validity not specified"
+            : product.validity_type === "unlimited" ? "Unlimited" : "Validity not specified"
         ));
       const price = Number(product.selling_price || 0).toLocaleString();
 
+      const productNetworkName =
+        product.network_name ||
+        product.network ||
+        (Array.isArray(product.service_networks)
+          ? product.service_networks[0]?.name
+          : product.service_networks?.name) ||
+        networkName;
+
       card.innerHTML = `
-        <span class="product-network">${networkName}</span>
+        <span class="product-network">${productNetworkName}</span>
         <span class="product-name">${name}</span>
         <span class="product-details">${duration}</span>
         <span class="product-price">₦${price}</span>
@@ -139,19 +147,38 @@ function showProducts(products) {
 
       card.onclick = function() {
         BindawasubCustomerState.selectedProduct = product;
-        BindawasubCustomerState.waitingForPhone = true;
+        BindawasubCustomerState.waitingForPhone = false;
         BindawasubCustomerState.waitingForConfirmation = false;
 
-        addMessage(`Na zabi ${product.product_name}`, "user");
+        addMessage("Na zabi " + String(product.product_name || "Data plan"), "user");
+        productList.remove();
+
+        const resolvedPhone = validatePhone(String(
+          purchaseContext?.phone_number ||
+          purchaseContext?.customer_input?.phone ||
+          ""
+        ));
+        const isPurchaseChoice =
+          String(purchaseContext?.intent || "").toLowerCase() === "purchase_intent";
+
+        if (isPurchaseChoice && resolvedPhone) {
+          BindawasubCustomerState.recipientPhone = resolvedPhone;
+          addMessage("Recipient details are ready. Please review the purchase before confirming.", "bot");
+          showConfirmation();
+          return;
+        }
+
+        BindawasubCustomerState.waitingForPhone = true;
         addMessage(
-          `Ka turo min lambar wayar da za a saka data.\\n\\nMisali: 08012345678`,
+          isPurchaseChoice
+            ? "Plan selected. Please send the recipient's phone number to continue.\n\nExample: 08012345678"
+            : "Ka turo min lambar wayar da za a saka data.\n\nMisali: 08012345678",
           "bot"
         );
 
         const input = document.getElementById("messageInput");
         input.placeholder = "Shigar da lambar wayar...";
         input.focus();
-        productList.remove();
       };
 
       grid.appendChild(card);
@@ -216,7 +243,9 @@ function showConfirmation() {
   box.textContent =
 `Ga bayanan sayayyarka:
 
-${BindawasubCustomerState.selectedProduct.product_name}
+Network: ${BindawasubCustomerState.selectedProduct.network_name || BindawasubCustomerState.selectedProduct.network || (Array.isArray(BindawasubCustomerState.selectedProduct.service_networks) ? BindawasubCustomerState.selectedProduct.service_networks[0]?.name : BindawasubCustomerState.selectedProduct.service_networks?.name) || "—"}
+Plan: ${BindawasubCustomerState.selectedProduct.product_name}
+Validity: ${BindawasubCustomerState.selectedProduct.validity || BindawasubCustomerState.selectedProduct.duration || (BindawasubCustomerState.selectedProduct.validity_value && BindawasubCustomerState.selectedProduct.validity_unit ? BindawasubCustomerState.selectedProduct.validity_value + " " + BindawasubCustomerState.selectedProduct.validity_unit : "Not specified")}
 Farashi: ₦${Number(BindawasubCustomerState.selectedProduct.selling_price).toLocaleString()}
 Lamba: ${BindawasubCustomerState.recipientPhone}
 
@@ -239,6 +268,13 @@ Kana tabbatar da wannan sayayya?`;
   confirm.textContent =
     "✅ Eh, tabbatar da sayayya";
 
+  // Keep one reference for this confirmation screen. If the request times out
+  // after the backend has accepted it, a retry must reuse the same reference.
+  const purchaseReference =
+    "BW-" +
+    Date.now() +
+    "-" +
+    Math.random().toString(36).substring(2, 8);
 
   confirm.onclick =
     async function() {
@@ -269,15 +305,6 @@ Kana tabbatar da wannan sayayya?`;
            CREATE UNIQUE TRANSACTION REFERENCE
         ===================================== */
 
-        const reference =
-          "BW-" +
-          Date.now() +
-          "-" +
-          Math.random()
-            .toString(36)
-            .substring(2, 8);
-
-
         /* =====================================
            PROCESS WALLET PURCHASE
         ===================================== */
@@ -286,7 +313,7 @@ Kana tabbatar da wannan sayayya?`;
           action: "purchase",
           product_id: BindawasubCustomerState.selectedProduct.id,
           phone_number: BindawasubCustomerState.recipientPhone,
-          reference: reference
+          reference: purchaseReference
         });
 
 

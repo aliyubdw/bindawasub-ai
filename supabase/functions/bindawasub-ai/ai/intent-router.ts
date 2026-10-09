@@ -101,32 +101,61 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
         );
       }
       if (ai.intent === "purchase_intent") {
-        // Resolve purchases only against the already network/data-type-filtered catalog.
-        const purchaseCatalog = requestedVariantText
-          ? variantFilteredProducts
-          : networkFilteredProducts;
+        // A fresh request such as "buy 1GB for Mom" must show every matching
+        // active network plan. Do not let a model-inferred network or product ID
+        // silently choose one when the customer did not name a network.
+        const explicitNetworkInMessage =
+          /\bmtn\b/i.test(originalMessage) ||
+          /\bairtel\b/i.test(originalMessage) ||
+          /\bglo\b/i.test(originalMessage) ||
+          /\b(?:9mobile|t2)\b/i.test(originalMessage);
+        const requestedSize = String(originalMessage.match(/\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i)?.[0] || ai?.volume || "").trim();
+        const unscopedSizePurchase =
+          !explicitNetworkInMessage &&
+          /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(originalMessage) &&
+          /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
+        const literalVariant = /\bsme\b/i.test(originalMessage) ? "smedata"
+          : /\bsocial\b/i.test(originalMessage) ? "social"
+          : /\bgifting\b/i.test(originalMessage) ? "gifting"
+          : /\bawoop\b/i.test(originalMessage) ? "awoop"
+          : null;
+        const purchaseCatalog = unscopedSizePurchase
+          ? (literalVariant
+              ? networkFilteredProducts.filter((p:any) => {
+                  const variant = Array.isArray(p.service_variants) ? p.service_variants[0] : p.service_variants;
+                  const normalize = (v:any) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                  return normalize(variant?.code) === normalize(literalVariant) || normalize(variant?.name) === normalize(literalVariant);
+                })
+              : networkFilteredProducts)
+          : (requestedVariantText ? variantFilteredProducts : networkFilteredProducts);
+        const purchaseAi = unscopedSizePurchase
+          ? { ...ai, service_type: "data", network: null, product_id: null, product_name: null, variant: literalVariant, volume: requestedSize || ai.volume }
+          : ai;
 
-        // Product specification is resolved from the live catalog, never from Gemini's
-        // product identity alone. An exact product ID is accepted only if it belongs to
-        // the already-filtered catalog.
-        const specificationCandidates = filterCatalogBySpecification(ai, purchaseCatalog);
-        const matchedById = String(ai?.product_id||"").trim()
+        // Product specification is resolved only against the live catalog.
+        // For unscoped data-size requests, the candidate list intentionally spans networks.
+        const specificationCandidates = filterCatalogBySpecification(purchaseAi, purchaseCatalog);
+        const matchedById = !unscopedSizePurchase && String(ai?.product_id||"").trim()
           ? specificationCandidates.find((p:any)=>p.id===String(ai.product_id).trim())
           : null;
         const matchedProduct = matchedById || (
-          specificationCandidates.length === 1
+          !unscopedSizePurchase && specificationCandidates.length === 1
             ? specificationCandidates[0]
             : null
         );
 
-        const serviceType = String(ai.service_type || matchedProduct?.service_type || "").trim().toLowerCase();
+        const serviceType = String((unscopedSizePurchase ? "data" : ai.service_type) || matchedProduct?.service_type || "").trim().toLowerCase();
         const catalogService = serviceCatalog.find((s:any) => s.code === serviceType);
         const customerInput = {
           ...(ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {})
         };
 
         if (ai.phone_number && !customerInput.phone) customerInput.phone = ai.phone_number;
-        if (ai.network && !customerInput.network) customerInput.network = ai.network;
+        if (unscopedSizePurchase) {
+          delete customerInput.network;
+        } else if (ai.network && !customerInput.network) {
+          customerInput.network = ai.network;
+        }
         if (ai.amount && Number(ai.amount) > 0 && !customerInput.amount) customerInput.amount = Number(ai.amount);
 
         const requiredFields = (catalogService?.fields || [])
@@ -139,8 +168,8 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
         );
 
         if (!matchedProduct) {
-          if (specificationCandidates.length > 1) {
-            const choices = specificationCandidates.slice(0, 12).map(productSpecification);
+          if (specificationCandidates.length > 1 || (unscopedSizePurchase && specificationCandidates.length > 0)) {
+            const choices = specificationCandidates.map(productSpecification);
             return new Response(JSON.stringify({
               success:true,
               intent:"purchase_intent",
@@ -148,8 +177,13 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
               product:null,
               products:choices,
               customer_input:customerInput,
+              phone_number: ai.phone_number || customerInput.phone || null,
               missing_fields:missingFields,
-              answer:ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want.",
+              answer: unscopedSizePurchase
+                ? (String(ai.language || "").toLowerCase() === "hausa"
+                    ? "Na samu data plans masu girman da ka nema a networks daban-daban. Zaɓi network da plan ɗin da kake so."
+                    : "I found matching data plans across available networks. Compare the network, validity and price, then choose your preferred plan.")
+                : (ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want."),
               requires_confirmation:false,
               ai_powered:true
             }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});

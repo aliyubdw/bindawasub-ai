@@ -709,7 +709,13 @@ Deno.serve(async (req) => {
         /\b(?:9mobile|t2)\b/i.test(messageForCatalog) ? "9mobile" :
         "";
 
-      const requestedNetworkToken = explicitNetwork || contextNetwork;
+      const naturalLanguageUnscopedDataPurchase =
+        !explicitNetwork &&
+        /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(messageForCatalog) &&
+        /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(messageForCatalog);
+      // A fresh request for a data size without a named network must not inherit
+      // an old network choice from the conversation. Show matching plans across networks.
+      const requestedNetworkToken = explicitNetwork || (naturalLanguageUnscopedDataPurchase ? "" : contextNetwork);
 
       const explicitVariant =
         /\b(?:sme|sme data|normal data)\b/i.test(messageForCatalog) ? "smedata" :
@@ -720,7 +726,7 @@ Deno.serve(async (req) => {
 
       // Selecting a network explicitly resets any older Data Type context so
       // the customer sees the complete catalog for that network.
-      const requestedVariantText = explicitVariant || (explicitNetwork ? "" : contextVariant);
+      const requestedVariantText = explicitVariant || (explicitNetwork || naturalLanguageUnscopedDataPurchase ? "" : contextVariant);
 
       const networkFilteredProducts = aiDataProducts.filter((product:any) => {
         if (!requestedNetworkToken) return true;
@@ -823,6 +829,39 @@ Deno.serve(async (req) => {
         recentTransactions: recentTransactionsForAI,
       });
 
+      // Resolve a named saved beneficiary to a phone number before purchase routing.
+      // This lookup is customer-scoped and never accepts a phone number from model output
+      // when it is merely a contact name.
+      if (String(ai.intent || "").toLowerCase() === "purchase_intent") {
+        try {
+          const { data: beneficiaries, error: beneficiaryError } = await supabase
+            .from("saved_beneficiaries")
+            .select("name,phone_number")
+            .eq("user_id", userId);
+          if (beneficiaryError) throw beneficiaryError;
+          const messageWords = String(originalMessage || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+          const matchedBeneficiaries = (beneficiaries || []).filter((item:any) => {
+            const name = String(item.name || "").trim();
+            if (name.length < 2 || !/^0[789]\d{9}$/.test(String(item.phone_number || ""))) return false;
+            const nameWords = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+            if (!nameWords.length) return false;
+            return messageWords.some((_, start:number) =>
+              nameWords.every((word:string, offset:number) => messageWords[start + offset] === word)
+            );
+          });
+          if (matchedBeneficiaries.length === 1) {
+            const contactPhone = String(matchedBeneficiaries[0].phone_number);
+            ai.phone_number = contactPhone;
+            ai.customer_input = {
+              ...(ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {}),
+              phone: contactPhone
+            };
+          }
+        } catch (beneficiaryLookupError) {
+          console.error("Saved beneficiary resolution failed:", beneficiaryLookupError);
+        }
+      }
+
       // If a requested data network or data type has no active plans, say so explicitly.
       const dataAvailabilityIntent = new Set(["product_enquiry","product_price","purchase_intent"]);
       if (dataAvailabilityIntent.has(String(ai.intent || "").toLowerCase()) &&
@@ -857,7 +896,7 @@ Deno.serve(async (req) => {
       // keep numeric/phone follow-ups in the Airtime flow instead of Data.
       const activeAirtimeContext = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
       const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
-      const explicitDataPurchase = /\b(?:buy|purchase|get|order|send|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
+      const explicitDataPurchase = /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
       if (explicitDataPurchase) {
         ai.intent = "purchase_intent";
         ai.service_type = "data";
@@ -866,7 +905,14 @@ Deno.serve(async (req) => {
         ai.amount = undefined;
         ai.volume = ai.volume || (String(originalMessage || "").match(/\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i)?.[0] || null);
         const dataNetworkMatch = String(originalMessage || "").match(/\b(mtn|airtel|glo|9mobile|t2)\b/i);
-        if (dataNetworkMatch) ai.network = dataNetworkMatch[1].toLowerCase() === "t2" ? "9mobile" : dataNetworkMatch[1].toLowerCase();
+        if (dataNetworkMatch) {
+          ai.network = dataNetworkMatch[1].toLowerCase() === "t2" ? "9mobile" : dataNetworkMatch[1].toLowerCase();
+        } else {
+          ai.network = null;
+          if (ai.customer_input && typeof ai.customer_input === "object") {
+            delete ai.customer_input.network;
+          }
+        }
         const dataPhoneMatch = String(originalMessage || "").match(/(?:\+234|234|0)\d{10}\b/);
         if (dataPhoneMatch) ai.phone_number = dataPhoneMatch[0];
       } else if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {

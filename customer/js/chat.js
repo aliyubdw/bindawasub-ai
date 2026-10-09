@@ -643,7 +643,7 @@ Misali: 08012345678`,
       Array.isArray(data?.products) &&
       data.products.length > 0
     ) {
-      showProducts(data.products);
+      showProducts(data.products, data);
     }
 
   } catch (error) {

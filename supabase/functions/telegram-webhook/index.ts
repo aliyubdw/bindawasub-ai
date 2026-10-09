@@ -678,8 +678,28 @@ Deno.serve(async(req)=>{
 
   if(state==="awaiting_data_recipient"){
     if(cancelRequest){await clearState();await send(chatId,"Data purchase cancelled. What would you like to do next?",true);return out({success:true,linked:true,state:"idle"});}
-    const digits=String(text||"").replace(/[^0-9]/g,""); const normalizedPhone=digits.startsWith("234")&&digits.length===13?"0"+digits.slice(3):digits;
-    if(!/^0[789][0-9]{9}$/.test(normalizedPhone)){await send(chatId,"Please enter a valid Nigerian mobile number.\n\nExample: 08012345678",false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});return out({success:true,linked:true,state:"awaiting_data_recipient"});}
+    const recipientText=String(text||"").trim();
+    const digits=recipientText.replace(/[^0-9]/g,"");
+    let normalizedPhone=digits.startsWith("234")&&digits.length===13?"0"+digits.slice(3):digits;
+    if(!/^0[789][0-9]{9}$/.test(normalizedPhone)){
+      const targetName=normalizeBeneficiaryName(recipientText).toLowerCase();
+      if(targetName){
+        const {data:savedTargets,error:savedTargetError}=await db.from("saved_beneficiaries").select("name,phone_number").eq("user_id",acct.user_id);
+        if(savedTargetError) throw savedTargetError;
+        const matches=(savedTargets||[]).filter((b:any)=>String(b.name||"").trim().toLowerCase()===targetName&&/^0[789]\d{9}$/.test(String(b.phone_number||"")));
+        if(matches.length===1) normalizedPhone=String(matches[0].phone_number);
+        else {
+          const message=matches.length>1
+            ?"More than one saved contact has that name. Please enter the recipient's phone number."
+            :"Please enter a valid Nigerian mobile number or the exact name of one of your saved contacts.\n\nExample: 08012345678";
+          await send(chatId,message,false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+          return out({success:true,linked:true,state:"awaiting_data_recipient"});
+        }
+      }else{
+        await send(chatId,"Please enter a valid Nigerian mobile number or the exact name of one of your saved contacts.\n\nExample: 08012345678",false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+        return out({success:true,linked:true,state:"awaiting_data_recipient"});
+      }
+    }
     const {data:walletBeforeData,error:walletBeforeError}=await db.rpc("get_my_balance",{p_user_id:acct.user_id});
     if(walletBeforeError) throw walletBeforeError;
     const walletBefore=Number(walletBeforeData?.[0]?.balance??0);
@@ -1050,6 +1070,55 @@ Deno.serve(async(req)=>{
     }
   }
 
+  if(state==="awaiting_natural_language_product_selection"){
+    if(cancelRequest || /^❌\s*cancel$/i.test(text) || text==="↩️ Main Menu"){
+      await clearState();
+      await send(chatId,"Plan selection cancelled. What would you like to do next?",true);
+      return out({success:true,linked:true,state:"idle"});
+    }
+    const selectionText=String(text||"").trim().replace(/^\s*(?:option|choice)\s*/i,"").replace(/[.)\-:]\s*$/,"");
+    const match=selectionText.match(/^(\d{1,3})$/);
+    const products=Array.isArray(context?.products)?context.products:[];
+    const selected=match?products[Number(match[1])-1]:null;
+    if(!selected){
+      const keyboard=products.map((_:any,i:number)=>[{text:String(i+1)}]).concat([[{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]]);
+      await send(chatId,"Please choose a valid plan number from the list.",false,{keyboard,resize_keyboard:true,is_persistent:false});
+      return out({success:true,linked:true,state:"awaiting_natural_language_product_selection"});
+    }
+    const productId=String(selected.id||selected.product_id||"");
+    if(!productId){
+      await clearState();
+      await send(chatId,"I couldn't identify that plan safely. Please start the purchase again.",true);
+      return out({success:false,linked:true,state:"idle"});
+    }
+    const digits=String(context.phone_number||"").replace(/\D/g,"");
+    const recipient=digits.startsWith("234")&&digits.length===13?"0"+digits.slice(3):digits;
+    const planContext={
+      product_id:productId,
+      product_name:String(selected.product_name||"Data plan"),
+      network_code:String(selected.network||selected.network_code||""),
+      network_name:String(selected.network_name||selected.network||selected.network_code||""),
+      volume:String(selected.volume||""),
+      price:Number(selected.selling_price||0),
+      variant_name:String(selected.variant_name||selected.variant||""),
+      validity_type:String(selected.validity_type||""),
+      validity_value:selected.validity_value??null,
+      validity_unit:String(selected.validity_unit||""),
+      phone_number:/^0[789]\d{9}$/.test(recipient)?recipient:null
+    };
+    if(planContext.phone_number){
+      const {data:walletData,error:walletError}=await db.rpc("get_my_balance",{p_user_id:acct.user_id});
+      if(walletError) throw walletError;
+      const walletBefore=Number(walletData?.[0]?.balance??0);
+      await saveState("awaiting_data_confirmation",{...planContext,wallet_before:walletBefore,idempotency_key:"TG-"+acct.user_id+"-"+crypto.randomUUID()});
+      await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+planContext.network_name+"\nPlan: "+planContext.product_name+"\nRecipient: "+planContext.phone_number.replace(/^(\d{4})\d+(\d{3})$/,"$1****$2")+"\nPrice: ₦"+planContext.price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-planContext.price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+      return out({success:true,linked:true,state:"awaiting_data_confirmation",product_id:productId});
+    }
+    await saveState("awaiting_data_recipient",planContext);
+    await send(chatId,"Selected: "+planContext.product_name+" — ₦"+planContext.price.toLocaleString("en-NG")+"\nNetwork: "+planContext.network_name+"\n\nWho should receive it? Send the phone number or use a saved contact name.",false,{keyboard:[[ {text:"↩️ Main Menu"} ]],resize_keyboard:true,is_persistent:false});
+    return out({success:true,linked:true,state:"awaiting_data_recipient",product_id:productId});
+  }
+
   const runAi=async()=>{try{
     const spendingRequest=/(?:\bhow much (?:have|did) i (?:spend|spent)\b|\bwhat did i spend\b|\bspending (?:summary|analysis|report)\b|\bwhat network .*?(?:buy|purchase).*(?:most|the most)\b|\bnawa .*?(?:kashe|na kashe)\b|\bwace network .*?(?:saya|akai-akai)\b)/i.test(String(effectiveText||""));
     if(spendingRequest){
@@ -1061,7 +1130,22 @@ Deno.serve(async(req)=>{
       return;
     }
     let aiPayload:any={user_id:acct.user_id,channel:"telegram",message:effectiveText};
-    if (pendingConversationId) aiPayload.conversation_id = pendingConversationId;const amountOnly=String(effectiveText||"").trim().match(/^(?:₦\s*|NGN\s*|naira\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*$/i);if(amountOnly){const {data:latestConversation}=await db.from("ai_conversations").select("id").eq("user_id",acct.user_id).eq("channel","telegram").order("last_message_at",{ascending:false}).limit(1).maybeSingle();if(latestConversation?.id){const {data:recentUsers}=await db.from("ai_messages").select("message,created_at").eq("conversation_id",latestConversation.id).eq("role","user").order("created_at",{ascending:false}).limit(2);const previous=String(recentUsers?.[1]?.message||"").trim().toLowerCase();if(/\b(fund|funding|deposit|top ?up|add money|add funds)\b/.test(previous)&&/\b(wallet|money|fund|funding|deposit|top ?up)\b/.test(previous)){const amount=Number(String(amountOnly[1]).replace(/,/g,""));if(Number.isFinite(amount)&&amount>0){aiPayload.action="manual_funding_request";aiPayload.amount=amount}}}}const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify(aiPayload)});const d=await ai.json().catch(()=>({}));if(!ai.ok){console.error("Telegram AI bridge:",{status:ai.status,error:d?.error||null});const msg=String(d?.error||"Bindawasub AI could not process that message right now.");const safe=/insufficient wallet balance|wallet not found|product not found|inactive|confirmation has expired|disabled|authentication|required/i.test(msg)?msg:"Bindawasub AI could not process that message right now.";await send(chatId,"❌ "+safe,true);return}if(d?.available===false){await send(chatId,String(d?.answer||"⚠️ The selected service is currently not available. Please try another service later."),true);return}let aiAnswer=String(d?.answer||"").trim();
+    if (pendingConversationId) aiPayload.conversation_id = pendingConversationId;const amountOnly=String(effectiveText||"").trim().match(/^(?:₦\s*|NGN\s*|naira\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*$/i);if(amountOnly){const {data:latestConversation}=await db.from("ai_conversations").select("id").eq("user_id",acct.user_id).eq("channel","telegram").order("last_message_at",{ascending:false}).limit(1).maybeSingle();if(latestConversation?.id){const {data:recentUsers}=await db.from("ai_messages").select("message,created_at").eq("conversation_id",latestConversation.id).eq("role","user").order("created_at",{ascending:false}).limit(2);const previous=String(recentUsers?.[1]?.message||"").trim().toLowerCase();if(/\b(fund|funding|deposit|top ?up|add money|add funds)\b/.test(previous)&&/\b(wallet|money|fund|funding|deposit|top ?up)\b/.test(previous)){const amount=Number(String(amountOnly[1]).replace(/,/g,""));if(Number.isFinite(amount)&&amount>0){aiPayload.action="manual_funding_request";aiPayload.amount=amount}}}}const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify(aiPayload)});const d=await ai.json().catch(()=>({}));if(!ai.ok){console.error("Telegram AI bridge:",{status:ai.status,error:d?.error||null});const msg=String(d?.error||"Bindawasub AI could not process that message right now.");const safe=/insufficient wallet balance|wallet not found|product not found|inactive|confirmation has expired|disabled|authentication|required/i.test(msg)?msg:"Bindawasub AI could not process that message right now.";await send(chatId,"❌ "+safe,true);return}if(d?.available===false){await send(chatId,String(d?.answer||"⚠️ The selected service is currently not available. Please try another service later."),true);return}
+  if(String(d?.intent||"").toLowerCase()==="purchase_intent"&&Array.isArray(d?.products)&&d.products.length>1){
+    const choices=d.products;
+    const lines=choices.map((p:any,i:number)=>{
+      const network=p.network_name||p.network||"Network";
+      const duration=p.validity||(p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":""));
+      const details=[network,p.volume,duration].filter(Boolean).join(" • ");
+      return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
+    });
+    const keyboard=choices.map((_:any,i:number)=>[{text:String(i+1)}]).concat([[{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]]);
+    await saveState("awaiting_natural_language_product_selection",{products:choices,phone_number:d.phone_number||d.customer_input?.phone||null});
+    const intro=String(d.answer||"I found several matching data plans. Choose the one you want.");
+    await send(chatId,intro+"\n\n📦 Available matching plans\n\n"+lines.join("\n\n")+"\n\nChoose a plan number to continue.",false,{keyboard,resize_keyboard:true,is_persistent:false});
+    return out({success:true,linked:true,state:"awaiting_natural_language_product_selection",options:choices.length});
+  }
+  let aiAnswer=String(d?.answer||"").trim();
   if(String(d?.intent||"").toLowerCase()==="transaction_history"&&Array.isArray(d?.transactions)){
     const rows=d.transactions.slice(0,5).map((tx:any,i:number)=>{
       const details=[tx.product_name||"Purchase",tx.network?String(tx.network).toUpperCase():null,tx.volume||null].filter(Boolean).join(" ");
