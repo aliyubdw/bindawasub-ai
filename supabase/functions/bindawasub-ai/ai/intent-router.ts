@@ -109,16 +109,27 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
           /\bairtel\b/i.test(originalMessage) ||
           /\bglo\b/i.test(originalMessage) ||
           /\b(?:9mobile|t2)\b/i.test(originalMessage);
-        const requestedSize = String(ai?.volume || originalMessage.match(/\b\d+(?:\.\d+)?\s*(?:gb|mb)\b/i)?.[0] || "").trim();
+        const requestedSize = String(originalMessage.match(/\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i)?.[0] || ai?.volume || "").trim();
         const unscopedSizePurchase =
           !explicitNetworkInMessage &&
-          /\b(?:buy|purchase|send|get|give|need|want|i want|i need)\b/i.test(originalMessage) &&
-          /\b\d+(?:\.\d+)?\s*(?:gb|mb)\b/i.test(originalMessage);
-        const purchaseCatalog = requestedVariantText
-          ? variantFilteredProducts
-          : networkFilteredProducts;
+          /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(originalMessage) &&
+          /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
+        const literalVariant = /\bsme\b/i.test(originalMessage) ? "smedata"
+          : /\bsocial\b/i.test(originalMessage) ? "social"
+          : /\bgifting\b/i.test(originalMessage) ? "gifting"
+          : /\bawoop\b/i.test(originalMessage) ? "awoop"
+          : null;
+        const purchaseCatalog = unscopedSizePurchase
+          ? (literalVariant
+              ? networkFilteredProducts.filter((p:any) => {
+                  const variant = Array.isArray(p.service_variants) ? p.service_variants[0] : p.service_variants;
+                  const normalize = (v:any) => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                  return normalize(variant?.code) === normalize(literalVariant) || normalize(variant?.name) === normalize(literalVariant);
+                })
+              : networkFilteredProducts)
+          : (requestedVariantText ? variantFilteredProducts : networkFilteredProducts);
         const purchaseAi = unscopedSizePurchase
-          ? { ...ai, service_type: "data", network: null, product_id: null, volume: requestedSize || ai.volume }
+          ? { ...ai, service_type: "data", network: null, product_id: null, product_name: null, variant: literalVariant, volume: requestedSize || ai.volume }
           : ai;
 
         // Product specification is resolved only against the live catalog.
@@ -140,7 +151,11 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
         };
 
         if (ai.phone_number && !customerInput.phone) customerInput.phone = ai.phone_number;
-        if (ai.network && !customerInput.network) customerInput.network = ai.network;
+        if (unscopedSizePurchase) {
+          delete customerInput.network;
+        } else if (ai.network && !customerInput.network) {
+          customerInput.network = ai.network;
+        }
         if (ai.amount && Number(ai.amount) > 0 && !customerInput.amount) customerInput.amount = Number(ai.amount);
 
         const requiredFields = (catalogService?.fields || [])
