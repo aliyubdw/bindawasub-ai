@@ -88,7 +88,7 @@ export async function routeExplicitAction(
 
   // Purchase confirmations must bypass explicit action routing and reach the pending-purchase handler in index.ts.
   const confirmationMessage = String(originalMessage || "").trim();
-  const isPurchaseConfirmation = /^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh|no|nope|cancel|stop)\\b/i.test(confirmationMessage);
+  const isPurchaseConfirmation = /^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh|no|nope|cancel|stop|a'a|ba na so|kar a|kar a yi)\\b/i.test(confirmationMessage);
   if (isPurchaseConfirmation) {
     return null;
   }
