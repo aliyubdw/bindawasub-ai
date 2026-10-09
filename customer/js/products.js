@@ -150,7 +150,7 @@ function showProducts(products, purchaseContext = null) {
         BindawasubCustomerState.waitingForPhone = false;
         BindawasubCustomerState.waitingForConfirmation = false;
 
-        addMessage(\`Na zabi \${product.product_name}\`, "user");
+        addMessage("Na zabi " + String(product.product_name || "Data plan"), "user");
         productList.remove();
 
         const resolvedPhone = validatePhone(String(
@@ -163,7 +163,7 @@ function showProducts(products, purchaseContext = null) {
 
         if (isPurchaseChoice && resolvedPhone) {
           BindawasubCustomerState.recipientPhone = resolvedPhone;
-          addMessage("I found the recipient from your saved contact. Please review the details below.", "bot");
+          addMessage("Recipient details are ready. Please review the purchase before confirming.", "bot");
           showConfirmation();
           return;
         }
