@@ -33,6 +33,9 @@ function lagosBounds(period:string){
     const lagosDate=new Date(Date.UTC(y,mo-1,day));
     const weekday=lagosDate.getUTCDay();
     const start=new Date(lagosDate); start.setUTCDate(start.getUTCDate()-(weekday===0?6:weekday-1));
+    // The date above is a Lagos calendar date represented at UTC midnight.
+    // Shift both weekly boundaries to 23:00 UTC on the prior day (Lagos midnight).
+    start.setUTCHours(start.getUTCHours()-1);
     const end=new Date(start); end.setUTCDate(end.getUTCDate()+7);
     return {start:start.toISOString(),end:end.toISOString(),label:"this week"};
   }
