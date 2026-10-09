@@ -148,10 +148,13 @@ Deno.serve(async(req)=>{
   const recHasData=["data","internet","plan","plans","gb","package","packages"].some((w)=>recText.includes(w));
   const recLooksLikeRecommendation=recHasWord&&recHasData;
   if(recLooksLikeRecommendation){
-    const ai=await fetch(url,{
+    const {data:recommendationWallet,error:recommendationWalletError}=await db.from("wallets").select("balance").eq("user_id",acct.user_id).maybeSingle();
+    if(recommendationWalletError) throw recommendationWalletError;
+    const recommendationUrl=Deno.env.get("SUPABASE_URL")!+"/functions/v1/recommend-products";
+    const ai=await fetch(recommendationUrl,{
       method:"POST",
-      headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},
-      body:JSON.stringify({user_id:acct.user_id,channel:"telegram",message:text})
+      headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key},
+      body:JSON.stringify({message:text,wallet_balance:Number(recommendationWallet?.balance||0)})
     });
     const d=await ai.json().catch(()=>({}));
     if(!ai.ok || String(d?.intent||"").toLowerCase()!=="budget_recommendation"){
