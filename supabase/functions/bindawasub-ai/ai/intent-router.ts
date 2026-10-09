@@ -118,7 +118,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
           ? variantFilteredProducts
           : networkFilteredProducts;
         const purchaseAi = unscopedSizePurchase
-          ? { ...ai, network: null, product_id: null, volume: requestedSize || ai.volume }
+          ? { ...ai, service_type: "data", network: null, product_id: null, volume: requestedSize || ai.volume }
           : ai;
 
         // Product specification is resolved only against the live catalog.
@@ -164,7 +164,11 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
               customer_input:customerInput,
               phone_number: ai.phone_number || customerInput.phone || null,
               missing_fields:missingFields,
-              answer:ai.reply || "I found several matching plans across networks. Please choose the network and package you prefer.",
+              answer: unscopedSizePurchase
+                ? (String(ai.language || "").toLowerCase() === "hausa"
+                    ? "Na samu data plans masu girman da ka nema a networks daban-daban. Zaɓi network da plan ɗin da kake so."
+                    : "I found matching data plans across available networks. Compare the network, validity and price, then choose your preferred plan.")
+                : (ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want."),
               requires_confirmation:false,
               ai_powered:true
             }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
