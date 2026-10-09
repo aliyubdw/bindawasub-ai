@@ -122,10 +122,10 @@ function showProducts(products, purchaseContext = null) {
 
       const name = String(product.product_name || "Data");
       const duration =
-        String(product.duration || (
+        String(product.duration || product.validity || (
           product.validity_value != null && product.validity_unit
             ? product.validity_value + " " + product.validity_unit
-            : "Validity not specified"
+            : product.validity_type === "unlimited" ? "Unlimited" : "Validity not specified"
         ));
       const price = Number(product.selling_price || 0).toLocaleString();
 
