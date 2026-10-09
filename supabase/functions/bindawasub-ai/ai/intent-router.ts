@@ -133,7 +133,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             : null
         );
 
-        const serviceType = String(ai.service_type || matchedProduct?.service_type || "").trim().toLowerCase();
+        const serviceType = String((unscopedSizePurchase ? "data" : ai.service_type) || matchedProduct?.service_type || "").trim().toLowerCase();
         const catalogService = serviceCatalog.find((s:any) => s.code === serviceType);
         const customerInput = {
           ...(ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {})
