@@ -101,16 +101,30 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
         );
       }
       if (ai.intent === "purchase_intent") {
-        // Resolve purchases only against the already network/data-type-filtered catalog.
+        // A fresh request such as "buy 1GB for Mom" must show every matching
+        // active network plan. Do not let a model-inferred network or product ID
+        // silently choose one when the customer did not name a network.
+        const explicitNetworkInMessage =
+          /\bmtn\b/i.test(originalMessage) ||
+          /\bairtel\b/i.test(originalMessage) ||
+          /\bglo\b/i.test(originalMessage) ||
+          /\b(?:9mobile|t2)\b/i.test(originalMessage);
+        const requestedSize = String(ai?.volume || originalMessage.match(/\b\d+(?:\.\d+)?\s*(?:gb|mb)\b/i)?.[0] || "").trim();
+        const unscopedSizePurchase =
+          !explicitNetworkInMessage &&
+          /\b(?:buy|purchase|send|get|give|need|want|i want|i need)\b/i.test(originalMessage) &&
+          /\b\d+(?:\.\d+)?\s*(?:gb|mb)\b/i.test(originalMessage);
         const purchaseCatalog = requestedVariantText
           ? variantFilteredProducts
           : networkFilteredProducts;
+        const purchaseAi = unscopedSizePurchase
+          ? { ...ai, network: null, product_id: null, volume: requestedSize || ai.volume }
+          : ai;
 
-        // Product specification is resolved from the live catalog, never from Gemini's
-        // product identity alone. An exact product ID is accepted only if it belongs to
-        // the already-filtered catalog.
-        const specificationCandidates = filterCatalogBySpecification(ai, purchaseCatalog);
-        const matchedById = String(ai?.product_id||"").trim()
+        // Product specification is resolved only against the live catalog.
+        // For unscoped data-size requests, the candidate list intentionally spans networks.
+        const specificationCandidates = filterCatalogBySpecification(purchaseAi, purchaseCatalog);
+        const matchedById = !unscopedSizePurchase && String(ai?.product_id||"").trim()
           ? specificationCandidates.find((p:any)=>p.id===String(ai.product_id).trim())
           : null;
         const matchedProduct = matchedById || (
@@ -140,7 +154,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
 
         if (!matchedProduct) {
           if (specificationCandidates.length > 1) {
-            const choices = specificationCandidates.slice(0, 12).map(productSpecification);
+            const choices = specificationCandidates.map(productSpecification);
             return new Response(JSON.stringify({
               success:true,
               intent:"purchase_intent",
