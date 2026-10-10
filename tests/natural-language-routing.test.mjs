@@ -87,3 +87,28 @@ test("mock catalog routing: old MTN context cannot narrow a fresh unscoped reque
     assert.deepEqual(actual, item.expected, item.message);
   }
 });
+
+
+test("production catalog size matching reads the quantity from product_name", async () => {
+  const source = await read("supabase/functions/bindawasub-ai/catalog/lookup.ts");
+  assert.match(source, /function sizeInMb/);
+  assert.match(source, /productMatchesVolume/);
+  assert.match(source, /product_name/);
+  assert.match(source, /if\(requested\.volume\)candidates=candidates\.filter\(\(p:any\)=>productMatchesVolume/);
+});
+
+test("Telegram offers even a single deterministic catalog match for explicit selection", async () => {
+  const source = await read(telegramPath);
+  assert.match(source, /d\.products\.length>0/);
+  assert.match(source, /Data type:/);
+  assert.match(source, /Validity:/);
+  assert.match(source, /matchingTargets\.length>1/);
+});
+
+test("web chat groups cross-network plans and confirms data type and corrected validity", async () => {
+  const source = await read("customer/js/products.js");
+  assert.match(source, /Matching Data Plans Across Networks/);
+  assert.match(source, /productNetwork\.toLowerCase\(\)\s*\+\s*"\|"/);
+  assert.match(source, /Data type:/);
+  assert.match(source, /formatProductValidity/);
+});
