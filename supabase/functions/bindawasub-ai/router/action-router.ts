@@ -86,13 +86,6 @@ export async function routeExplicitAction(
     return null;
   }
 
-  // Purchase confirmations must bypass explicit action routing and reach the pending-purchase handler in index.ts.
-  const confirmationMessage = String(originalMessage || "").trim();
-  const isPurchaseConfirmation = /^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh|no|nope|cancel|stop)\\b/i.test(confirmationMessage);
-  if (isPurchaseConfirmation) {
-    return null;
-  }
-
   // Deterministic natural-language wallet balance detection.
   // Balance is account data and must never depend on Gemini intent classification.
   const balanceMessage = String(originalMessage || "").trim().toLowerCase();
@@ -107,7 +100,9 @@ export async function routeExplicitAction(
       persistAssistantMessage,
     );
   }
-  const transactionAction = detectTransactionAction(originalMessage);
+  const confirmationMessage = String(originalMessage || '').trim();
+  const isPurchaseConfirmation = /^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh|no|nope|cancel|stop|a'a|ba na so|kar a|kar a yi)\\b/i.test(confirmationMessage);
+  const transactionAction = isPurchaseConfirmation ? null : detectTransactionAction(originalMessage);
   if (transactionAction) {
     return await handleTransactionActions(
       { supabase, userId, corsHeaders },
