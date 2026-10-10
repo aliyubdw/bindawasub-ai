@@ -829,11 +829,12 @@ Deno.serve(async (req) => {
         recentTransactions: recentTransactionsForAI,
       });
 
+      const naturalLanguageDataPurchaseRequest = /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
       let trustedSavedBeneficiaryPhone: string | null = null;
       // Resolve a named saved beneficiary to a phone number before purchase routing.
       // This lookup is customer-scoped and never accepts a phone number from model output
       // when it is merely a contact name.
-      if (String(ai.intent || "").toLowerCase() === "purchase_intent") {
+      if (String(ai.intent || "").toLowerCase() === "purchase_intent" || naturalLanguageDataPurchaseRequest) {
         try {
           const { data: beneficiaries, error: beneficiaryError } = await supabase
             .from("saved_beneficiaries")
@@ -898,7 +899,7 @@ Deno.serve(async (req) => {
       // keep numeric/phone follow-ups in the Airtime flow instead of Data.
       const activeAirtimeContext = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
       const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
-      const explicitDataPurchase = /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
+      const explicitDataPurchase = naturalLanguageDataPurchaseRequest;
       if (explicitDataPurchase) {
         ai.intent = "purchase_intent";
         ai.service_type = "data";
