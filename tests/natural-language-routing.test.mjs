@@ -112,3 +112,14 @@ test("web chat groups cross-network plans and confirms data type and corrected v
   assert.match(source, /Data type:/);
   assert.match(source, /formatProductValidity/);
 });
+
+
+test("confirmation handlers require the entire message to be a confirmation", async () => {
+  const index = await read(indexPath);
+  const actionRouter = await read("supabase/functions/bindawasub-ai/router/action-router.ts");
+  const telegram = await read(telegramPath);
+  assert.match(index, /affirmativeConfirmation=\/\^\(\?:yes/);
+  assert.match(index, /negativeConfirmation=\/\^\(\?:no/);
+  assert.match(actionRouter, /isPurchaseConfirmation = \/\^\(\?:yes/);
+  assert.match(telegram, /const affirmative=\/\^\(\?:yes/);
+});
