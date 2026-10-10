@@ -5,6 +5,8 @@ on:
     paths:
       - "supabase/functions/bindawasub-ai/**"
       - "supabase/functions/telegram-webhook/**"
+      - "customer/js/**"
+      - "tests/**"
       - ".github/workflows/pr-regression.yml"
   workflow_dispatch:
 
