@@ -43,6 +43,7 @@ test("request pre-processing discards inherited network when request is unscoped
   assert.match(source, /const naturalLanguageUnscopedDataPurchase\s*=/);
   assert.match(source, /const requestedNetworkToken\s*=\s*explicitNetwork\s*\|\|\s*\(naturalLanguageUnscopedDataPurchase\s*\?\s*""\s*:\s*contextNetwork\)/);
   assert.match(source, /if\s*\(dataNetworkMatch\)[\s\S]{0,250}else\s*\{[\s\S]{0,250}ai\.network\s*=\s*null/);
+  assert.ok(source.includes("|| naturalLanguageDataPurchaseRequest"), "saved contacts must resolve even if Gemini misclassifies a fresh data request");
 });
 
 test("catalog enquiry handler defers unscoped purchase requests to purchase router", async () => {
