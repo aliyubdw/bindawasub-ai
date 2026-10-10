@@ -15,6 +15,7 @@ import { handleStartAirtime, handleFundingActions } from "../funding/handler.ts"
 import { handleFundingHistory } from "../funding/history-handler.ts";
 import { handleWalletBalance } from "../wallet/balance-handler.ts";
 import { detectTransactionAction } from "../transactions/intent.ts";
+import { classifyConfirmation } from "../purchase/request.ts";
 
 export type ActionRouterContext = {
   supabase: any;
@@ -88,7 +89,7 @@ export async function routeExplicitAction(
 
   // Purchase confirmations must bypass explicit action routing and reach the pending-purchase handler in index.ts.
   const confirmationMessage = String(originalMessage || "").trim();
-  const isPurchaseConfirmation = /^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh|no|nope|cancel|stop)\\b/i.test(confirmationMessage);
+  const isPurchaseConfirmation = classifyConfirmation(confirmationMessage) !== null;
   if (isPurchaseConfirmation) {
     return null;
   }

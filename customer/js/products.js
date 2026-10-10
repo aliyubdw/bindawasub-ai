@@ -55,6 +55,8 @@ function showProducts(products, purchaseContext = null) {
   productList.className = "product-list";
 
   const firstProduct = products[0] || {};
+  const distinctNetworks = new Set(products.map(p => String(p.network_name || p.network || "").toLowerCase()));
+  const crossNetwork = distinctNetworks.size > 1;
   const networkName =
     firstProduct.network_name ||
     firstProduct.network ||
@@ -67,7 +69,7 @@ function showProducts(products, purchaseContext = null) {
   heading.className = "product-list-heading";
   heading.innerHTML = `
     <span class="product-network-icon">📶</span>
-    <span><strong>${networkName} Data Plans</strong><small>Choose a package</small></span>
+    <span><strong>${crossNetwork ? "Matching Data Plans" : networkName + " Data Plans"}</strong><small>${crossNetwork ? "Compare networks, then choose a plan" : "Choose a package"}</small></span>
   `;
   productList.appendChild(heading);
 
@@ -85,14 +87,14 @@ function showProducts(products, purchaseContext = null) {
         : product.service_variants?.name) ||
       "Other Data";
 
-    const variantKey = String(
+    const variantKey = (crossNetwork ? String(product.network_name || product.network || "") + "|" : "") + String(
       product.variant ||
       variantName
     ).trim().toLowerCase();
 
     if (!groups.has(variantKey)) {
       groups.set(variantKey, {
-        name: String(variantName),
+        name: crossNetwork ? String(product.network_name || product.network || "") + " · " + String(variantName) : String(variantName),
         products: []
       });
     }
@@ -244,6 +246,7 @@ function showConfirmation() {
 `Ga bayanan sayayyarka:
 
 Network: ${BindawasubCustomerState.selectedProduct.network_name || BindawasubCustomerState.selectedProduct.network || (Array.isArray(BindawasubCustomerState.selectedProduct.service_networks) ? BindawasubCustomerState.selectedProduct.service_networks[0]?.name : BindawasubCustomerState.selectedProduct.service_networks?.name) || "—"}
+Data type: ${BindawasubCustomerState.selectedProduct.variant_name || BindawasubCustomerState.selectedProduct.variant || "—"}
 Plan: ${BindawasubCustomerState.selectedProduct.product_name}
 Validity: ${BindawasubCustomerState.selectedProduct.validity || BindawasubCustomerState.selectedProduct.duration || (BindawasubCustomerState.selectedProduct.validity_value && BindawasubCustomerState.selectedProduct.validity_unit ? BindawasubCustomerState.selectedProduct.validity_value + " " + BindawasubCustomerState.selectedProduct.validity_unit : "Not specified")}
 Farashi: ₦${Number(BindawasubCustomerState.selectedProduct.selling_price).toLocaleString()}
