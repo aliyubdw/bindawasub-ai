@@ -108,5 +108,5 @@ Deno.test("production routing source retains the safety guards", async () => {
   assert(telegram.includes("awaiting_data_confirmation"), "Telegram plan selection must continue to explicit confirmation");
   assert(telegram.includes("crypto.randomUUID()"), "Telegram confirmation must have a fresh transaction reference");
   assert(actionRouter.includes("isPurchaseConfirmationMessage(originalMessage)"), "action router must use tested confirmation matcher");
-  assert(confirmation.includes("(?:\\\\b|$)"), "confirmation matcher must handle apostrophe-ending Hausa phrase");
+  assert(confirmation.includes("(?:\\b|$)"), "confirmation matcher must handle apostrophe-ending Hausa phrase");
 });
