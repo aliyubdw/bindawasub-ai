@@ -829,6 +829,7 @@ Deno.serve(async (req) => {
         recentTransactions: recentTransactionsForAI,
       });
 
+      let trustedSavedBeneficiaryPhone: string | null = null;
       // Resolve a named saved beneficiary to a phone number before purchase routing.
       // This lookup is customer-scoped and never accepts a phone number from model output
       // when it is merely a contact name.
@@ -851,6 +852,7 @@ Deno.serve(async (req) => {
           });
           if (matchedBeneficiaries.length === 1) {
             const contactPhone = String(matchedBeneficiaries[0].phone_number);
+            trustedSavedBeneficiaryPhone = contactPhone;
             ai.phone_number = contactPhone;
             ai.customer_input = {
               ...(ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {}),
@@ -914,7 +916,12 @@ Deno.serve(async (req) => {
           }
         }
         const dataPhoneMatch = String(originalMessage || "").match(/(?:\+234|234|0)\d{10}\b/);
-        if (dataPhoneMatch) ai.phone_number = dataPhoneMatch[0];
+        const trustedRecipient = dataPhoneMatch?.[0] || trustedSavedBeneficiaryPhone;
+        ai.phone_number = trustedRecipient || null;
+        if (ai.customer_input && typeof ai.customer_input === "object") {
+          if (trustedRecipient) ai.customer_input.phone = trustedRecipient;
+          else delete ai.customer_input.phone;
+        }
       } else if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {
         ai.intent = "airtime_purchase";
         ai.service_type = "airtime";
