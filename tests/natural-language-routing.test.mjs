@@ -47,7 +47,7 @@ test("request pre-processing discards inherited network when request is unscoped
 
 test("catalog enquiry handler defers unscoped purchase requests to purchase router", async () => {
   const source = await read(catalogPath);
-  assert.match(source, /if\s*\(hasPurchaseVerbAndDataSize\s*&&\s*!namesNetwork\)\s*return null/);
+  assert.match(source, /if\s*\(hasPurchaseVerbAndDataSize\)\s*return null/);
 });
 
 test("Telegram selection stage stores confirmation state without vending immediately", async () => {
