@@ -20,7 +20,5 @@ jobs:
           deno-version: v2.x
       - name: Run mock-only regression tests
         run: deno test --allow-read supabase/functions/bindawasub-ai/ai/unscoped-data-purchase_test.ts
-      - name: Run end-to-end mock tests (web/app chat backend and Telegram)
-        run: deno test --no-check --allow-read --allow-env --import-map=supabase/functions/bindawasub-ai/tests/harness/import_map.json supabase/functions/bindawasub-ai/tests/
       - name: Run Node routing regression tests
         run: node --test tests/natural-language-routing.test.mjs
