@@ -15,6 +15,15 @@ function cleanTelegramText(text:string){
     .trim();
 }
 const canonicalNetworkLabel=(code:string,name?:string)=>String(code||"").toLowerCase()==="9mobile"?"9mobile (T2)":(name||String(code||"")).trim();
+function formatPlanValidity(p:any):string {
+  if (p?.validity_type === "unlimited") return "Unlimited";
+  const value = p?.validity_value;
+  const unit = String(p?.validity_unit || "").trim();
+  if (value == null || !unit) return String(p?.validity || p?.duration || "Validity not specified");
+  const numeric = Number(value);
+  const singular = unit.replace(/s$/i, "");
+  return String(value) + " " + (Number.isFinite(numeric) && numeric === 1 ? singular : (unit.endsWith("s") ? unit : unit + "s"));
+}
 const networkKeyboard={keyboard:[
   [{text:"MTN"},{text:"Airtel"}],
   [{text:"Glo"},{text:"9mobile (T2)"}],
@@ -1111,7 +1120,7 @@ Deno.serve(async(req)=>{
       if(walletError) throw walletError;
       const walletBefore=Number(walletData?.[0]?.balance??0);
       await saveState("awaiting_data_confirmation",{...planContext,wallet_before:walletBefore,idempotency_key:"TG-"+acct.user_id+"-"+crypto.randomUUID()});
-      await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+planContext.network_name+"\nPlan: "+planContext.product_name+"\nRecipient: "+planContext.phone_number.replace(/^(\d{4})\d+(\d{3})$/,"$1****$2")+"\nPrice: ₦"+planContext.price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-planContext.price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+      await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+planContext.network_name+"\nData type: "+(planContext.variant_name||"Not specified")+"\nPlan: "+planContext.product_name+"\nValidity: "+formatPlanValidity(planContext)+"\nRecipient: "+planContext.phone_number.replace(/^(\d{4})\d+(\d{3})$/,"$1****$2")+"\nPrice: ₦"+planContext.price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-planContext.price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
       return out({success:true,linked:true,state:"awaiting_data_confirmation",product_id:productId});
     }
     await saveState("awaiting_data_recipient",planContext);
@@ -1131,11 +1140,11 @@ Deno.serve(async(req)=>{
     }
     let aiPayload:any={user_id:acct.user_id,channel:"telegram",message:effectiveText};
     if (pendingConversationId) aiPayload.conversation_id = pendingConversationId;const amountOnly=String(effectiveText||"").trim().match(/^(?:₦\s*|NGN\s*|naira\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*$/i);if(amountOnly){const {data:latestConversation}=await db.from("ai_conversations").select("id").eq("user_id",acct.user_id).eq("channel","telegram").order("last_message_at",{ascending:false}).limit(1).maybeSingle();if(latestConversation?.id){const {data:recentUsers}=await db.from("ai_messages").select("message,created_at").eq("conversation_id",latestConversation.id).eq("role","user").order("created_at",{ascending:false}).limit(2);const previous=String(recentUsers?.[1]?.message||"").trim().toLowerCase();if(/\b(fund|funding|deposit|top ?up|add money|add funds)\b/.test(previous)&&/\b(wallet|money|fund|funding|deposit|top ?up)\b/.test(previous)){const amount=Number(String(amountOnly[1]).replace(/,/g,""));if(Number.isFinite(amount)&&amount>0){aiPayload.action="manual_funding_request";aiPayload.amount=amount}}}}const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify(aiPayload)});const d=await ai.json().catch(()=>({}));if(!ai.ok){console.error("Telegram AI bridge:",{status:ai.status,error:d?.error||null});const msg=String(d?.error||"Bindawasub AI could not process that message right now.");const safe=/insufficient wallet balance|wallet not found|product not found|inactive|confirmation has expired|disabled|authentication|required/i.test(msg)?msg:"Bindawasub AI could not process that message right now.";await send(chatId,"❌ "+safe,true);return}if(d?.available===false){await send(chatId,String(d?.answer||"⚠️ The selected service is currently not available. Please try another service later."),true);return}
-  if(String(d?.intent||"").toLowerCase()==="purchase_intent"&&Array.isArray(d?.products)&&d.products.length>1){
+  if(String(d?.intent||"").toLowerCase()==="purchase_intent"&&Array.isArray(d?.products)&&d.products.length>0){
     const choices=d.products;
     const lines=choices.map((p:any,i:number)=>{
       const network=p.network_name||p.network||"Network";
-      const duration=p.validity||(p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":""));
+      const duration=formatPlanValidity(p);const dataType=p.variant_name||p.variant||(Array.isArray(p.service_variants)?p.service_variants[0]?.name:p.service_variants?.name)||"Data type not specified";
       const details=[network,p.volume,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
