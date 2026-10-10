@@ -47,6 +47,22 @@ function showDataTypes(dataTypes, networkName) {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function formatProductValidity(product) {
+  if (product?.validity_type === "unlimited") return "Unlimited";
+  let value = product?.validity_value;
+  let unit = String(product?.validity_unit || "").trim();
+  let label = "";
+  if (value != null && unit) {
+    const singular = unit.replace(/s$/i, "");
+    const numeric = Number(value);
+    label = String(value) + " " + (Number.isFinite(numeric) && numeric === 1 ? singular : (unit.endsWith("s") ? unit : unit + "s"));
+  } else {
+    label = String(product?.validity || product?.duration || "Validity not specified");
+    label = label.replace(/\b1\s+(days|weeks|months|years)\b/gi, (_, unit) => "1 " + unit.slice(0, -1));
+  }
+  return label;
+}
+
 function showProducts(products, purchaseContext = null) {
   const messages = document.getElementById("messages");
   if (!messages || !Array.isArray(products) || !products.length) return;
@@ -131,12 +147,7 @@ function showProducts(products, purchaseContext = null) {
       card.type = "button";
 
       const name = String(product.product_name || "Data");
-      const duration =
-        String(product.duration || product.validity || (
-          product.validity_value != null && product.validity_unit
-            ? product.validity_value + " " + product.validity_unit
-            : product.validity_type === "unlimited" ? "Unlimited" : "Validity not specified"
-        ));
+      const duration = formatProductValidity(product);
       const price = Number(product.selling_price || 0).toLocaleString();
 
       const productNetworkName =
@@ -256,7 +267,7 @@ function showConfirmation() {
 Network: ${BindawasubCustomerState.selectedProduct.network_name || BindawasubCustomerState.selectedProduct.network || (Array.isArray(BindawasubCustomerState.selectedProduct.service_networks) ? BindawasubCustomerState.selectedProduct.service_networks[0]?.name : BindawasubCustomerState.selectedProduct.service_networks?.name) || "—"}
 Data type: ${BindawasubCustomerState.selectedProduct.variant_name || BindawasubCustomerState.selectedProduct.variant || (Array.isArray(BindawasubCustomerState.selectedProduct.service_variants) ? BindawasubCustomerState.selectedProduct.service_variants[0]?.name : BindawasubCustomerState.selectedProduct.service_variants?.name) || "Not specified"}
 Plan: ${BindawasubCustomerState.selectedProduct.product_name}
-Validity: ${BindawasubCustomerState.selectedProduct.validity || BindawasubCustomerState.selectedProduct.duration || (BindawasubCustomerState.selectedProduct.validity_value && BindawasubCustomerState.selectedProduct.validity_unit ? BindawasubCustomerState.selectedProduct.validity_value + " " + BindawasubCustomerState.selectedProduct.validity_unit : "Not specified")}
+Validity: ${formatProductValidity(BindawasubCustomerState.selectedProduct)}
 Farashi: ₦${Number(BindawasubCustomerState.selectedProduct.selling_price).toLocaleString()}
 Lamba: ${BindawasubCustomerState.recipientPhone}
 
