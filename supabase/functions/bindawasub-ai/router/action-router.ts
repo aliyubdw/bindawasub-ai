@@ -106,7 +106,10 @@ export async function routeExplicitAction(
       persistAssistantMessage,
     );
   }
-  const transactionAction = detectTransactionAction(originalMessage);
+  // Confirmations must bypass transaction action routing and reach the pending-purchase handler.
+  const transactionAction = isPurchaseConfirmationMessage(originalMessage)
+    ? null
+    : detectTransactionAction(originalMessage);
   if (transactionAction) {
     return await handleTransactionActions(
       { supabase, userId, corsHeaders },
