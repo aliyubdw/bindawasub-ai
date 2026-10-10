@@ -1078,7 +1078,7 @@ Deno.serve(async(req)=>{
         return out({success:true,linked:true,state:"idle",contact_ambiguous:true});
       }
       const target=matchingTargets.length===1?matchingTargets[0]:null;
-      if(target?.phone_number && /^0[789]\\d{9}$/.test(String(target.phone_number)) && targetMatch){
+      if(target?.phone_number && /^0[789]\d{9}$/.test(String(target.phone_number)) && targetMatch){
         effectiveText=String(effectiveText).slice(0,targetMatch.index||0)+targetMatch[0].replace(targetMatch[1],String(target.phone_number));
       }
     }
