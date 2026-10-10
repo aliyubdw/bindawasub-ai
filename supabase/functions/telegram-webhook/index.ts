@@ -1150,7 +1150,7 @@ Deno.serve(async(req)=>{
     const lines=choices.map((p:any,i:number)=>{
       const network=p.network_name||p.network||"Network";
       const duration=formatPlanValidity(p);const dataType=p.variant_name||p.variant||(Array.isArray(p.service_variants)?p.service_variants[0]?.name:p.service_variants?.name)||"Data type not specified";
-      const details=[network,p.volume,duration].filter(Boolean).join(" • ");
+      const details=[network,dataType,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
     const keyboard=choices.map((_:any,i:number)=>[{text:String(i+1)}]).concat([[{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]]);
