@@ -25,7 +25,7 @@ function response(ctx: PurchaseContext, payload: any, status = 200) {
 }
 
 export async function handleAirtimePurchase(ctx: PurchaseContext): Promise<Response> {
-  const { body, supabase, userId, channel, conversationId, aiConfig, originalMessage, executeViaProviderExecution, loadCustomerTransaction, buildPurchaseConfirmation, persistAssistantMessage, logAiActivity } = ctx;
+  const { body, supabase, userId, channel, conversationId, aiConfig, originalMessage, corsHeaders, executeViaProviderExecution, loadCustomerTransaction, buildPurchaseConfirmation, persistAssistantMessage, logAiActivity } = ctx;
 
 const network = String(body.network || "").trim().toUpperCase();
       const amount = Number(body.amount);
