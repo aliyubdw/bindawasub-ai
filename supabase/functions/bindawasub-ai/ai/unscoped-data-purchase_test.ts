@@ -108,5 +108,8 @@ Deno.test("production routing source retains the safety guards", async () => {
   assert(telegram.includes("awaiting_data_confirmation"), "Telegram plan selection must continue to explicit confirmation");
   assert(telegram.includes("crypto.randomUUID()"), "Telegram confirmation must have a fresh transaction reference");
   assert(actionRouter.includes("isPurchaseConfirmationMessage(originalMessage)"), "action router must use tested confirmation matcher");
+  assert(actionRouter.includes("if (body.action === \"wallet_balance\" || asksForBalance)"), "action router must preserve deterministic wallet-balance handling");
+  const purchaseHandler = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/purchase/handler.ts", root));
+  assert(purchaseHandler.includes("originalMessage, corsHeaders, executeViaProviderExecution"), "purchase handlers must keep CORS headers in scope");
   assert(confirmation.includes("(?:\\b|$)"), "confirmation matcher must handle apostrophe-ending Hausa phrase");
 });
