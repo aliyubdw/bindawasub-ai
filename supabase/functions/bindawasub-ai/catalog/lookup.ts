@@ -5,7 +5,7 @@ export function normalizeLookup(value:any){
 // Numeric data-size matching for the production catalog schema.
 // products.volume commonly stores only the unit ("GB"); the quantity is in product_name.
 function sizeInMb(value: unknown): number | null {
-  const match = String(value ?? "").toLowerCase().match(/(\\d+(?:\\.\\d+)?)\\s*(kb|mb|gb|tb)\\b/);
+  const match = String(value ?? "").toLowerCase().match(/(\d+(?:\.\d+)?)\s*(kb|mb|gb|tb)\b/);
   if (!match) return null;
   const amount = Number(match[1]);
   if (!Number.isFinite(amount)) return null;
