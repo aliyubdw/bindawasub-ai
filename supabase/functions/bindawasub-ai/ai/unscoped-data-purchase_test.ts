@@ -73,3 +73,18 @@ Deno.test("production routing source retains the safety guards", async () => {
   assert(telegram.includes("awaiting_data_confirmation"), "Telegram plan selection must continue to explicit confirmation");
   assert(telegram.includes("crypto.randomUUID()"), "Telegram confirmation must have a fresh transaction reference");
 });
+
+
+Deno.test("production-shaped catalog matches size from product_name, not unit-only volume", () => {
+  const plans = [
+    { id: "a", service_type: "data", product_name: "Airtel Social 1 GB", volume: "GB", service_networks: { code: "airtel", name: "Airtel" }, service_variants: { code: "social", name: "Social" } },
+    { id: "b", service_type: "data", product_name: "MTN SME 1 GB", volume: "GB", service_networks: { code: "mtn", name: "MTN" }, service_variants: { code: "smedata", name: "SME Data" } },
+    { id: "c", service_type: "data", product_name: "Airtel SME 10 GB", volume: "GB", service_networks: { code: "airtel", name: "Airtel" }, service_variants: { code: "smedata", name: "SME Data" } },
+    { id: "d", service_type: "data", product_name: "Airtel Gifting 1.5 GB", volume: "GB", service_networks: { code: "airtel", name: "Airtel" }, service_variants: { code: "gifting", name: "Gifting" } },
+  ];
+  const matches = filterCatalogBySpecification({ service_type: "data", volume: "1GB" }, plans);
+  assert(matches.length === 2, "1GB must match both 1 GB plans only");
+  assert(matches.some((p) => p.id === "a") && matches.some((p) => p.id === "b"), "expected the Airtel and MTN 1GB plans");
+  assert(!matches.some((p) => p.id === "c" || p.id === "d"), "1GB must not match 10GB or 1.5GB");
+  assert(productMatchesVolume({ product_name: "Plan 500 MB", volume: "MB" }, "0.5GB"), "equivalent sizes should match numerically");
+});
