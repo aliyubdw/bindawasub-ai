@@ -63,11 +63,17 @@ function showProducts(products, purchaseContext = null) {
       : firstProduct.service_networks?.name) ||
     "Data";
 
+  const networkNames = [...new Set(products.map(product =>
+    String(product.network_name || product.network ||
+      (Array.isArray(product.service_networks)
+        ? product.service_networks[0]?.name
+        : product.service_networks?.name) || "Network")
+  ))];
   const heading = document.createElement("div");
   heading.className = "product-list-heading";
   heading.innerHTML = `
     <span class="product-network-icon">📶</span>
-    <span><strong>${networkName} Data Plans</strong><small>Choose a package</small></span>
+    <span><strong>${networkNames.length > 1 ? "Matching Data Plans Across Networks" : networkName + " Data Plans"}</strong><small>Choose a network and data type</small></span>
   `;
   productList.appendChild(heading);
 
@@ -85,19 +91,23 @@ function showProducts(products, purchaseContext = null) {
         : product.service_variants?.name) ||
       "Other Data";
 
-    const variantKey = String(
-      product.variant ||
-      variantName
-    ).trim().toLowerCase();
+    const productNetwork = String(
+      product.network_name || product.network ||
+      (Array.isArray(product.service_networks)
+        ? product.service_networks[0]?.name
+        : product.service_networks?.name) || "Network"
+    ).trim();
+    const variantKey = String(product.variant || variantName).trim().toLowerCase();
+    const groupKey = productNetwork.toLowerCase() + "|" + variantKey;
 
-    if (!groups.has(variantKey)) {
-      groups.set(variantKey, {
-        name: String(variantName),
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        name: networkNames.length > 1 ? productNetwork + " — " + String(variantName) : String(variantName),
         products: []
       });
     }
 
-    groups.get(variantKey).products.push(product);
+    groups.get(groupKey).products.push(product);
   });
 
   groups.forEach(group => {
@@ -244,6 +254,7 @@ function showConfirmation() {
 `Ga bayanan sayayyarka:
 
 Network: ${BindawasubCustomerState.selectedProduct.network_name || BindawasubCustomerState.selectedProduct.network || (Array.isArray(BindawasubCustomerState.selectedProduct.service_networks) ? BindawasubCustomerState.selectedProduct.service_networks[0]?.name : BindawasubCustomerState.selectedProduct.service_networks?.name) || "—"}
+Data type: ${BindawasubCustomerState.selectedProduct.variant_name || BindawasubCustomerState.selectedProduct.variant || (Array.isArray(BindawasubCustomerState.selectedProduct.service_variants) ? BindawasubCustomerState.selectedProduct.service_variants[0]?.name : BindawasubCustomerState.selectedProduct.service_variants?.name) || "Not specified"}
 Plan: ${BindawasubCustomerState.selectedProduct.product_name}
 Validity: ${BindawasubCustomerState.selectedProduct.validity || BindawasubCustomerState.selectedProduct.duration || (BindawasubCustomerState.selectedProduct.validity_value && BindawasubCustomerState.selectedProduct.validity_unit ? BindawasubCustomerState.selectedProduct.validity_value + " " + BindawasubCustomerState.selectedProduct.validity_unit : "Not specified")}
 Farashi: ₦${Number(BindawasubCustomerState.selectedProduct.selling_price).toLocaleString()}
