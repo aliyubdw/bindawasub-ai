@@ -1,3 +1,5 @@
+import { parseDataSize, productMatchesSize } from "./size.ts";
+
 export function normalizeLookup(value:any){
   return String(value??"").toLowerCase().replace(/[^a-z0-9]+/g,"");
 }
@@ -22,7 +24,7 @@ export function resolveCatalogProduct(ai:any, products:any[]){
     const n=Array.isArray(p.service_networks)?p.service_networks[0]:p.service_networks;
     return normalizeLookup(n?.code)===network||normalizeLookup(n?.name)===network;
   });
-  if(volume)candidates=candidates.filter((p:any)=>normalizeLookup(p.volume)===volume);
+  if(volume)candidates=candidates.filter((p:any)=>parseDataSize(ai?.volume)?productMatchesSize(p,ai?.volume):normalizeLookup(p.volume)===volume);
   if(variant)candidates=candidates.filter((p:any)=>{
     const v=Array.isArray(p.service_variants)?p.service_variants[0]:p.service_variants;
     return normalizeLookup(v?.code)===variant||normalizeLookup(v?.name)===variant;
@@ -55,7 +57,7 @@ export function filterCatalogBySpecification(ai:any, products:any[]){
     const v=Array.isArray(p?.service_variants)?p.service_variants[0]:p?.service_variants;
     return normalizeLookup(v?.code)===requested.variant||normalizeLookup(v?.name)===requested.variant;
   });
-  if(requested.volume)candidates=candidates.filter((p:any)=>normalizeLookup(p?.volume)===requested.volume);
+  if(requested.volume)candidates=candidates.filter((p:any)=>parseDataSize(ai?.volume)?productMatchesSize(p,ai?.volume):normalizeLookup(p?.volume)===requested.volume);
   if(requested.product)candidates=candidates.filter((p:any)=>normalizeLookup(p?.product_name)===requested.product);
 
   return candidates;

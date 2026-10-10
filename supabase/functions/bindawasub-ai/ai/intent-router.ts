@@ -1,4 +1,4 @@
-import { formatCatalogProduct, productSpecification } from "../catalog/format.ts";
+import { describePlan, formatCatalogProduct, productSpecification } from "../catalog/format.ts";
 import { resolveCatalogProduct, filterCatalogBySpecification } from "../catalog/lookup.ts";
 import { getWalletBalance } from "../wallet/balance.ts";
 import { getCustomerTransactions } from "../transactions/handler.ts";
@@ -183,7 +183,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
                 ? (String(ai.language || "").toLowerCase() === "hausa"
                     ? "Na samu data plans masu girman da ka nema a networks daban-daban. Zaɓi network da plan ɗin da kake so."
                     : "I found matching data plans across available networks. Compare the network, validity and price, then choose your preferred plan.")
-                : (ai.reply || "I found more than one matching product. Please choose the network, data type, amount, or validity you want."),
+                : "I found more than one matching plan across networks or data types. Please tell me the network, for example: Buy 1GB MTN for 08012345678.",
               requires_confirmation:false,
               ai_powered:true
             }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
@@ -197,7 +197,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             products:[],
             customer_input:customerInput,
             missing_fields:missingFields,
-            answer:ai.reply || "That product is not currently available. Please choose an available product from the catalog.",
+            answer:"That product is not currently available. Please choose an available product from the catalog.",
             requires_confirmation:false,
             ai_powered:true
           }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
@@ -256,7 +256,9 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
           phone_number:ai.phone_number || customerInput.phone || null,
           network:ai.network || customerInput.network || null,
           volume:ai.volume || null,
-          answer:ai.reply || `You selected ${matchedProduct.product_name} for ₦${price.toLocaleString("en-NG")}. Please confirm before purchase.`,
+          answer:String(serviceType)==="data"
+            ? `Please confirm this purchase: ${describePlan(matchedProduct)} for ${ai.phone_number || customerInput.phone}. Reply YES to confirm or NO to cancel.`
+            : (ai.reply || `You selected ${matchedProduct.product_name} for ₦${price.toLocaleString("en-NG")}. Please confirm before purchase.`),
           requires_confirmation:true,
           ai_powered:true
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});

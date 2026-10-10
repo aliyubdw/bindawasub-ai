@@ -705,7 +705,7 @@ Deno.serve(async(req)=>{
     const walletBefore=Number(walletBeforeData?.[0]?.balance??0);
     const price=Number(context.price||0);
     await saveState("awaiting_data_confirmation",{...context,phone_number:normalizedPhone,wallet_before:walletBefore,price,idempotency_key:"TG-"+acct.user_id+"-"+crypto.randomUUID()});
-    await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+String(context.network_name||context.network_code||"—")+"\nPlan: "+String(context.product_name||context.volume||"Data plan")+"\nRecipient: "+normalizedPhone+"\nPrice: ₦"+price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+    await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+String(context.network_name||context.network_code||"—")+"\nData type: "+String(context.variant_name||"—")+"\nPlan: "+String(context.product_name||context.volume||"Data plan")+"\nValidity: "+String(context.validity||(context.validity_value?context.validity_value+" "+context.validity_unit:"—"))+"\nRecipient: "+normalizedPhone+"\nPrice: ₦"+price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
     return out({success:true,linked:true,state:"awaiting_data_confirmation"});
   }
 
@@ -1101,6 +1101,7 @@ Deno.serve(async(req)=>{
       volume:String(selected.volume||""),
       price:Number(selected.selling_price||0),
       variant_name:String(selected.variant_name||selected.variant||""),
+      validity:String(selected.validity||""),
       validity_type:String(selected.validity_type||""),
       validity_value:selected.validity_value??null,
       validity_unit:String(selected.validity_unit||""),
@@ -1111,11 +1112,11 @@ Deno.serve(async(req)=>{
       if(walletError) throw walletError;
       const walletBefore=Number(walletData?.[0]?.balance??0);
       await saveState("awaiting_data_confirmation",{...planContext,wallet_before:walletBefore,idempotency_key:"TG-"+acct.user_id+"-"+crypto.randomUUID()});
-      await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+planContext.network_name+"\nPlan: "+planContext.product_name+"\nRecipient: "+planContext.phone_number.replace(/^(\d{4})\d+(\d{3})$/,"$1****$2")+"\nPrice: ₦"+planContext.price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-planContext.price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+      await send(chatId,"📦 Confirm Data Purchase\n\nNetwork: "+planContext.network_name+"\nData type: "+(planContext.variant_name||"—")+"\nPlan: "+planContext.product_name+"\nValidity: "+(planContext.validity||(planContext.validity_value?planContext.validity_value+" "+planContext.validity_unit:"—"))+"\nRecipient: "+planContext.phone_number.replace(/^(\d{4})\d+(\d{3})$/,"$1****$2")+"\nPrice: ₦"+planContext.price.toLocaleString("en-NG")+"\nWallet balance: ₦"+walletBefore.toLocaleString("en-NG")+"\nAfter purchase: ₦"+Math.max(0,walletBefore-planContext.price).toLocaleString("en-NG")+"\n\nTap “✅ Confirm Purchase” to complete it.",false,{keyboard:[[{text:"✅ Confirm Purchase"},{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
       return out({success:true,linked:true,state:"awaiting_data_confirmation",product_id:productId});
     }
     await saveState("awaiting_data_recipient",planContext);
-    await send(chatId,"Selected: "+planContext.product_name+" — ₦"+planContext.price.toLocaleString("en-NG")+"\nNetwork: "+planContext.network_name+"\n\nWho should receive it? Send the phone number or use a saved contact name.",false,{keyboard:[[ {text:"↩️ Main Menu"} ]],resize_keyboard:true,is_persistent:false});
+    await send(chatId,"Selected: "+planContext.product_name+" — ₦"+planContext.price.toLocaleString("en-NG")+"\nNetwork: "+planContext.network_name+"\nData type: "+(planContext.variant_name||"—")+"\nValidity: "+(planContext.validity||"—")+"\n\nWho should receive it? Send the phone number or use a saved contact name.",false,{keyboard:[[ {text:"↩️ Main Menu"} ]],resize_keyboard:true,is_persistent:false});
     return out({success:true,linked:true,state:"awaiting_data_recipient",product_id:productId});
   }
 
@@ -1131,12 +1132,12 @@ Deno.serve(async(req)=>{
     }
     let aiPayload:any={user_id:acct.user_id,channel:"telegram",message:effectiveText};
     if (pendingConversationId) aiPayload.conversation_id = pendingConversationId;const amountOnly=String(effectiveText||"").trim().match(/^(?:₦\s*|NGN\s*|naira\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*$/i);if(amountOnly){const {data:latestConversation}=await db.from("ai_conversations").select("id").eq("user_id",acct.user_id).eq("channel","telegram").order("last_message_at",{ascending:false}).limit(1).maybeSingle();if(latestConversation?.id){const {data:recentUsers}=await db.from("ai_messages").select("message,created_at").eq("conversation_id",latestConversation.id).eq("role","user").order("created_at",{ascending:false}).limit(2);const previous=String(recentUsers?.[1]?.message||"").trim().toLowerCase();if(/\b(fund|funding|deposit|top ?up|add money|add funds)\b/.test(previous)&&/\b(wallet|money|fund|funding|deposit|top ?up)\b/.test(previous)){const amount=Number(String(amountOnly[1]).replace(/,/g,""));if(Number.isFinite(amount)&&amount>0){aiPayload.action="manual_funding_request";aiPayload.amount=amount}}}}const ai=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify(aiPayload)});const d=await ai.json().catch(()=>({}));if(!ai.ok){console.error("Telegram AI bridge:",{status:ai.status,error:d?.error||null});const msg=String(d?.error||"Bindawasub AI could not process that message right now.");const safe=/insufficient wallet balance|wallet not found|product not found|inactive|confirmation has expired|disabled|authentication|required/i.test(msg)?msg:"Bindawasub AI could not process that message right now.";await send(chatId,"❌ "+safe,true);return}if(d?.available===false){await send(chatId,String(d?.answer||"⚠️ The selected service is currently not available. Please try another service later."),true);return}
-  if(String(d?.intent||"").toLowerCase()==="purchase_intent"&&Array.isArray(d?.products)&&d.products.length>1){
+  if(String(d?.intent||"").toLowerCase()==="purchase_intent"&&Array.isArray(d?.products)&&d.products.length>=1){
     const choices=d.products;
     const lines=choices.map((p:any,i:number)=>{
       const network=p.network_name||p.network||"Network";
       const duration=p.validity||(p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+String(p.validity_unit):p.validity_type==="unlimited"?"Unlimited":""));
-      const details=[network,p.volume,duration].filter(Boolean).join(" • ");
+      const details=[network,p.variant_name||p.variant,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
     const keyboard=choices.map((_:any,i:number)=>[{text:String(i+1)}]).concat([[{text:"❌ Cancel"}],[{text:"↩️ Main Menu"}]]);

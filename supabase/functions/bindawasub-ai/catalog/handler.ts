@@ -31,7 +31,7 @@ export async function handleProductEnquiry({
     /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(originalMessage) &&
     /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
   const namesNetwork = /\b(?:mtn|airtel|glo|9mobile|t2)\b/i.test(originalMessage);
-  if (hasPurchaseVerbAndDataSize && !namesNetwork) return null;
+  if (hasPurchaseVerbAndDataSize) return null; // the purchase router resolves size, network and type
 
   if (
     shouldUseGeminiFirst ||

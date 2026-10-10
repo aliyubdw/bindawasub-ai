@@ -68,7 +68,7 @@ Deno.test("production routing source retains the safety guards", async () => {
   assert(router.includes("network: null, product_id: null, product_name: null"), "unscoped request must discard AI-guessed product/network");
   assert(router.includes("requires_confirmation:false"), "showing choices must not purchase");
   assert(index.includes("ai.network = null;") && index.includes("delete ai.customer_input.network;"), "index must clear guessed/inherited network");
-  assert(catalog.includes("if (hasPurchaseVerbAndDataSize && !namesNetwork) return null;"), "catalog enquiry must yield unscoped purchase to purchase router");
+  assert(catalog.includes("if (hasPurchaseVerbAndDataSize) return null;"), "catalog enquiry must yield unscoped purchase to purchase router");
   assert(telegram.includes("awaiting_natural_language_product_selection"), "Telegram must wait for a plan selection");
   assert(telegram.includes("awaiting_data_confirmation"), "Telegram plan selection must continue to explicit confirmation");
   assert(telegram.includes("crypto.randomUUID()"), "Telegram confirmation must have a fresh transaction reference");

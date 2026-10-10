@@ -4,6 +4,9 @@ import { formatCatalogProduct } from "./catalog/format.ts";
 import { normalizeCatalogToken } from "./catalog/list.ts";
 import { handleProductEnquiry } from "./catalog/handler.ts";
 import { handleDeterministicDataPriceQuery } from "./catalog/price.ts";
+import { filterEligibleDataProducts, loadEligibleDataProducts } from "./catalog/eligibility.ts";
+import { handleDataSizeRequest, handleSelectionFollowUp } from "./purchase/data-request.ts";
+import { classifyConfirmation } from "./purchase/request.ts";
 import { formatTransactionForAI } from "./transactions/format.ts";
 import { executeViaProviderExecution } from "./purchase/execution.ts";
 import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
@@ -259,8 +262,10 @@ Deno.serve(async (req) => {
     // CONFIRMATION OF A PENDING PURCHASE
     // ==========================================
 
-    const affirmativeConfirmation=/^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh)/i.test(originalMessage.trim());
-    const negativeConfirmation=/^(no|nope|cancel|stop|a'a|ba na so|kar a|kar a yi)/i.test(originalMessage.trim());
+    // Whole-message match only: "easy, buy 2GB Airtel" must never confirm an older pending purchase.
+    const confirmationKind=classifyConfirmation(originalMessage);
+    const affirmativeConfirmation=confirmationKind==="confirm";
+    const negativeConfirmation=confirmationKind==="cancel";
 
     if (conversationId && (affirmativeConfirmation || negativeConfirmation)) {
       const {data:pendingConversation,error:pendingError}=await supabase
@@ -388,12 +393,7 @@ Deno.serve(async (req) => {
     // GREETINGS
     // ==========================================
 
-    if (
-      message.includes("hello") ||
-      message.includes("hi") ||
-      message.includes("hey") ||
-      message.includes("sannu")
-    ) {
+    if (/\b(?:hello|hi|hey|sannu)\b/i.test(message) && !/\d/.test(message)) {
       return new Response(
         JSON.stringify({
           success: true,
@@ -436,6 +436,20 @@ Deno.serve(async (req) => {
 
     const shouldUseGeminiFirst =
       hasPhoneNumber && hasPurchaseLanguage;
+
+    // An open plan selection ("2", "airtel gifting", a phone number) is answered before the generic
+    // catalog enquiry, which would otherwise re-list every plan instead of narrowing the choices.
+    if (conversationContext?.pending_selection) {
+      try {
+        const selectionResponse = await handleSelectionFollowUp({
+          supabase, userId, channel, conversationId, conversationContext, originalMessage,
+          eligibleProducts: await loadEligibleDataProducts(supabase), corsHeaders, persistAssistantMessage,
+        });
+        if (selectionResponse) return selectionResponse;
+      } catch (selectionError) {
+        console.error("Plan selection follow-up failed:", selectionError);
+      }
+    }
 
     const productEnquiry = await handleProductEnquiry({
       supabase,
@@ -681,15 +695,32 @@ Deno.serve(async (req) => {
         await supabase
           .from("products")
           .select(
-            "id, sku, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, display_order, metadata, network_id, variant_id, service_networks(code,name), service_variants(code,name)"
+            "id, sku, service_type, product_name, volume, validity_value, validity_unit, validity_type, selling_price, display_order, metadata, network_id, variant_id, service_networks(code,name,active), service_variants(code,name,active)"
           )
           .eq("active", true)
           .order("selling_price", { ascending: true });
 
       if (aiProductsError) throw aiProductsError;
 
-      const activeProducts = aiProducts || [];
-      const aiDataProducts = activeProducts.filter((product:any) => String(product.service_type || "").toLowerCase() === "data");
+      // Only plans the customer could really buy right now are ever offered:
+      // active product + network + data type, with an active provider mapping.
+      const allActiveProducts = aiProducts || [];
+      let eligibleDataProducts: any[];
+      try {
+        eligibleDataProducts = await filterEligibleDataProducts(
+          supabase,
+          allActiveProducts.filter((product:any) => String(product.service_type || "").toLowerCase() === "data"),
+        );
+      } catch (eligibilityError) {
+        // Execution still re-validates the plan server-side, so fall back rather than block every reply.
+        console.error("Eligibility lookup failed; using active catalog:", eligibilityError);
+        eligibleDataProducts = allActiveProducts.filter((product:any) => String(product.service_type || "").toLowerCase() === "data");
+      }
+      const activeProducts = [
+        ...allActiveProducts.filter((product:any) => String(product.service_type || "").toLowerCase() !== "data"),
+        ...eligibleDataProducts,
+      ];
+      const aiDataProducts = eligibleDataProducts;
       const activeServiceTypes = new Set(activeProducts.map((product:any) => String(product.service_type || "").trim().toLowerCase()).filter(Boolean));
 
       // Data catalog filtering is deterministic. The AI must never receive
@@ -815,6 +846,16 @@ Deno.serve(async (req) => {
           quick_action: true,
         }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+
+      // Natural-language data purchases are resolved WITHOUT Gemini: size, recipient and any
+      // named network/type come only from this message (or a saved contact), and the options
+      // come only from the live eligible catalog. Nothing is selected or confirmed here.
+      const dataRequestContext = {
+        supabase, userId, channel, conversationId, conversationContext, originalMessage,
+        eligibleProducts: eligibleDataProducts, corsHeaders, persistAssistantMessage,
+      };
+      const dataSizeResponse = await handleDataSizeRequest(dataRequestContext);
+      if (dataSizeResponse) return dataSizeResponse;
 
       const ai = await classifyIntent({
         userMessage: originalMessage,
