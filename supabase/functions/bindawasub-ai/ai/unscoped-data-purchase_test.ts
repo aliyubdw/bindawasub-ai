@@ -86,5 +86,5 @@ Deno.test("production-shaped catalog matches size from product_name, not unit-on
   assert(matches.length === 2, "1GB must match both 1 GB plans only");
   assert(matches.some((p) => p.id === "a") && matches.some((p) => p.id === "b"), "expected the Airtel and MTN 1GB plans");
   assert(!matches.some((p) => p.id === "c" || p.id === "d"), "1GB must not match 10GB or 1.5GB");
-  assert(productMatchesVolume({ product_name: "Plan 500 MB", volume: "MB" }, "0.5GB"), "equivalent sizes should match numerically");
+  assert(productMatchesVolume({ product_name: "Plan 512 MB", volume: "MB" }, "0.5GB"), "equivalent sizes should match numerically");
 });
