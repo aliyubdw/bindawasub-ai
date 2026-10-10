@@ -2,6 +2,8 @@
 // These tests combine mock-catalog behavior checks with source guards.
 // They do not call Supabase, Telegram, or a vending provider.
 
+import { filterCatalogBySpecification, productMatchesVolume } from "../catalog/lookup.ts";
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -84,7 +86,7 @@ Deno.test("production-shaped catalog matches size from product_name, not unit-on
   ];
   const matches = filterCatalogBySpecification({ service_type: "data", volume: "1GB" }, plans);
   assert(matches.length === 2, "1GB must match both 1 GB plans only");
-  assert(matches.some((p) => p.id === "a") && matches.some((p) => p.id === "b"), "expected the Airtel and MTN 1GB plans");
-  assert(!matches.some((p) => p.id === "c" || p.id === "d"), "1GB must not match 10GB or 1.5GB");
+  assert(matches.some((p: any) => p.id === "a") && matches.some((p: any) => p.id === "b"), "expected the Airtel and MTN 1GB plans");
+  assert(!matches.some((p: any) => p.id === "c" || p.id === "d"), "1GB must not match 10GB or 1.5GB");
   assert(productMatchesVolume({ product_name: "Plan 512 MB", volume: "MB" }, "0.5GB"), "equivalent sizes should match numerically");
 });
