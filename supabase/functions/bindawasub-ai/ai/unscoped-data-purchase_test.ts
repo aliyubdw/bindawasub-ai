@@ -1,6 +1,8 @@
 // Regression tests for PR #24's unscoped data-plan routing.
-// These tests combine mock-catalog behavior checks with source guards.
+// These tests use mock catalog data and source guards only.
 // They do not call Supabase, Telegram, or a vending provider.
+import { filterCatalogBySpecification, productMatchesVolume, resolveCatalogProduct } from "../catalog/lookup.ts";
+import { isPurchaseConfirmationMessage } from "../router/confirmation.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -57,12 +59,45 @@ Deno.test("new unscoped request ignores previous MTN context", () => {
   assert(result.candidates.length === 4, "prior network must not filter the candidates");
 });
 
+
+const sizeCatalog = [
+  { id: "mtn-1", service_type: "data", product_name: "MTN SME 1GB", volume: "GB", service_networks: { code: "mtn", name: "MTN" } },
+  { id: "airtel-1", service_type: "data", product_name: "Airtel Social 1 GB", volume: "GB", service_networks: { code: "airtel", name: "Airtel" } },
+  { id: "airtel-10", service_type: "data", product_name: "Airtel SME 10GB", volume: "GB", service_networks: { code: "airtel", name: "Airtel" } },
+  { id: "airtel-15", service_type: "data", product_name: "Airtel SME 1.5GB", volume: "GB", service_networks: { code: "airtel", name: "Airtel" } },
+  { id: "glo-500", service_type: "data", product_name: "Glo 500MB", volume: "MB", service_networks: { code: "glo", name: "Glo" } },
+];
+
+Deno.test("catalog size matching handles formatting and avoids 1GB collisions", () => {
+  assert(productMatchesVolume(sizeCatalog[0], "1GB"), "1GB should match MTN plan");
+  assert(productMatchesVolume(sizeCatalog[1], "1 gb"), "spaced/case-insensitive size should match");
+  assert(productMatchesVolume(sizeCatalog[0], "1.0GB"), "equivalent decimal size should match");
+  assert(!productMatchesVolume(sizeCatalog[2], "1GB"), "1GB must not match 10GB");
+  assert(!productMatchesVolume(sizeCatalog[3], "1GB"), "1GB must not match 1.5GB");
+  assert(productMatchesVolume(sizeCatalog[4], "500MB"), "500MB should match Glo plan");
+  const matches = filterCatalogBySpecification({ service_type: "data", volume: "1GB" }, sizeCatalog);
+  assert(matches.length === 2, "filter should return only the two 1GB plans");
+  const resolved = resolveCatalogProduct({ service_type: "data", network: "MTN", volume: "1GB" }, sizeCatalog);
+  assert(resolved?.id === "mtn-1", "resolver should match 1GB from product_name when volume is only GB");
+});
+
+Deno.test("purchase confirmation routing recognizes English and Hausa answers", () => {
+  for (const phrase of ["yes", "YES", "no", "cancel", "a'a", "ba na so", "kar a yi"]) {
+    assert(isPurchaseConfirmationMessage(phrase), `should recognize confirmation/cancellation: ${phrase}`);
+  }
+  for (const phrase of ["yesterday", "nothing", "buy 1GB for Mom", "hello"]) {
+    assert(!isPurchaseConfirmationMessage(phrase), `should not classify ordinary text as confirmation: ${phrase}`);
+  }
+});
+
 Deno.test("production routing source retains the safety guards", async () => {
   const root = new URL("../../../../", import.meta.url);
   const router = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/ai/intent-router.ts", root));
   const index = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/index.ts", root));
   const catalog = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/catalog/handler.ts", root));
   const telegram = await Deno.readTextFile(new URL("supabase/functions/telegram-webhook/index.ts", root));
+  const actionRouter = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/router/action-router.ts", root));
+  const confirmation = await Deno.readTextFile(new URL("supabase/functions/bindawasub-ai/router/confirmation.ts", root));
 
   assert(router.includes("delete customerInput.network;"), "unscoped router must discard inherited network");
   assert(router.includes("network: null, product_id: null, product_name: null"), "unscoped request must discard AI-guessed product/network");
@@ -72,4 +107,6 @@ Deno.test("production routing source retains the safety guards", async () => {
   assert(telegram.includes("awaiting_natural_language_product_selection"), "Telegram must wait for a plan selection");
   assert(telegram.includes("awaiting_data_confirmation"), "Telegram plan selection must continue to explicit confirmation");
   assert(telegram.includes("crypto.randomUUID()"), "Telegram confirmation must have a fresh transaction reference");
+  assert(actionRouter.includes("isPurchaseConfirmationMessage(originalMessage)"), "action router must use tested confirmation matcher");
+  assert(confirmation.includes("(?:\\\\b|$)"), "confirmation matcher must handle apostrophe-ending Hausa phrase");
 });
