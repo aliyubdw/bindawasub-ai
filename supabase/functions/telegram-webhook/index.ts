@@ -1072,8 +1072,13 @@ Deno.serve(async(req)=>{
     if(targetName && !targetLooksLikePhone){
       const {data:savedTargets,error:savedTargetError}=await db.from("saved_beneficiaries").select("name,phone_number").eq("user_id",acct.user_id);
       if(savedTargetError) throw savedTargetError;
-      const target=savedTargets?.find((b:any)=>String(b.name||"").trim().toLowerCase()===targetName.toLowerCase());
-      if(target?.phone_number && targetMatch){
+      const matchingTargets=(savedTargets||[]).filter((b:any)=>String(b.name||"").trim().toLowerCase()===targetName.toLowerCase());
+      if(matchingTargets.length>1){
+        await send(chatId,"I found more than one saved contact named \""+targetName+"\". Please send the recipient's phone number so I don't send data to the wrong person.",true);
+        return out({success:true,linked:true,state:"idle",contact_ambiguous:true});
+      }
+      const target=matchingTargets.length===1?matchingTargets[0]:null;
+      if(target?.phone_number && /^0[789]\\d{9}$/.test(String(target.phone_number)) && targetMatch){
         effectiveText=String(effectiveText).slice(0,targetMatch.index||0)+targetMatch[0].replace(targetMatch[1],String(target.phone_number));
       }
     }
