@@ -197,7 +197,11 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             products:[],
             customer_input:customerInput,
             missing_fields:missingFields,
-            answer:ai.reply || "That product is not currently available. Please choose an available product from the catalog.",
+            answer:unscopedSizePurchase
+              ? (String(ai.language || "").toLowerCase() === "hausa"
+                  ? "Ban sami active data plan mai wannan girman ba a yanzu. A gwada wani girman daban."
+                  : "I couldn’t find an active data plan matching that size. Please try another size or ask to see available plans.")
+              : (ai.reply || "That product is not currently available. Please choose an available product from the catalog."),
             requires_confirmation:false,
             ai_powered:true
           }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
