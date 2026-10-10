@@ -259,8 +259,8 @@ Deno.serve(async (req) => {
     // CONFIRMATION OF A PENDING PURCHASE
     // ==========================================
 
-    const affirmativeConfirmation=/^(yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh)/i.test(originalMessage.trim());
-    const negativeConfirmation=/^(no|nope|cancel|stop|a'a|ba na so|kar a|kar a yi)/i.test(originalMessage.trim());
+    const affirmativeConfirmation=/^(?:yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh)[.!]?$/i.test(originalMessage.trim());
+    const negativeConfirmation=/^(?:no|nope|cancel|stop|a['’]a|ba na so|kar a(?: yi)?)[.!]?$/i.test(originalMessage.trim());
 
     if (conversationId && (affirmativeConfirmation || negativeConfirmation)) {
       const {data:pendingConversation,error:pendingError}=await supabase
