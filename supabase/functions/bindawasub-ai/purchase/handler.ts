@@ -125,17 +125,17 @@ const network = String(body.network || "").trim().toUpperCase();
         const confirmation = buildPurchaseConfirmation(finalizedTransaction, airtimePurchase, execution);
         const customerAnswer =
           confirmation.status === "successful"
-            ? "✅ Airtime purchase successful!\\n\\n" +
+            ? "✅ Airtime purchase successful!\n\n" +
               confirmation.description +
-              (confirmation.phone_number ? "\\nRecipient: " + confirmation.phone_number : "") +
-              "\\nAmount: ₦" + Number(confirmation.amount || 0).toLocaleString("en-NG") +
-              "\\nStatus: Successful" +
-              (confirmation.reference ? "\\nReference: " + confirmation.reference : "\\nReference: Pending")
+              (confirmation.phone_number ? "\nRecipient: " + confirmation.phone_number : "") +
+              "\nAmount: ₦" + Number(confirmation.amount || 0).toLocaleString("en-NG") +
+              "\nStatus: Successful" +
+              (confirmation.reference ? "\nReference: " + confirmation.reference : "\nReference: Pending")
             : confirmation.status === "failed"
               ? "❌ The airtime purchase failed. Your wallet has been refunded automatically." +
-                (confirmation.reference ? "\\nReference: " + confirmation.reference : "")
+                (confirmation.reference ? "\nReference: " + confirmation.reference : "")
               : "⏳ Your airtime purchase is still being processed. No second purchase will be sent while the provider result is being checked." +
-                (confirmation.reference ? "\\nReference: " + confirmation.reference : "");
+                (confirmation.reference ? "\nReference: " + confirmation.reference : "");
 
         await persistAssistantMessage(customerAnswer, "airtime_purchase", "backend");
         return new Response(JSON.stringify({
@@ -348,17 +348,17 @@ const productId = body.product_id;
         const confirmation = buildPurchaseConfirmation(finalizedTransaction, purchase, execution);
         const customerAnswer =
           confirmation.status === "successful"
-            ? "✅ Purchase successful!\\n\\n" +
+            ? "✅ Purchase successful!\n\n" +
               confirmation.description +
-              (confirmation.phone_number ? "\\nRecipient: " + confirmation.phone_number : "") +
-              "\\nAmount: ₦" + Number(confirmation.amount || 0).toLocaleString("en-NG") +
-              "\\nStatus: Successful" +
-              (confirmation.reference ? "\\nReference: " + confirmation.reference : "\\nReference: Pending")
+              (confirmation.phone_number ? "\nRecipient: " + confirmation.phone_number : "") +
+              "\nAmount: ₦" + Number(confirmation.amount || 0).toLocaleString("en-NG") +
+              "\nStatus: Successful" +
+              (confirmation.reference ? "\nReference: " + confirmation.reference : "\nReference: Pending")
             : confirmation.status === "failed"
               ? "❌ The purchase failed. Your wallet has been refunded automatically." +
-                (confirmation.reference ? "\\nReference: " + confirmation.reference : "")
+                (confirmation.reference ? "\nReference: " + confirmation.reference : "")
               : "⏳ Your purchase is still being processed. No second purchase will be sent while the provider result is being checked." +
-                (confirmation.reference ? "\\nReference: " + confirmation.reference : "");
+                (confirmation.reference ? "\nReference: " + confirmation.reference : "");
 
         await persistAssistantMessage(customerAnswer, "purchase", "backend");
         return new Response(JSON.stringify({
