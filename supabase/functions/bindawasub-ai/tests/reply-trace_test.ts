@@ -53,3 +53,11 @@ Deno.test("an action this function no longer handles returns a JSON error, not n
   const r = await send({ action: "fund_wallet" });
   eq([r.status, r.json.success], [400, false], "clear error instead of a failed request");
 });
+
+Deno.test("background calls such as funding-history polling are not saved as chat messages", async () => {
+  await boot(honestModel);
+  await send({ message: "hi" });
+  const before = assistantMessages().length;
+  for (let i = 0; i < 3; i++) await send({ action: "manual_funding_history" });
+  eq(assistantMessages().length, before, "polling saved nothing");
+});

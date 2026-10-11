@@ -218,6 +218,7 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
       if (conversationId) {
         await touchConversation(supabase, conversationId, userId, channel);
         await logAiMessage(supabase, conversationId, "user", originalMessage);
+        trace.isChatMessage = !!String(originalMessage || "").trim();
         await logAiActivity(
           supabase,
           userId,

@@ -6,15 +6,17 @@
 // final answer was not already saved during this request, it is saved here.
 import { logAiMessage } from "./state.ts";
 
-export type ReplyTrace = { supabase: any; conversationId: string | null; startedAt: string };
+export type ReplyTrace = { supabase: any; conversationId: string | null; startedAt: string; isChatMessage: boolean };
 
 export function createReplyTrace(): ReplyTrace {
-  return { supabase: null, conversationId: null, startedAt: new Date(Date.now() - 1000).toISOString() };
+  return { supabase: null, conversationId: null, startedAt: new Date(Date.now() - 1000).toISOString(), isChatMessage: false };
 }
 
 export async function recordFinalReply(response: Response, trace: ReplyTrace): Promise<void> {
   try {
-    if (!trace.supabase || !trace.conversationId) return;
+    // Only real chat turns are recorded. Background calls (for example the page polling funding
+    // history every few seconds) also return an `answer` and must not appear as chat messages.
+    if (!trace.isChatMessage || !trace.supabase || !trace.conversationId) return;
     if (!String(response.headers.get("Content-Type") || "").includes("application/json")) return;
     const body = await response.clone().json().catch(() => null);
     const answer = typeof body?.answer === "string" ? body.answer.trim() : "";
