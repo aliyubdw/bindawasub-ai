@@ -633,7 +633,7 @@ Deno.serve(async(req)=>{
       await send(chatId,"Recommendation cancelled. What would you like to do next?",true);
       return out({success:true,linked:true,state:"idle"});
     }
-    const match=String(text||"").trim().match(/^(?:option\\s*)?(\\d+)$/i);
+    const match=String(text||"").trim().match(/^(?:option\s*)?(\d+)$/i);
     const index=match?Number(match[1])-1:-1;
     const recs=Array.isArray(context?.recommendations)?context.recommendations:[];
     const selected=index>=0?recs[index]:null;
@@ -971,7 +971,7 @@ Deno.serve(async(req)=>{
     }
 
     const amountText=String(text||"").trim();
-    const amountValue=Number(amountText.replace(/^(?:₦|NGN|naira)\\s*/i,"").replace(/,/g,""));
+    const amountValue=Number(amountText.replace(/^(?:₦|NGN|naira)\s*/i,"").replace(/,/g,""));
     if(!Number.isFinite(amountValue)||amountValue<=0){
       await send(chatId,"Please enter a valid amount. Example: 5000",true);
       return out({success:true,linked:true,state:"awaiting_funding_amount"});

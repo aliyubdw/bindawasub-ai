@@ -63,10 +63,12 @@ Deno.serve(async (req) => {
       body?.user_id
     );
 
+    // CORS headers on auth failures: without them the browser reports a bare "Failed to fetch".
     const authResult = await authenticateRequest(
       req,
       supabase,
-      isInternalTelegramRequest
+      isInternalTelegramRequest,
+      corsHeaders
     );
 
     if (authResult instanceof Response) return authResult;
@@ -589,7 +591,7 @@ Deno.serve(async (req) => {
     const storedAirtimeAmount = Number(
       conversationContext?.airtime_amount ?? existingConversation?.pending_airtime_amount ?? 0
     );
-    const rawRecipient = String(originalMessage || "").trim().replace(/[\\s-]/g, "");
+    const rawRecipient = String(originalMessage || "").trim().replace(/[\s-]/g, "");
     const phoneMatch = rawRecipient.match(/^(?:0\d{10}|234\d{10})$/);
 
     if (
@@ -956,7 +958,7 @@ Deno.serve(async (req) => {
         }
         const dataPhoneMatch = String(originalMessage || "").match(/(?:\+234|234|0)\d{10}\b/);
         if (dataPhoneMatch) ai.phone_number = dataPhoneMatch[0];
-      } else if (activeAirtimeContext && !/\\bdata\\b/i.test(String(originalMessage || ""))) {
+      } else if (activeAirtimeContext && !/\bdata\b/i.test(String(originalMessage || ""))) {
         ai.intent = "airtime_purchase";
         ai.service_type = "airtime";
         ai.network = ai.network || conversationContext?.network || null;
@@ -972,9 +974,9 @@ Deno.serve(async (req) => {
           }
         }
       } else if (explicitAirtimeRequest) {
-        const airtimeNetworkMatch = String(originalMessage || "").match(/\\b(mtn|airtel|glo|9mobile|9mobile\\s*\\(\\s*t2\\s*\\)|t2)\\b/i);
+        const airtimeNetworkMatch = String(originalMessage || "").match(/\b(mtn|airtel|glo|9mobile|9mobile\s*\(\s*t2\s*\)|t2)\b/i);
         if (airtimeNetworkMatch) {
-          const rawNetwork = airtimeNetworkMatch[1].toLowerCase().replace(/\\s+/g, "");
+          const rawNetwork = airtimeNetworkMatch[1].toLowerCase().replace(/\s+/g, "");
           ai.network = rawNetwork === "t2" || rawNetwork.startsWith("9mobile") ? "9mobile" : rawNetwork;
         }
         ai.intent = "airtime_purchase";
@@ -989,7 +991,7 @@ Deno.serve(async (req) => {
         // The Bills selector sends the live service code in parentheses, so
         // adding a new active bill service automatically gets its own route.
         const explicitBillMatch = String(originalMessage || "").match(
-          /(?:pay for|pay|buy)\\s+(.+?)\\s*\\(([^)]+)\\)/i
+          /(?:pay for|pay|buy)\s+(.+?)\s*\(([^)]+)\)/i
         );
         if (explicitBillMatch) {
           const requestedServiceCode = String(explicitBillMatch[2] || "").trim().toLowerCase();
