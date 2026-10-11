@@ -22,6 +22,7 @@ function geminiResponse(obj: Row) {
 }
 
 export const telegramSent: { method: string; payload: any }[] = [];
+let recommendHandler: ((req: Request) => Promise<Response>) | null = null;
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: any, init?: any) => {
   const url = String(typeof input === "string" ? input : input?.url);
@@ -36,6 +37,7 @@ globalThis.fetch = (async (input: any, init?: any) => {
     return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
   }
   if (url.endsWith("/functions/v1/bindawasub-ai")) return await handler!(new Request(url, init)); // in-process
+  if (url.endsWith("/functions/v1/recommend-products") && recommendHandler) return await recommendHandler(new Request(url, init));
   // Anything else (provider-execution, Telegram, SMEPlug) is recorded and blocked.
   externalCalls.push({ url, body: init?.body ? safeParse(init.body) : null });
   return new Response(JSON.stringify({ success: false, error: "blocked by test harness" }), { status: 599 });
@@ -103,3 +105,18 @@ export async function tgSend(text: string) {
   return { status: res.status, json: await res.json().catch(() => ({})), texts: telegramSent.map((m) => String(m.payload?.text ?? "")) };
 }
 export const tgState = () => db.tables.telegram_conversation_states[0];
+
+// ---- recommend-products Edge Function, run in-process ----
+export async function loadRecommend() {
+  if (recommendHandler) return;
+  const previous = (Deno as any).serve;
+  (Deno as any).serve = (h: any) => { recommendHandler = h; return { finished: Promise.resolve(), shutdown() {} }; };
+  await import("../../../recommend-products/index.ts");
+  (Deno as any).serve = previous;
+}
+export async function callRecommend(body: Row, token = "mock-service-role") {
+  const res = await recommendHandler!(new Request("https://mock.supabase.test/functions/v1/recommend-products", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
+  }));
+  return { status: res.status, json: await res.json() };
+}
