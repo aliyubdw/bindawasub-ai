@@ -87,6 +87,37 @@ function rank(products: any[], strategy: Strategy): any[] {
   });
 }
 
+function validityLabel(p: any): string {
+  if (p?.validity_type === "unlimited") return "Unlimited";
+  const n = Number(p?.validity_value);
+  const unit = String(p?.validity_unit ?? "");
+  if (!Number.isFinite(n) || !unit) return "";
+  return n === 1 ? "1 " + unit.replace(/s$/i, "") : n + " " + unit;
+}
+
+// Eligible = product, network and data type active, with at least one active provider mapping
+// to an active provider. Mirrors catalog/eligibility.ts in the bindawasub-ai function.
+async function eligiblePlans(supabase: any, products: any[]): Promise<any[]> {
+  const one = (v: any) => (Array.isArray(v) ? v[0] : v);
+  const candidates = products.filter((p: any) =>
+    p?.active !== false && one(p?.service_networks)?.active !== false && one(p?.service_variants)?.active !== false);
+  if (!candidates.length) return [];
+  const { data: mappings, error: mappingError } = await supabase
+    .from("provider_plan_mappings").select("product_id,provider_id,active,provider_status")
+    .in("product_id", candidates.map((p: any) => p.id)).eq("active", true);
+  if (mappingError) throw mappingError;
+  const providerIds = Array.from(new Set((mappings ?? []).map((m: any) => m.provider_id)));
+  const { data: providers, error: providerError } = providerIds.length
+    ? await supabase.from("api_providers").select("id,status").in("id", providerIds)
+    : { data: [], error: null };
+  if (providerError) throw providerError;
+  const activeProviders = new Set((providers ?? []).filter((p: any) => String(p.status ?? "").toLowerCase() === "active").map((p: any) => p.id));
+  const executable = new Set((mappings ?? [])
+    .filter((m: any) => String(m.provider_status ?? "active").toLowerCase() === "active" && activeProviders.has(m.provider_id))
+    .map((m: any) => m.product_id));
+  return candidates.filter((p: any) => executable.has(p.id));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -126,15 +157,19 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabase
       .from("products")
-      .select("id,service_type,product_name,volume,selling_price,active,sku,validity_value,validity_unit,validity_type,network_id,service_networks(code,name)")
+      .select("id,service_type,product_name,volume,selling_price,active,sku,validity_value,validity_unit,validity_type,network_id,variant_id,service_networks(code,name,active),service_variants(code,name,active)")
       .eq("active", true)
       .eq("service_type", "data");
 
     if (error) throw error;
 
-    const all = (data ?? []).map((p: any) => {
+    // Only plans the customer could really buy right now are ever recommended. Failures here
+    // are not swallowed: a recommendation built on unchecked plans is worse than an error.
+    const eligible = await eligiblePlans(supabase, data ?? []);
+    const all = eligible.map((p: any) => {
       const n = Array.isArray(p.service_networks) ? p.service_networks[0] : p.service_networks;
-      return { ...p, network: n?.code ?? null, network_name: n?.name ?? null };
+      const v = Array.isArray(p.service_variants) ? p.service_variants[0] : p.service_variants;
+      return { ...p, network: n?.code ?? null, network_name: n?.name ?? null, variant: v?.code ?? null, variant_name: v?.name ?? null };
     });
 
     const scoped = network ? all.filter((p: any) => networkKey(p.network ?? p.network_name) === network) : all;
@@ -186,6 +221,10 @@ Deno.serve(async (req) => {
       volume: p.volume,
       network: p.network,
       network_name: p.network_name,
+      network_code: p.network,
+      variant: p.variant,
+      variant_name: p.variant_name,
+      validity: validityLabel(p),
       selling_price: Number(p.selling_price),
       validity_value: p.validity_value,
       validity_unit: p.validity_unit,

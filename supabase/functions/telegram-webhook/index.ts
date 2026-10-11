@@ -171,8 +171,8 @@ Deno.serve(async(req)=>{
     const selectedRecs=recs.slice(0,3);
     const lines=selectedRecs.map((p:any,i:number)=>{
       const network=p.network_name||p.network||"";
-      const duration=p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+p.validity_unit:p.validity_type==="unlimited"?"Unlimited":"");
-      const details=[network,p.volume,duration].filter(Boolean).join(" • ");
+      const duration=p.validity||p.duration||(p.validity_type==="fixed"&&p.validity_value&&p.validity_unit?String(p.validity_value)+" "+p.validity_unit:p.validity_type==="unlimited"?"Unlimited":"");
+      const details=[network,p.variant_name||p.variant,duration].filter(Boolean).join(" • ");
       return (i+1)+". "+(p.product_name||"Data plan")+" — ₦"+Number(p.selling_price||0).toLocaleString("en-NG")+(details?"\n   "+details:"");
     });
     await saveState("awaiting_recommendation_selection",{recommendations:selectedRecs,products:selectedRecs});
@@ -214,7 +214,7 @@ Deno.serve(async(req)=>{
           validity_value:selected.validity_value??null,
           validity_unit:selected.validity_unit||""
         });
-        await send(chatId,"Selected: "+String(selected.product_name||selected.volume||"Data plan")+" — ₦"+Number(selected.selling_price||0).toLocaleString("en-NG")+"\\n\\nWho should receive it? Send the recipient phone number (e.g. 08012345678).",false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
+        await send(chatId,"Selected: "+String(selected.product_name||selected.volume||"Data plan")+" — ₦"+Number(selected.selling_price||0).toLocaleString("en-NG")+"\n\nWho should receive it? Send the recipient phone number (e.g. 08012345678).",false,{keyboard:[[{text:"↩️ Main Menu"}]],resize_keyboard:true,is_persistent:false});
         return out({success:true,linked:true,state:"awaiting_data_recipient",product:selected});
       }
     }
