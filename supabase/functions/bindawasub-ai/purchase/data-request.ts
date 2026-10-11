@@ -39,7 +39,7 @@ const productVariant = (p: any) => [norm(one(p?.service_variants)?.code), norm(o
 const byPriceThenNetwork = (a: any, b: any) =>
   Number(a.selling_price) - Number(b.selling_price) || String(one(a.service_networks)?.name).localeCompare(String(one(b.service_networks)?.name));
 
-async function resolveContact(ctx: DataRequestContext): Promise<{ phone: string | null; ambiguous: string | null }> {
+export async function resolveSavedContact(ctx: Pick<DataRequestContext, "supabase" | "userId" | "originalMessage">): Promise<{ phone: string | null; ambiguous: string | null }> {
   const { data, error } = await ctx.supabase.from("saved_beneficiaries").select("name,phone_number").eq("user_id", ctx.userId);
   if (error) { console.error("Saved beneficiary lookup failed:", error); return { phone: null, ambiguous: null }; }
   const words = String(ctx.originalMessage || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -105,7 +105,7 @@ export async function handleDataSizeRequest(ctx: DataRequestContext): Promise<Re
 
   let phone = request.phone;
   if (!phone && !request.phoneInvalid) {
-    const contact = await resolveContact(ctx);
+    const contact = await resolveSavedContact(ctx);
     if (contact.ambiguous) {
       return reply(ctx, { products: [], missing_fields: ["phone"] },
         hausa ? `Kana da lambobi fiye da ɗaya mai suna ${contact.ambiguous}. Da fatan za ka aiko lambar kai tsaye.`

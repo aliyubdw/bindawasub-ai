@@ -5,8 +5,8 @@ import { normalizeCatalogToken } from "./catalog/list.ts";
 import { handleProductEnquiry } from "./catalog/handler.ts";
 import { handleDeterministicDataPriceQuery } from "./catalog/price.ts";
 import { filterEligibleDataProducts, loadEligibleDataProducts } from "./catalog/eligibility.ts";
-import { handleDataSizeRequest, handleSelectionFollowUp } from "./purchase/data-request.ts";
-import { classifyConfirmation } from "./purchase/request.ts";
+import { handleDataSizeRequest, handleSelectionFollowUp, resolveSavedContact } from "./purchase/data-request.ts";
+import { classifyConfirmation, parsePhone } from "./purchase/request.ts";
 import { formatTransactionForAI } from "./transactions/format.ts";
 import { executeViaProviderExecution } from "./purchase/execution.ts";
 import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
@@ -968,7 +968,8 @@ Deno.serve(async (req) => {
         ai.volume = null;
 
         const numericAmount = String(originalMessage || "").trim().match(/^(?:₦\s*|NGN\s*)?([0-9][0-9,]*(?:\.\d+)?)$/i);
-        if (numericAmount) {
+        // A bare phone number is a recipient, never an amount.
+        if (numericAmount && !parsePhone(String(originalMessage || "")).phone) {
           const parsedAmount = Number(numericAmount[1].replace(/,/g, ""));
           if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
             ai.amount = parsedAmount;
@@ -1018,6 +1019,24 @@ Deno.serve(async (req) => {
               : "You selected " + selectedService.name + ". Tell me the details you want to pay for.";
           }
         }
+      }
+      // Airtime recipient: only a number typed in THIS message, or a saved contact named in it.
+      // Gemini output and numbers from earlier turns (for example a data purchase) are never used.
+      // The one exception is a short follow-up inside an airtime conversation that is already
+      // underway, which may keep the recipient already chosen for that airtime request.
+      if (String(ai.intent || "").toLowerCase() === "airtime_purchase") {
+        const typedRecipient = parsePhone(String(originalMessage || "")).phone;
+        const contactRecipient = typedRecipient
+          ? null
+          : (await resolveSavedContact({ supabase, userId, originalMessage })).phone;
+        const continuedRecipient = activeAirtimeContext && !explicitAirtimeRequest
+          ? (parsePhone(String(conversationContext?.phone_number || "")).phone || null)
+          : null;
+        const airtimeRecipient = typedRecipient || contactRecipient || continuedRecipient || null;
+        ai.phone_number = airtimeRecipient;
+        const { phone: _modelPhone, ...otherInput } = (ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {}) as any;
+        ai.customer_input = airtimeRecipient ? { ...otherInput, phone: airtimeRecipient } : otherInput;
+        if (!airtimeRecipient) conversationContext = { ...(conversationContext || {}), phone_number: null };
       }
       ai.language = String(ai.language || "english").trim().toLowerCase();
       if (!["english", "hausa"].includes(ai.language)) ai.language = "english";
