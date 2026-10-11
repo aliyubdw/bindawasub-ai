@@ -608,6 +608,7 @@ Deno.serve(async (req) => {
       const nextContext = {
         ...(conversationContext || {}),
         last_intent: "airtime_purchase",
+        pending_selection: null,
         service_type: "airtime",
         network: storedAirtimeNetwork,
         airtime_amount: storedAirtimeAmount,
@@ -1032,6 +1033,7 @@ Deno.serve(async (req) => {
         const nextContext = {
           ...(conversationContext || {}),
           last_intent: ai.intent,
+          pending_selection: ai.intent === "purchase_intent" ? (conversationContext?.pending_selection ?? null) : null,
           language: ai.language,
           service_type: ai.service_type || conversationContext?.service_type || null,
           network: ai.network || conversationContext?.network || null,

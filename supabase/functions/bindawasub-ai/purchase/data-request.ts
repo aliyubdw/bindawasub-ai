@@ -161,6 +161,13 @@ export async function handleSelectionFollowUp(ctx: DataRequestContext): Promise<
   const sel = ctx.conversationContext?.pending_selection;
   if (!sel || !Array.isArray(sel.product_ids)) return null;
   const message = String(ctx.originalMessage || "").trim();
+  // The conversation moved on (for example to airtime): the old plan list is stale, so drop it
+  // instead of capturing an unrelated phone number or amount.
+  const activeService = String(ctx.conversationContext?.service_type || "").toLowerCase();
+  if (activeService && activeService !== "data") {
+    await savePending(ctx, {}, { pending_selection: null });
+    return null;
+  }
   const age = Date.now() - new Date(sel.created_at || 0).getTime();
   const expired = !Number.isFinite(age) || age > SELECTION_TTL_MS;
   const confirmation = classifyConfirmation(message);

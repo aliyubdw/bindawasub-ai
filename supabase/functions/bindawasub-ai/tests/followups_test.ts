@@ -82,3 +82,27 @@ Deno.test("Telegram: amount with a currency prefix and commas is accepted", asyn
   assert(!/valid amount/i.test(r.texts.join(" ")), `rejected a valid amount: ${r.texts.join(" | ")}`);
   void tgState; void mockPurchaseRpc;
 });
+
+Deno.test("an open data plan list does not capture a phone number meant for an airtime request", async () => {
+  const airtimeModel: ModelFn = (m) => /airtime/i.test(m)
+    ? { intent: "airtime_purchase", service_type: "airtime", network: "mtn", amount: 500 }
+    : { intent: "unknown" };
+  await boot(airtimeModel, { service_networks: [
+    { id: "an1", service_id: "svc-airtime", code: "MTN", name: "MTN", active: true },
+  ] });
+  await send({ message: `Buy 1GB for ${PHONE}` });                 // plan list is now open
+  await send({ message: "Buy 500 airtime" });                       // customer moves on to airtime
+  const r = await send({ message: "0806 743 6727" });               // number for the airtime request
+  assert(!/choose which plan/i.test(r.json.answer || ""), `data list hijacked the number: ${r.json.answer}`);
+  assert(/airtime/i.test(r.json.answer || ""), `expected the airtime flow, got: ${r.json.answer}`);
+  eq(purchaseRpcs().length, 0, "nothing bought");
+});
+
+Deno.test("a plan list still works when nothing else happened in between", async () => {
+  await boot(honestModel); mockPurchaseRpc();
+  await send({ message: "Buy 1GB" });                               // no recipient yet
+  await send({ message: PHONE });                                   // number arrives while the list is open
+  const r = await send({ message: "mtn" });
+  eq(r.json.requires_confirmation, true, "still reaches the confirmation summary");
+  eq(purchaseRpcs().length, 0, "nothing bought");
+});
