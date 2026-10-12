@@ -16,6 +16,7 @@ import { handleFundingHistory } from "../funding/history-handler.ts";
 import { handleWalletBalance } from "../wallet/balance-handler.ts";
 import { detectTransactionAction } from "../transactions/intent.ts";
 import { classifyConfirmation } from "../purchase/request.ts";
+import { detectAccountIntent } from "./account-intents.ts";
 
 export type ActionRouterContext = {
   supabase: any;
@@ -99,7 +100,10 @@ export async function routeExplicitAction(
   const balanceMessage = String(originalMessage || "").trim().toLowerCase();
   const asksForBalance = /^(?:what(?:'s| is)\s+(?:my\s+)?balance|check\s+(?:my\s+)?balance|show\s+(?:my\s+)?balance|my\s+balance|how\s+much\s+(?:do\s+)?i\s+have|nawa\s+ne\s+(?:kudin|money)\s+(?:na|a)\s+wallet(?:\s+ta)?|duba\s+balance)$/i.test(balanceMessage);
 
-  if (body.action === "wallet_balance" || asksForBalance) {
+  // Tolerant matching for how customers actually phrase these requests (see account-intents.ts).
+  const accountIntent = detectAccountIntent(originalMessage);
+
+  if (body.action === "wallet_balance" || asksForBalance || accountIntent === "wallet_balance") {
     return await handleWalletBalance(
       supabase,
       userId,
@@ -108,7 +112,8 @@ export async function routeExplicitAction(
       persistAssistantMessage,
     );
   }
-  const transactionAction = detectTransactionAction(originalMessage);
+  const transactionAction = detectTransactionAction(originalMessage)
+    ?? (accountIntent === "transaction_history" || accountIntent === "transaction_status" ? accountIntent : null);
   if (transactionAction) {
     return await handleTransactionActions(
       { supabase, userId, corsHeaders },
@@ -118,7 +123,7 @@ export async function routeExplicitAction(
 
   const fundingMessage = String(originalMessage || "").trim().toLowerCase();
   const asksHowToFund = /^(?:how\s+(?:do|can)\s+i\s+fund(?:\s+my)?\s+wallet|how\s+do\s+i\s+add\s+money(?:\s+to\s+my\s+wallet)?|how\s+can\s+i\s+add\s+money(?:\s+to\s+my\s+wallet)?|fund(?:\s+my)?\s+wallet|i\s+want\s+to\s+fund(?:\s+my)?\s+wallet|i\s+want\s+to\s+add\s+money(?:\s+to\s+my\s+wallet)?|ta\s+yaya\s+zan\s+yi\s+funding|yaya\s+zan\s+kara\s+kudi(?:\s+a\s+wallet)?|ina\s+son\s+na\s+sa\s+kudi(?:\s+a\s+wallet)?)$/i.test(fundingMessage);
-  if (asksHowToFund) {
+  if (asksHowToFund || accountIntent === "fund_howto") {
     return await handleFundingActions(
       { supabase, userId, isAdmin, corsHeaders, persistAssistantMessage },
       { ...body, action: "fund_wallet" },
