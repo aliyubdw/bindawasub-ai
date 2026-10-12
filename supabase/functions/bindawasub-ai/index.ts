@@ -20,6 +20,7 @@ import { jsonResponse } from "./ai/response.ts";
 import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
+import { createReplyTrace, recordFinalReply, type ReplyTrace } from "./conversation/reply-trace.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
 
 
@@ -31,7 +32,7 @@ const corsHeaders = {
 };
 
 
-Deno.serve(async (req) => {
+async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: corsHeaders,
@@ -209,12 +210,15 @@ Deno.serve(async (req) => {
       }
 
       conversationId = state.conversationId || null;
+      trace.supabase = supabase;
+      trace.conversationId = conversationId;
       conversationContext = state.conversationContext || {};
       existingConversation = state.existingConversation || null;
 
       if (conversationId) {
         await touchConversation(supabase, conversationId, userId, channel);
         await logAiMessage(supabase, conversationId, "user", originalMessage);
+        trace.isChatMessage = !!String(originalMessage || "").trim();
         await logAiActivity(
           supabase,
           userId,
@@ -1087,14 +1091,8 @@ Deno.serve(async (req) => {
       ]);
       if (!supportedIntents.has(ai.intent)) ai.intent = "unknown";
 
-      await logAiMessage(
-        supabase,
-        conversationId,
-        "assistant",
-        String(ai.reply || ""),
-        String(ai.intent || "other"),
-        "gemini"
-      );
+      // Gemini's draft is recorded as activity only; the reply the customer receives is saved
+      // by recordFinalReply() once the backend has routed the request.
       await logAiActivity(supabase, userId, conversationId, channel,
           
         "ai_response",
@@ -1104,7 +1102,7 @@ Deno.serve(async (req) => {
         true,
         null,
         null,
-        { ai_powered: true }
+        { ai_powered: true, draft: true }
       );
 
       const aiIntentResponse = await routeAiIntent({
@@ -1175,7 +1173,12 @@ Deno.serve(async (req) => {
     }
 
     } else {
-      // BillStack fund_wallet handler below.
+      // fund_wallet is no longer handled by this function. Answer with a clear JSON error instead of
+      // returning nothing, which made the browser report a bare "Failed to fetch".
+      return new Response(JSON.stringify({ success: false, error: "Unsupported action" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
   } catch (error) {
@@ -1198,4 +1201,11 @@ Deno.serve(async (req) => {
       }
     );
   }
+}
+
+Deno.serve(async (req) => {
+  const trace = createReplyTrace();
+  const response = await handleRequest(req, trace);
+  await recordFinalReply(response, trace);
+  return response;
 });

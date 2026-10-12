@@ -1,3 +1,4 @@
+import { answerWithCatalogPrices } from "./price-guard.ts";
 import { describePlan, formatCatalogProduct, productSpecification } from "../catalog/format.ts";
 import { resolveCatalogProduct, filterCatalogBySpecification } from "../catalog/lookup.ts";
 import { getWalletBalance } from "../wallet/balance.ts";
@@ -41,7 +42,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             success:true,
             intent:"product_price",
             product:formatCatalogProduct(matchedProduct),
-            answer:ai.reply || `${matchedProduct.product_name} is ₦${price.toLocaleString("en-NG")}.`,
+            answer:answerWithCatalogPrices(ai.reply,[matchedProduct],`${describePlan(matchedProduct)}.`),
             ai_powered:true
           }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
         }
@@ -49,7 +50,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
           success:true,
           intent:"product_price",
           products:(aiProducts || []).map(formatCatalogProduct),
-          answer:ai.reply || "Tell me the network and package you want the price for.",
+          answer:answerWithCatalogPrices(ai.reply,aiProducts||[],"Tell me the network and package you want the price for."),
           ai_powered:true
         }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
@@ -91,7 +92,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             network: requestedNetworkToken || null,
             variant: requestedVariantText || null,
             products: (aiProducts || []).map(formatCatalogProduct),
-            answer: ai.reply || "Here are the available plans.",
+            answer: answerWithCatalogPrices(ai.reply, aiProducts || [], "Here are the available plans."),
             ai_powered: true,
           }),
           {
@@ -212,7 +213,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
             product:matchedProduct,
             customer_input:customerInput,
             missing_fields:missingFields,
-            answer:ai.reply || `I found ${matchedProduct.product_name} for ₦${price.toLocaleString("en-NG")}. Please provide: ${missingFields.join(", ")}.`,
+            answer:answerWithCatalogPrices(ai.reply,[matchedProduct],`I found ${describePlan(matchedProduct)}. Please provide: ${missingFields.join(", ")}.`),
             requires_confirmation:false,
             ai_powered:true
           }), {status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});

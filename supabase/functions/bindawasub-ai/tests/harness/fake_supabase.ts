@@ -86,7 +86,7 @@ class Query {
       for (const r of list) {
         const existing = this.conflictKey ? rows.find((x) => x[this.conflictKey!] === r[this.conflictKey!]) : null;
         if (existing) { Object.assign(existing, r); inserted.push(existing); }
-        else { const row = { id: nextId(), ...r }; rows.push(row); inserted.push(row); }
+        else { const row = { id: nextId(), created_at: new Date().toISOString(), ...r }; rows.push(row); inserted.push(row); }
       }
       return this.finish(this.selectAfterWrite || this.wantSingle ? inserted : null);
     }
