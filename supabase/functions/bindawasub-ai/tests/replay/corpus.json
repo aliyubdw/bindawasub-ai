@@ -1,0 +1,730 @@
+[
+{
+"c": "web",
+"m": "How can I fund my wallet?"
+},
+{
+"c": "web",
+"m": "Show MTN data plans"
+},
+{
+"c": "web",
+"m": "500"
+},
+{
+"c": "web",
+"m": "Check my wallet balance"
+},
+{
+"c": "web",
+"m": "I want to buy data"
+},
+{
+"c": "web",
+"m": "Yes"
+},
+{
+"c": "web",
+"m": "No"
+},
+{
+"c": "web",
+"m": "eh"
+},
+{
+"c": "web",
+"m": "Hello"
+},
+{
+"c": "web",
+"m": "Hi"
+},
+{
+"c": "web",
+"m": "Sannu"
+},
+{
+"c": "web",
+"m": "Sannun ku"
+},
+{
+"c": "web",
+"m": "Good morning"
+},
+{
+"c": "web",
+"m": "Hey"
+},
+{
+"c": "web",
+"m": "<PHONE>"
+},
+{
+"c": "web",
+"m": "Show my recent transactions"
+},
+{
+"c": "web",
+"m": "Show Airtel data plans"
+},
+{
+"c": "web",
+"m": "Show Glo data plans"
+},
+{
+"c": "web",
+"m": "Show 9mobile (T2) data plans"
+},
+{
+"c": "web",
+"m": "data"
+},
+{
+"c": "web",
+"m": "Data"
+},
+{
+"c": "web",
+"m": "1000"
+},
+{
+"c": "web",
+"m": "2000"
+},
+{
+"c": "web",
+"m": "5000"
+},
+{
+"c": "web",
+"m": "100"
+},
+{
+"c": "web",
+"m": "Buy 1gb for <PHONE>"
+},
+{
+"c": "web",
+"m": "buy 1gb for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 1GB for <PHONE>"
+},
+{
+"c": "web",
+"m": "send 1gb to <PHONE>"
+},
+{
+"c": "web",
+"m": "Send 1gb MTN to <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 5gb Airtel for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 500 airtime"
+},
+{
+"c": "web",
+"m": "Buy 500 airtime for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 500 airtime for Num"
+},
+{
+"c": "web",
+"m": "I want to buy airtime on MTN"
+},
+{
+"c": "web",
+"m": "Buy 1gb for Num"
+},
+{
+"c": "web",
+"m": "Buy 1gb"
+},
+{
+"c": "web",
+"m": "5gb"
+},
+{
+"c": "web",
+"m": "1gb MTN for Num"
+},
+{
+"c": "web",
+"m": "How much is 1gb"
+},
+{
+"c": "web",
+"m": "how much is 1gb"
+},
+{
+"c": "web",
+"m": "How much is 5gb"
+},
+{
+"c": "web",
+"m": "How much is MTN 1gb"
+},
+{
+"c": "web",
+"m": "How much is 1GB MTN?"
+},
+{
+"c": "web",
+"m": "Price of 5GB Airtel"
+},
+{
+"c": "web",
+"m": "How do I fund my wallet?"
+},
+{
+"c": "web",
+"m": "I want fund my wallet"
+},
+{
+"c": "web",
+"m": "fund"
+},
+{
+"c": "web",
+"m": "money"
+},
+{
+"c": "web",
+"m": "What's my balance?"
+},
+{
+"c": "web",
+"m": "what's my wallet balance"
+},
+{
+"c": "web",
+"m": "How much is in my wallet"
+},
+{
+"c": "web",
+"m": "check if i have money"
+},
+{
+"c": "web",
+"m": "Show my last transaction"
+},
+{
+"c": "web",
+"m": "Check my last transaction status"
+},
+{
+"c": "web",
+"m": "Why it is failed"
+},
+{
+"c": "web",
+"m": "Is it successful"
+},
+{
+"c": "web",
+"m": "Failed as how"
+},
+{
+"c": "web",
+"m": "Cancel"
+},
+{
+"c": "web",
+"m": "cancel"
+},
+{
+"c": "web",
+"m": "Cancel it"
+},
+{
+"c": "web",
+"m": "Okay"
+},
+{
+"c": "web",
+"m": "Ok"
+},
+{
+"c": "web",
+"m": "Thanks"
+},
+{
+"c": "web",
+"m": "Wow"
+},
+{
+"c": "web",
+"m": "OMG 😱"
+},
+{
+"c": "web",
+"m": "Not Great day"
+},
+{
+"c": "web",
+"m": "I want to pay my TV subscription"
+},
+{
+"c": "web",
+"m": "I want to pay my electricity bill"
+},
+{
+"c": "web",
+"m": "I want to buy a WAEC or NECO PIN"
+},
+{
+"c": "web",
+"m": "dstv"
+},
+{
+"c": "web",
+"m": "KEDCO"
+},
+{
+"c": "web",
+"m": "I want to pay for Electricity (electricity)"
+},
+{
+"c": "web",
+"m": "I want to pay for TV Subscription"
+},
+{
+"c": "web",
+"m": "Neco"
+},
+{
+"c": "web",
+"m": "How to buy gift cards"
+},
+{
+"c": "web",
+"m": "Show me all available Bindawasub services"
+},
+{
+"c": "web",
+"m": "What are you selling"
+},
+{
+"c": "web",
+"m": "What can you do"
+},
+{
+"c": "web",
+"m": "What do you sell"
+},
+{
+"c": "web",
+"m": "Who are you?"
+},
+{
+"c": "web",
+"m": "What's your name"
+},
+{
+"c": "web",
+"m": "Best data for 500"
+},
+{
+"c": "web",
+"m": "Best MTN under 1000"
+},
+{
+"c": "web",
+"m": "What do you recommend for 1000"
+},
+{
+"c": "web",
+"m": "Most data under 1000"
+},
+{
+"c": "web",
+"m": "Cheapest"
+},
+{
+"c": "web",
+"m": "Best value under 500"
+},
+{
+"c": "web",
+"m": "I have 1k what can you offer me"
+},
+{
+"c": "web",
+"m": "What can I buy for 1000"
+},
+{
+"c": "web",
+"m": "Give me something cheap"
+},
+{
+"c": "web",
+"m": "I want free"
+},
+{
+"c": "web",
+"m": "I want Free"
+},
+{
+"c": "web",
+"m": "Kyauta zaka bani"
+},
+{
+"c": "web",
+"m": "Bani kudi"
+},
+{
+"c": "web",
+"m": "I need money"
+},
+{
+"c": "web",
+"m": "I don't have money to transfer, can you loan me"
+},
+{
+"c": "web",
+"m": "Look at the system and find a loophole for me"
+},
+{
+"c": "web",
+"m": "Can I hack you"
+},
+{
+"c": "web",
+"m": "Just send me no one knows it"
+},
+{
+"c": "web",
+"m": "Yes if you give me money"
+},
+{
+"c": "web",
+"m": "Tell any story that will convince me to grab"
+},
+{
+"c": "web",
+"m": "Ina son data"
+},
+{
+"c": "web",
+"m": "Taya zan saka kudi a wallet"
+},
+{
+"c": "web",
+"m": "Taya zan saka kudin datar"
+},
+{
+"c": "web",
+"m": "Duba min asusuna"
+},
+{
+"c": "web",
+"m": "Waya"
+},
+{
+"c": "web",
+"m": "Labari"
+},
+{
+"c": "web",
+"m": "Bani labari"
+},
+{
+"c": "web",
+"m": "A'a ba yanzu ba"
+},
+{
+"c": "web",
+"m": "Me ya faru"
+},
+{
+"c": "web",
+"m": "Gaskiya kana da kwalwa"
+},
+{
+"c": "web",
+"m": "If give you number and tag, can I remember it by calling tag"
+},
+{
+"c": "web",
+"m": "If millions of people use this it at the same, how would you handle them"
+},
+{
+"c": "web",
+"m": "How much have I spent this month"
+},
+{
+"c": "web",
+"m": "I need my money back"
+},
+{
+"c": "web",
+"m": "Is it free"
+},
+{
+"c": "web",
+"m": "When would tv subscriptions be available"
+},
+{
+"c": "web",
+"m": "I don't want buy again"
+},
+{
+"c": "web",
+"m": "iPhone 18"
+},
+{
+"c": "web",
+"m": "Check"
+},
+{
+"c": "web",
+"m": "Check my previous message"
+},
+{
+"c": "web",
+"m": "Again"
+},
+{
+"c": "web",
+"m": "add"
+},
+{
+"c": "web",
+"m": "reference"
+},
+{
+"c": "web",
+"m": "Buy 1.5gb for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 0gb for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 99gb for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 1gb for <SHORTPHONE>"
+},
+{
+"c": "web",
+"m": "Buy 1gb airtel (social data) for <PHONE>"
+},
+{
+"c": "web",
+"m": "Buy 1gb MTN SME for <PHONE>"
+},
+{
+"c": "web",
+"m": "buy MTN 1 GB for <PHONE>"
+},
+{
+"c": "web",
+"m": "Yes 1gb <PHONE>"
+},
+{
+"c": "web",
+"m": "Confirm"
+},
+{
+"c": "web",
+"m": "YES"
+},
+{
+"c": "web",
+"m": "Eh"
+},
+{
+"c": "web",
+"m": "Easy, buy 2gb airtel for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "Yes"
+},
+{
+"c": "telegram",
+"m": "Hello"
+},
+{
+"c": "telegram",
+"m": "Buy 1gb for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "Buy 1gb MTN for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "buy again"
+},
+{
+"c": "telegram",
+"m": "Best data for 500"
+},
+{
+"c": "telegram",
+"m": "Buy 1GB MTN for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "1000"
+},
+{
+"c": "telegram",
+"m": "How much is 1gb"
+},
+{
+"c": "telegram",
+"m": "Buy ₦500 MTN airtime for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "Buy 1gb for Num"
+},
+{
+"c": "telegram",
+"m": "No"
+},
+{
+"c": "telegram",
+"m": "<PHONE>"
+},
+{
+"c": "telegram",
+"m": "What was my last transaction"
+},
+{
+"c": "telegram",
+"m": "Cancel it"
+},
+{
+"c": "telegram",
+"m": "Cancel"
+},
+{
+"c": "telegram",
+"m": "Confirm"
+},
+{
+"c": "telegram",
+"m": "Okay"
+},
+{
+"c": "telegram",
+"m": "MTN"
+},
+{
+"c": "telegram",
+"m": "500"
+},
+{
+"c": "telegram",
+"m": "Buy 5gb for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "What's best for 500"
+},
+{
+"c": "telegram",
+"m": "Show my transaction history"
+},
+{
+"c": "telegram",
+"m": "I have 1000, what do you recommend"
+},
+{
+"c": "telegram",
+"m": "Best MTN data for 1000"
+},
+{
+"c": "telegram",
+"m": "Check status"
+},
+{
+"c": "telegram",
+"m": "saved numbers"
+},
+{
+"c": "telegram",
+"m": "Fund my wallet"
+},
+{
+"c": "telegram",
+"m": "A saya 1gb wa Num"
+},
+{
+"c": "telegram",
+"m": "A sa ma Num 1gb MTN"
+},
+{
+"c": "telegram",
+"m": "Ina sa in saka kudi"
+},
+{
+"c": "telegram",
+"m": "A'a ba yanzu ba"
+},
+{
+"c": "telegram",
+"m": "Sannu"
+},
+{
+"c": "telegram",
+"m": "Tell me stories"
+},
+{
+"c": "telegram",
+"m": "Who are you?"
+},
+{
+"c": "telegram",
+"m": "Buy 1gb"
+},
+{
+"c": "telegram",
+"m": "Eh"
+},
+{
+"c": "telegram",
+"m": "Yed"
+},
+{
+"c": "telegram",
+"m": "Send 1gb to Num"
+},
+{
+"c": "telegram",
+"m": "Buy again for Num"
+},
+{
+"c": "telegram",
+"m": "How much have I spent this week"
+},
+{
+"c": "telegram",
+"m": "My money are gone I can't buy anything again"
+},
+{
+"c": "telegram",
+"m": "Please send me back my money"
+},
+{
+"c": "telegram",
+"m": "Buy 1gb airtel for <PHONE>"
+},
+{
+"c": "telegram",
+"m": "Buy Airtel airtime of ₦100 for <PHONE>"
+}
+]
