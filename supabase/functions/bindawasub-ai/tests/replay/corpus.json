@@ -726,5 +726,9 @@
 {
 "c": "telegram",
 "m": "Buy Airtel airtime of ₦100 for <PHONE>"
+},
+{
+"c": "web",
+"m": "Ta ya zan saka kudi a wallet"
 }
 ]

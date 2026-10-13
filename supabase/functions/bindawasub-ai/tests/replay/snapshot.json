@@ -180,5 +180,6 @@
  "telegram|My money are gone I can't buy anything again": "-|replied",
  "telegram|Please send me back my money": "-|replied",
  "telegram|Buy 1gb airtel for <PHONE>": "awaiting_natural_language_product_selection|replied",
- "telegram|Buy Airtel airtime of ₦100 for <PHONE>": "-|replied"
+ "telegram|Buy Airtel airtime of ₦100 for <PHONE>": "-|replied",
+ "web|Ta ya zan saka kudi a wallet": "-|fund_wallet"
 }

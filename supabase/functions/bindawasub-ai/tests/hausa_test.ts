@@ -12,9 +12,12 @@ Deno.test("Hausa: confirmed balance and funding phrasings are recognised", () =>
   const cases: [string, string | null][] = [
     ["Duba min asusuna", "wallet_balance"], ["duba asusuna", "wallet_balance"],
     ["Taya zan saka kudi a wallet", "fund_howto"], ["Yaya zan saka kudi a wallet", "fund_howto"],
+    ["Ta ya zan saka kudi a wallet", "fund_howto"], ["Ta yaya zan saka kudi a wallet", "fund_howto"], ["ta ya ya zan saka kudi", "fund_howto"], // spaced spellings customers type
     ["Ina so in saka kudi", "fund_howto"], ["Ina so in saka kudi a wallet", "fund_howto"],
     ["Ina sa in saka kudi", "fund_howto"], // a typo real customers make
     ["Ina so in saka 5000 a wallet", null],  // an amount belongs to the funding flow
+    ["Ta ya zan saka 5000 a wallet", null],  // so does this
+    ["Ya zan saka kudi a wallet", null],      // too loose to trust
   ];
   const wrong = cases.filter(([m, want]) => detectAccountIntent(m) !== want).map(([m, w]) => `${m} (wanted ${w}, got ${detectAccountIntent(m)})`);
   eq(wrong, [], "Hausa phrasings");
@@ -74,4 +77,11 @@ Deno.test("Hausa data purchase for a saved contact lists plans and never buys", 
   const open = await send({ message: "A saya 1gb wa Mom" });
   assert(open.json.products.length > 1, "all networks listed when none named");
   eq(purchaseRpcs().length, 0, "nothing bought");
+});
+
+Deno.test("Hausa 'Ta ya zan saka kudi a wallet' is answered by the backend, not Gemini", async () => {
+  await boot(honestModel, { manual_funding_settings: [{ id: 1, active: true, bank_name: "Test Bank", account_name: "Mock Account", account_number: "0000000000", instructions: "Mock instructions." }] } as any);
+  const r = await send({ message: "Ta ya zan saka kudi a wallet" });
+  eq(r.json.intent, "fund_wallet", "funding instructions intent");
+  eq(geminiCalls.length, 0, "Gemini not consulted");
 });

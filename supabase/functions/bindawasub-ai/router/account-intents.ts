@@ -49,7 +49,7 @@ const FUND_PATTERNS: RegExp[] = [
   /^yaya zan kara kudi(?: a wallet)?$/,
   /^ina son na sa kudi(?: a wallet)?$/,
   // Confirmed Hausa phrasings. "ina sa in ..." is accepted too because customers really write it.
-  /^(?:taya|yaya|ta yaya) zan (?:saka|sa|kara) kudi(?: a (?:wallet|asusu(?:na)?))?$/,
+  /^(?:ta ?ya(?: ?ya)?|ya ?ya) zan (?:saka|sa|kara) kudi(?: a (?:wallet|asusu(?:na)?))?$/,
   /^ina (?:so|son|sa) (?:in|na) (?:saka|sa|kara) kudi(?: a (?:wallet|asusu(?:na)?))?$/,
 ];
 
