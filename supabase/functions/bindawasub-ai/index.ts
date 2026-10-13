@@ -20,6 +20,7 @@ import { jsonResponse } from "./ai/response.ts";
 import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
+import { handleCancelRequest } from "./account/cancel-handler.ts";
 import { createReplyTrace, recordFinalReply, type ReplyTrace } from "./conversation/reply-trace.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
 
@@ -343,6 +344,12 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
         }),{status:200,headers:{...corsHeaders,"Content-Type":"application/json"}});
       }
       }
+    }
+
+    // A plain "cancel" that no pending purchase claimed is answered by the backend, never by Gemini.
+    if (conversationId && !body.action) {
+      const cancelResponse = await handleCancelRequest({ supabase, userId, conversationId, conversationContext, originalMessage, corsHeaders });
+      if (cancelResponse) return cancelResponse;
     }
 
     // ==========================================
