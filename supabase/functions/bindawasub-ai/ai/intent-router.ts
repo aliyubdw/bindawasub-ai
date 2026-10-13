@@ -1,4 +1,5 @@
 import { answerWithCatalogPrices } from "./price-guard.ts";
+import { PURCHASE_VERB } from "../purchase/request.ts";
 import { describePlan, formatCatalogProduct, productSpecification } from "../catalog/format.ts";
 import { resolveCatalogProduct, filterCatalogBySpecification } from "../catalog/lookup.ts";
 import { getWalletBalance } from "../wallet/balance.ts";
@@ -113,7 +114,7 @@ export async function routeAiIntent(ctx: AiIntentRouterContext): Promise<Respons
         const requestedSize = String(originalMessage.match(/\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i)?.[0] || ai?.volume || "").trim();
         const unscopedSizePurchase =
           !explicitNetworkInMessage &&
-          /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(originalMessage) &&
+          PURCHASE_VERB.test(originalMessage) &&
           /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
         const literalVariant = /\bsme\b/i.test(originalMessage) ? "smedata"
           : /\bsocial\b/i.test(originalMessage) ? "social"

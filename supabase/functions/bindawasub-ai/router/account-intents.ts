@@ -34,6 +34,7 @@ const BALANCE_PATTERNS: RegExp[] = [
   // Hausa phrases that were already supported before this change
   /^nawa ne (?:kudin|money) (?:na|a) wallet(?: ta)?$/,
   /^duba balance$/,
+  /^duba (?:asusuna|asusun na|wallet(?: na| dina)?)$/,
 ];
 
 const FUND_PATTERNS: RegExp[] = [
@@ -47,6 +48,9 @@ const FUND_PATTERNS: RegExp[] = [
   /^ta yaya zan yi funding$/,
   /^yaya zan kara kudi(?: a wallet)?$/,
   /^ina son na sa kudi(?: a wallet)?$/,
+  // Confirmed Hausa phrasings. "ina sa in ..." is accepted too because customers really write it.
+  /^(?:taya|yaya|ta yaya) zan (?:saka|sa|kara) kudi(?: a (?:wallet|asusu(?:na)?))?$/,
+  /^ina (?:so|son|sa) (?:in|na) (?:saka|sa|kara) kudi(?: a (?:wallet|asusu(?:na)?))?$/,
 ];
 
 const HISTORY_PATTERNS: RegExp[] = [

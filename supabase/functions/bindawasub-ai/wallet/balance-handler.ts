@@ -6,9 +6,12 @@ export async function handleWalletBalance(
   corsHeaders: Record<string, string>,
   conversationId: string | null,
   persistAssistantMessage?: (...args: any[]) => Promise<void>,
+  language: "english" | "hausa" = "english",
 ) {
   const wallet = await getWalletBalance(supabase, userId);
-  const answer = `Your wallet balance is ₦${wallet.balance.toLocaleString()}.`;
+  const answer = language === "hausa"
+    ? `Kudin da ke wallet ɗinka ₦${wallet.balance.toLocaleString()} ne.`
+    : `Your wallet balance is ₦${wallet.balance.toLocaleString()}.`;
   if (persistAssistantMessage && conversationId) {
     await persistAssistantMessage(
       supabase,

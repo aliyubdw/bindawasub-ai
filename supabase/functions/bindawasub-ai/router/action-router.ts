@@ -17,6 +17,7 @@ import { handleWalletBalance } from "../wallet/balance-handler.ts";
 import { detectTransactionAction } from "../transactions/intent.ts";
 import { classifyConfirmation } from "../purchase/request.ts";
 import { detectAccountIntent } from "./account-intents.ts";
+import { looksHausa } from "./language.ts";
 
 export type ActionRouterContext = {
   supabase: any;
@@ -110,6 +111,7 @@ export async function routeExplicitAction(
       corsHeaders,
       conversationId,
       persistAssistantMessage,
+      looksHausa(originalMessage) ? "hausa" : "english",
     );
   }
   const transactionAction = detectTransactionAction(originalMessage)

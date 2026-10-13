@@ -7,10 +7,12 @@
 //     unsubmitted funding request (created in the last 30 minutes) is marked cancelled;
 //   - otherwise the open flow is cleared and the customer is told nothing was pending.
 // Only an explicit "cancel" counts. A bare "no" or "stop" never cancels a funding request.
+import { looksHausa } from "../router/language.ts";
+
 const WINDOW_MS = 30 * 60 * 1000;
 
 const CANCEL_RE =
-  /^(?:cancel|cancel (?:it|that|this|request|the request|my request|funding|the funding|the funding request|my funding request|payment|the payment|the transaction|my transaction))$/;
+  /^(?:cancel|cancel (?:it|that|this|request|the request|my request|funding|the funding|the funding request|my funding request|payment|the payment|the transaction|my transaction)|(?:a )?soke(?: shi| wannan)?|a'a ba yanzu ba|ba yanzu ba)$/;
 
 export function isExplicitCancel(message: string): boolean {
   const text = String(message || "")
@@ -95,5 +97,7 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
     pending_product_id: null, pending_phone_number: null, pending_at: null, pending_service_type: null,
     pending_airtime_amount: null, pending_network: null, pending_idempotency_key: null, pending_customer_input: {},
   }).eq("id", conversationId).eq("user_id", userId);
-  return reply(corsHeaders, "nothing_to_cancel", "Okay, cancelled. Nothing was pending and nothing was charged.");
+  return reply(corsHeaders, "nothing_to_cancel", looksHausa(ctx.originalMessage)
+    ? "To, an soke. Babu abin da ke jiran aiki kuma ba a cire kuɗi ba."
+    : "Okay, cancelled. Nothing was pending and nothing was charged.");
 }

@@ -1,4 +1,5 @@
 import { getActiveDataCatalog, normalizeCatalogToken } from "./list.ts";
+import { PURCHASE_VERB } from "../purchase/request.ts";
 
 function response(data: any, corsHeaders: Record<string, string>) {
   return new Response(JSON.stringify(data), {
@@ -28,7 +29,7 @@ export async function handleProductEnquiry({
   if (isPriceQuery) return null;
 
   const hasPurchaseVerbAndDataSize =
-    /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(originalMessage) &&
+    PURCHASE_VERB.test(originalMessage) &&
     /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
   const namesNetwork = /\b(?:mtn|airtel|glo|9mobile|t2)\b/i.test(originalMessage);
   if (hasPurchaseVerbAndDataSize) return null; // the purchase router resolves size, network and type
