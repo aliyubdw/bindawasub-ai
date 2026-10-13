@@ -172,11 +172,12 @@ export async function handleSelectionFollowUp(ctx: DataRequestContext): Promise<
   const expired = !Number.isFinite(age) || age > SELECTION_TTL_MS;
   const confirmation = classifyConfirmation(message);
 
+  // A list older than the window is forgotten first: it must not answer "cancel" (or anything else).
+  if (expired) { await savePending(ctx, {}, { pending_selection: null }); return null; }
   if (confirmation === "cancel") {
     await savePending(ctx, NO_PENDING, { pending_selection: null });
     return reply(ctx, { products: [], cancelled: true }, "Okay, I cancelled that request. No money was deducted.");
   }
-  if (expired) { await savePending(ctx, {}, { pending_selection: null }); return null; }
   if (confirmation === "confirm") return null; // nothing chosen yet, so nothing to confirm
   if (parseDataPurchaseRequest(message).isDataPurchase) return null; // a new request, handled elsewhere
 

@@ -44,7 +44,9 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
   const { supabase, userId, conversationId, corsHeaders } = ctx;
   if (!isExplicitCancel(ctx.originalMessage)) return null;
   // An open plan list has its own cancel handling.
-  if (ctx.conversationContext?.pending_selection) return null;
+  const selection = ctx.conversationContext?.pending_selection;
+  const selectionAge = Date.now() - new Date(selection?.created_at || 0).getTime();
+  if (selection && Number.isFinite(selectionAge) && selectionAge <= 15 * 60 * 1000) return null;
 
   const { data: lastReply } = await supabase
     .from("ai_messages")
@@ -77,6 +79,11 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
         .eq("status", "pending") // never overwrite a request that moved on in the meantime
         .select("id");
       if ((updated || []).length) {
+        if (ctx.conversationContext?.pending_selection) {
+          await supabase.from("ai_conversations")
+            .update({ conversation_context: { ...ctx.conversationContext, pending_selection: null } })
+            .eq("id", conversationId).eq("user_id", userId);
+        }
         const { data: others } = await supabase
           .from("manual_funding_requests").select("id").eq("user_id", userId).eq("status", "pending");
         const n = (others || []).length;
