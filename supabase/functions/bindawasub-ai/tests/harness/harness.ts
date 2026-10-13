@@ -79,8 +79,9 @@ export function mockPurchaseRpc() {
 
 // ---- Telegram webhook, run in-process against the same fake database ----
 let tgHandler: ((req: Request) => Promise<Response>) | null = null;
-export async function bootTelegram(model: ModelFn) {
+export async function bootTelegram(model: ModelFn, extraSeed: Record<string, Row[]> = {}) {
   await boot(model, {
+    ...extraSeed,
     telegram_accounts: [{ id: "ta1", user_id: "user-1", telegram_user_id: 111, telegram_chat_id: 111, active: true }],
     telegram_conversation_states: [],
   });

@@ -224,7 +224,7 @@ Deno.serve(async(req)=>{
   const lowWalletThreshold=1000;
   const criticalWalletThreshold=500;
   const walletWarning=(balance:number)=>balance<criticalWalletThreshold?"⚠️ Your wallet balance is ₦"+balance.toLocaleString("en-NG")+". You may need to fund your wallet before your next purchase.":balance<lowWalletThreshold?"⚠️ Your wallet balance is ₦"+balance.toLocaleString("en-NG")+". Consider funding your wallet before your next purchase.":"";
-  const cancelRequest=/^(cancel|stop|quit|no|never mind|forget it|a'a|a'a ba)$/i.test(text);
+  const cancelRequest=/^(?:❌\s*)?(cancel|stop|quit|no|never mind|forget it|a'a|a'a ba|soke|a soke|a'a ba yanzu ba|ba yanzu ba)$/i.test(text);
   if(text==="↩️ Main Menu"){
     await clearState();
     await send(chatId,"Returned to the main menu. What would you like to do next?",true);
@@ -1148,6 +1148,13 @@ Deno.serve(async(req)=>{
     const intro=String(d.answer||"I found several matching data plans. Choose the one you want.");
     await send(chatId,intro+"\n\n📦 Available matching plans\n\n"+lines.join("\n\n")+"\n\nChoose a plan number to continue.",false,{keyboard,resize_keyboard:true,is_persistent:false});
     return out({success:true,linked:true,state:"awaiting_natural_language_product_selection",options:choices.length});
+  }
+  // The backend recognised a funding question (in any language) and is asking for the amount: enter the
+  // same amount step the English keyword path uses, so the customer's next message ("500") is an amount.
+  if(String(d?.intent||"").toLowerCase()==="fund_wallet"&&d?.requires_amount===true){
+    await saveState("awaiting_funding_amount",{});
+    await send(chatId,"💰 Wallet Funding\n\nHow much would you like to add to your wallet?\n\nExample: 5000",true);
+    return out({success:true,linked:true,state:"awaiting_funding_amount"});
   }
   let aiAnswer=String(d?.answer||"").trim();
   if(String(d?.intent||"").toLowerCase()==="transaction_history"&&Array.isArray(d?.transactions)){
