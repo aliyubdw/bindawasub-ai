@@ -5,6 +5,7 @@
 // context (network, product, phone, volume) are never consulted, so nothing can be
 // invented, and no money moves: this module only lists options or records a pending
 // confirmation that still needs an explicit "yes" (or a confirm tap) from the customer.
+import { looksHausa } from "../router/language.ts";
 import { describePlan, productSpecification } from "../catalog/format.ts";
 import { productSize, sameSize } from "../catalog/size.ts";
 import { classifyConfirmation, normalizeNigerianPhone, parseDataPurchaseRequest, parseNetwork, parsePhone, parseVariant } from "./request.ts";
@@ -25,8 +26,7 @@ export type DataRequestContext = {
   persistAssistantMessage: (...args: any[]) => Promise<void>;
 };
 
-const isHausa = (message: string) =>
-  /\b(?:saya|sayi|siyo|siya|oda|aika|kunna|ina son|zan saya|zan siye)\b/i.test(message);
+const isHausa = (message: string) => looksHausa(message);
 
 function reply(ctx: DataRequestContext, body: Record<string, unknown>, answer: string) {
   return ctx.persistAssistantMessage(ctx.supabase, ctx.conversationId, answer, "purchase_intent", "backend").then(() =>
@@ -172,11 +172,12 @@ export async function handleSelectionFollowUp(ctx: DataRequestContext): Promise<
   const expired = !Number.isFinite(age) || age > SELECTION_TTL_MS;
   const confirmation = classifyConfirmation(message);
 
+  // A list older than the window is forgotten first: it must not answer "cancel" (or anything else).
+  if (expired) { await savePending(ctx, {}, { pending_selection: null }); return null; }
   if (confirmation === "cancel") {
     await savePending(ctx, NO_PENDING, { pending_selection: null });
     return reply(ctx, { products: [], cancelled: true }, "Okay, I cancelled that request. No money was deducted.");
   }
-  if (expired) { await savePending(ctx, {}, { pending_selection: null }); return null; }
   if (confirmation === "confirm") return null; // nothing chosen yet, so nothing to confirm
   if (parseDataPurchaseRequest(message).isDataPurchase) return null; // a new request, handled elsewhere
 

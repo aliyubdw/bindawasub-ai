@@ -7,10 +7,12 @@
 //     unsubmitted funding request (created in the last 30 minutes) is marked cancelled;
 //   - otherwise the open flow is cleared and the customer is told nothing was pending.
 // Only an explicit "cancel" counts. A bare "no" or "stop" never cancels a funding request.
+import { looksHausa } from "../router/language.ts";
+
 const WINDOW_MS = 30 * 60 * 1000;
 
 const CANCEL_RE =
-  /^(?:cancel|cancel (?:it|that|this|request|the request|my request|funding|the funding|the funding request|my funding request|payment|the payment|the transaction|my transaction))$/;
+  /^(?:cancel|cancel (?:it|that|this|request|the request|my request|funding|the funding|the funding request|my funding request|payment|the payment|the transaction|my transaction)|(?:a )?soke(?: shi| wannan)?|a'a ba yanzu ba|ba yanzu ba)$/;
 
 export function isExplicitCancel(message: string): boolean {
   const text = String(message || "")
@@ -42,7 +44,9 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
   const { supabase, userId, conversationId, corsHeaders } = ctx;
   if (!isExplicitCancel(ctx.originalMessage)) return null;
   // An open plan list has its own cancel handling.
-  if (ctx.conversationContext?.pending_selection) return null;
+  const selection = ctx.conversationContext?.pending_selection;
+  const selectionAge = Date.now() - new Date(selection?.created_at || 0).getTime();
+  if (selection && Number.isFinite(selectionAge) && selectionAge <= 15 * 60 * 1000) return null;
 
   const { data: lastReply } = await supabase
     .from("ai_messages")
@@ -75,6 +79,11 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
         .eq("status", "pending") // never overwrite a request that moved on in the meantime
         .select("id");
       if ((updated || []).length) {
+        if (ctx.conversationContext?.pending_selection) {
+          await supabase.from("ai_conversations")
+            .update({ conversation_context: { ...ctx.conversationContext, pending_selection: null } })
+            .eq("id", conversationId).eq("user_id", userId);
+        }
         const { data: others } = await supabase
           .from("manual_funding_requests").select("id").eq("user_id", userId).eq("status", "pending");
         const n = (others || []).length;
@@ -95,5 +104,7 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
     pending_product_id: null, pending_phone_number: null, pending_at: null, pending_service_type: null,
     pending_airtime_amount: null, pending_network: null, pending_idempotency_key: null, pending_customer_input: {},
   }).eq("id", conversationId).eq("user_id", userId);
-  return reply(corsHeaders, "nothing_to_cancel", "Okay, cancelled. Nothing was pending and nothing was charged.");
+  return reply(corsHeaders, "nothing_to_cancel", looksHausa(ctx.originalMessage)
+    ? "To, an soke. Babu abin da ke jiran aiki kuma ba a cire kuɗi ba."
+    : "Okay, cancelled. Nothing was pending and nothing was charged.");
 }

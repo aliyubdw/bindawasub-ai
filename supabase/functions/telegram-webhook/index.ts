@@ -224,7 +224,7 @@ Deno.serve(async(req)=>{
   const lowWalletThreshold=1000;
   const criticalWalletThreshold=500;
   const walletWarning=(balance:number)=>balance<criticalWalletThreshold?"⚠️ Your wallet balance is ₦"+balance.toLocaleString("en-NG")+". You may need to fund your wallet before your next purchase.":balance<lowWalletThreshold?"⚠️ Your wallet balance is ₦"+balance.toLocaleString("en-NG")+". Consider funding your wallet before your next purchase.":"";
-  const cancelRequest=/^(cancel|stop|quit|no|never mind|forget it|a'a|a'a ba)$/i.test(text);
+  const cancelRequest=/^(?:❌\s*)?(cancel|stop|quit|no|never mind|forget it|a'a|a'a ba|soke|a soke|a'a ba yanzu ba|ba yanzu ba)$/i.test(text);
   if(text==="↩️ Main Menu"){
     await clearState();
     await send(chatId,"Returned to the main menu. What would you like to do next?",true);
@@ -1036,7 +1036,18 @@ Deno.serve(async(req)=>{
   }
 
   if(state==="awaiting_funding_reference"){
-    if(cancelRequest){await clearState();await send(chatId,"Funding request remains pending. No payment reference was submitted.",true);return out({success:true,linked:true,state:"idle"})}
+    if(cancelRequest){
+      // Cancel the customer's own request for real, instead of leaving it pending.
+      const cancelRequestId=String(context.request_id||"").trim();
+      let cancelMessage="Funding request remains pending. No payment reference was submitted.";
+      if(cancelRequestId){
+        const cr=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify({user_id:acct.user_id,channel:"telegram",action:"manual_funding_cancel",request_id:cancelRequestId})});
+        const cd=await cr.json().catch(()=>({}));
+        if(cr.ok&&cd?.success!==false)cancelMessage=String(cd?.answer||"Your funding request has been cancelled. No money was added to your wallet.");
+        else if(cd?.error)cancelMessage=String(cd.error);
+      }
+      await clearState();await send(chatId,cancelMessage,true);return out({success:true,linked:true,state:"idle"});
+    }
     const requestId=String(context.request_id||"").trim();if(!requestId){await clearState();await send(chatId,"Your funding session expired. Please tap Fund Wallet to start again.",true);return out({success:true,linked:true,state:"idle"})}
     const sessionId=String(text||"").replace(/\s+/g,"").trim();
     if(!/^\d{30}$/.test(sessionId)){await send(chatId,"❌ Invalid Moniepoint Session ID.\n\nPlease send the exact 30-digit Session ID from your Moniepoint transfer receipt.\n\nCustomer Care: @Aliyubdw",true);return out({success:false,linked:true,state:"awaiting_funding_reference",error:"invalid_moniepoint_session_id"})}
@@ -1148,6 +1159,13 @@ Deno.serve(async(req)=>{
     const intro=String(d.answer||"I found several matching data plans. Choose the one you want.");
     await send(chatId,intro+"\n\n📦 Available matching plans\n\n"+lines.join("\n\n")+"\n\nChoose a plan number to continue.",false,{keyboard,resize_keyboard:true,is_persistent:false});
     return out({success:true,linked:true,state:"awaiting_natural_language_product_selection",options:choices.length});
+  }
+  // The backend recognised a funding question (in any language) and is asking for the amount: enter the
+  // same amount step the English keyword path uses, so the customer's next message ("500") is an amount.
+  if(String(d?.intent||"").toLowerCase()==="fund_wallet"&&d?.requires_amount===true){
+    await saveState("awaiting_funding_amount",{});
+    await send(chatId,"💰 Wallet Funding\n\nHow much would you like to add to your wallet?\n\nExample: 5000",true);
+    return out({success:true,linked:true,state:"awaiting_funding_amount"});
   }
   let aiAnswer=String(d?.answer||"").trim();
   if(String(d?.intent||"").toLowerCase()==="transaction_history"&&Array.isArray(d?.transactions)){

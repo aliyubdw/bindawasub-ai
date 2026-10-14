@@ -1,4 +1,5 @@
 // Phase 3 purchase handlers. These remain inside the same public Edge Function.
+import { clearPendingSelection } from "./selection-clear.ts";
 // Provider execution remains delegated to provider-execution.
 
 export type PurchaseContext = {
@@ -172,6 +173,7 @@ const network = String(body.network || "").trim().toUpperCase();
 }
 
 export async function handleDataPurchase(ctx: PurchaseContext): Promise<Response> {
+  await clearPendingSelection(ctx.supabase, ctx.userId, ctx.channel, ctx.conversationId);
   const { body, supabase, userId, channel, conversationId, aiConfig, originalMessage, corsHeaders, executeViaProviderExecution, loadCustomerTransaction, buildPurchaseConfirmation, persistAssistantMessage, logAiActivity } = ctx;
 
 const productId = body.product_id;

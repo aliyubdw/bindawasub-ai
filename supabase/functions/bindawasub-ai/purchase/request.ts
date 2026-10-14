@@ -4,7 +4,7 @@
 import { parseDataSize, type DataSize } from "../catalog/size.ts";
 
 export const PURCHASE_VERB =
-  /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i;
+  /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna|a sa|sa ma)\b/i;
 const DATA_SIZE = /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i;
 
 export type DataPurchaseRequest = {
@@ -62,7 +62,7 @@ export function parseDataPurchaseRequest(message: string): DataPurchaseRequest {
 const CONFIRM_RE =
   /^(?:yes|yeah|yep|ok|okay|confirm|confirmed|proceed|go ahead|do it|eh|e|naam|toh|tabbatar)(?:[\s,.!]+(?:please|pls|now|abeg|confirm|confirmed|yes))?[\s.!]*$/i;
 const CANCEL_RE =
-  /^(?:no|nope|nah|cancel|stop|a'a|ba na so|kar a yi|kar a)(?![a-z0-9])/i;
+  /^(?:no|nope|nah|cancel|stop|a'a|ba na so|kar a yi|kar a|a soke|soke)(?![a-z0-9])/i;
 
 export function classifyConfirmation(text: string): "confirm" | "cancel" | null {
   const value = String(text || "").trim();

@@ -6,7 +6,7 @@ import { handleProductEnquiry } from "./catalog/handler.ts";
 import { handleDeterministicDataPriceQuery } from "./catalog/price.ts";
 import { filterEligibleDataProducts, loadEligibleDataProducts } from "./catalog/eligibility.ts";
 import { handleDataSizeRequest, handleSelectionFollowUp, resolveSavedContact } from "./purchase/data-request.ts";
-import { classifyConfirmation, parsePhone } from "./purchase/request.ts";
+import { classifyConfirmation, parsePhone, PURCHASE_VERB } from "./purchase/request.ts";
 import { formatTransactionForAI } from "./transactions/format.ts";
 import { executeViaProviderExecution } from "./purchase/execution.ts";
 import { buildPurchaseConfirmation } from "./purchase/confirmation-format.ts";
@@ -437,7 +437,7 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
       /\b(buy|purchase|get|order|send|activate|subscribe)\b/i.test(
         originalMessage
       ) ||
-      /\b(saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(
+      /\b(saya|sayi|siyo|siya|oda|aika|kunna|a sa)\b/i.test(
         originalMessage
       ) ||
       message.includes("ina son saya") ||
@@ -756,7 +756,7 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
 
       const naturalLanguageUnscopedDataPurchase =
         !explicitNetwork &&
-        /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(messageForCatalog) &&
+        PURCHASE_VERB.test(messageForCatalog) &&
         /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(messageForCatalog);
       // A fresh request for a data size without a named network must not inherit
       // an old network choice from the conversation. Show matching plans across networks.
@@ -951,7 +951,7 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
       // keep numeric/phone follow-ups in the Airtime flow instead of Data.
       const activeAirtimeContext = String(conversationContext?.service_type || "").toLowerCase() === "airtime";
       const explicitAirtimeRequest = /\bairtime\b|\btalktime\b/i.test(String(originalMessage || ""));
-      const explicitDataPurchase = /\b(?:buy|purchase|send|get|give|need|want|order|activate|subscribe|saya|sayi|siyo|siya|oda|aika|kunna)\b/i.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
+      const explicitDataPurchase = PURCHASE_VERB.test(String(originalMessage || "")) && /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(String(originalMessage || ""));
       if (explicitDataPurchase) {
         ai.intent = "purchase_intent";
         ai.service_type = "data";
