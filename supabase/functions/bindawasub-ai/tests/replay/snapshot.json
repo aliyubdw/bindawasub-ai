@@ -13,7 +13,7 @@
  "web|Sannun ku": "gemini|unknown",
  "web|Good morning": "gemini|unknown",
  "web|Hey": "backend|greeting",
- "web|<PHONE>": "gemini|unknown",
+ "web|<PHONE>": "backend|phone_only",
  "web|Show my recent transactions": "backend|transaction_history",
  "web|Show Airtel data plans": "backend|product_enquiry",
  "web|Show Glo data plans": "backend|product_enquiry",

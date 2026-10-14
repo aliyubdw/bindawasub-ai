@@ -21,6 +21,7 @@ import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleCancelRequest } from "./account/cancel-handler.ts";
+import { handlePhoneOnly } from "./router/phone-only.ts";
 import { createReplyTrace, recordFinalReply, type ReplyTrace } from "./conversation/reply-trace.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
 
@@ -870,6 +871,10 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
       };
       const dataSizeResponse = await handleDataSizeRequest(dataRequestContext);
       if (dataSizeResponse) return dataSizeResponse;
+
+      // A number sent on its own, with nothing open that could be waiting for it: ask what it is for.
+      const phoneOnlyResponse = await handlePhoneOnly({ supabase, userId, conversationId, conversationContext, originalMessage, corsHeaders });
+      if (phoneOnlyResponse) return phoneOnlyResponse;
 
       const ai = await classifyIntent({
         userMessage: originalMessage,
