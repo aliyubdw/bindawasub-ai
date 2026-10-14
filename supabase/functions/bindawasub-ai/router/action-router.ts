@@ -223,6 +223,7 @@ export async function routeExplicitAction(
       "fund_wallet",
       "manual_funding_request",
       "manual_funding_submit",
+      "manual_funding_cancel",
       "manual_funding_history",
       "manual_funding_requests",
       "manual_funding_approve",

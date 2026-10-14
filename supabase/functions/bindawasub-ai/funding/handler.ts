@@ -240,6 +240,45 @@ if (body.action === "manual_funding_submit") {
 // MANUAL FUNDING HISTORY — CUSTOMER
 // ==========================================
 
+if (body.action === "manual_funding_cancel") {
+  const requestId = String(body.request_id || "").trim();
+  const json = (status: number, payload: Record<string, unknown>) =>
+    new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (!requestId) return json(400, { success: false, error: "Funding request ID is required." });
+
+  const { data: request, error: requestError } = await supabase
+    .from("manual_funding_requests")
+    .select("id, amount, reference, status, payment_reference")
+    .eq("id", requestId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (requestError) throw requestError;
+  if (!request) return json(404, { success: false, error: "Funding request not found." });
+  if (request.payment_reference) {
+    return json(400, { success: false, error: "A payment reference was already submitted, so this request can no longer be cancelled." });
+  }
+  if (request.status !== "pending") {
+    return json(400, { success: false, error: `This funding request is already ${request.status}.` });
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("manual_funding_requests")
+    .update({ status: "cancelled", note: "Cancelled by customer" })
+    .eq("id", request.id)
+    .eq("user_id", userId)
+    .eq("status", "pending") // never overwrite a request that moved on in the meantime
+    .select("id");
+  if (updateError) throw updateError;
+  if (!(updated || []).length) return json(400, { success: false, error: "This funding request can no longer be cancelled." });
+
+  return json(200, {
+    success: true,
+    intent: "manual_funding_cancel",
+    cancelled_reference: request.reference,
+    answer: `Your funding request ${request.reference} for ₦${Number(request.amount).toLocaleString("en-NG")} has been cancelled. No money was added to your wallet.`,
+  });
+}
+
 if (body.action === "manual_funding_history") {
   const { data: requests, error: historyError } = await supabase
     .from("manual_funding_requests")

@@ -1036,7 +1036,18 @@ Deno.serve(async(req)=>{
   }
 
   if(state==="awaiting_funding_reference"){
-    if(cancelRequest){await clearState();await send(chatId,"Funding request remains pending. No payment reference was submitted.",true);return out({success:true,linked:true,state:"idle"})}
+    if(cancelRequest){
+      // Cancel the customer's own request for real, instead of leaving it pending.
+      const cancelRequestId=String(context.request_id||"").trim();
+      let cancelMessage="Funding request remains pending. No payment reference was submitted.";
+      if(cancelRequestId){
+        const cr=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":key,"Authorization":"Bearer "+key,"X-Bindawasub-Channel":"telegram"},body:JSON.stringify({user_id:acct.user_id,channel:"telegram",action:"manual_funding_cancel",request_id:cancelRequestId})});
+        const cd=await cr.json().catch(()=>({}));
+        if(cr.ok&&cd?.success!==false)cancelMessage=String(cd?.answer||"Your funding request has been cancelled. No money was added to your wallet.");
+        else if(cd?.error)cancelMessage=String(cd.error);
+      }
+      await clearState();await send(chatId,cancelMessage,true);return out({success:true,linked:true,state:"idle"});
+    }
     const requestId=String(context.request_id||"").trim();if(!requestId){await clearState();await send(chatId,"Your funding session expired. Please tap Fund Wallet to start again.",true);return out({success:true,linked:true,state:"idle"})}
     const sessionId=String(text||"").replace(/\s+/g,"").trim();
     if(!/^\d{30}$/.test(sessionId)){await send(chatId,"❌ Invalid Moniepoint Session ID.\n\nPlease send the exact 30-digit Session ID from your Moniepoint transfer receipt.\n\nCustomer Care: @Aliyubdw",true);return out({success:false,linked:true,state:"awaiting_funding_reference",error:"invalid_moniepoint_session_id"})}
