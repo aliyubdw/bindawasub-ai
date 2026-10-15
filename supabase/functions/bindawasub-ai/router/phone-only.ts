@@ -21,6 +21,18 @@ type PhoneOnlyContext = {
 // Only digits, spaces, hyphens and an optional leading + count as "a number on its own".
 const DIGITS_ONLY = /^\+?[\d\s-]{9,20}$/;
 
+export const REMEMBER_MS = 10 * 60 * 1000;
+
+// A number the customer typed themselves in the last 10 minutes. It is used only when a request names no
+// recipient of its own, and every confirmation shows it, so nothing is ever sent to a number unseen.
+export function freshTypedPhone(context: any): string | null {
+  const remembered = context?.typed_phone;
+  if (!remembered?.phone) return null;
+  const age = Date.now() - new Date(remembered.at || 0).getTime();
+  if (!Number.isFinite(age) || age > REMEMBER_MS) return null;
+  return normalizeNigerianPhone(String(remembered.phone));
+}
+
 function respond(corsHeaders: Record<string, string>, intent: string, answer: string, extra: Record<string, unknown> = {}) {
   return new Response(JSON.stringify({ success: true, intent, answer, ai_powered: false, ...extra }), {
     status: 200,
@@ -60,7 +72,12 @@ export async function handlePhoneOnly(ctx: PhoneOnlyContext): Promise<Response |
     return respond(ctx.corsHeaders, "phone_invalid",
       "That phone number doesn't look valid. Please send it again (for example 08012345678).");
   }
+  if (ctx.conversationId) {
+    await ctx.supabase.from("ai_conversations").update({
+      conversation_context: { ...(ctx.conversationContext || {}), typed_phone: { phone, at: new Date().toISOString() } },
+    }).eq("id", ctx.conversationId).eq("user_id", ctx.userId);
+  }
   return respond(ctx.corsHeaders, "phone_only",
-    `I got the number ${phone}. What would you like to do with it? For example: "Buy 500 airtime for ${phone}" or "Buy 1GB for ${phone}".`,
+    `I got the number ${phone} and will use it for the next 10 minutes. What would you like to do? Just say, for example, "Buy 500 airtime" or "Buy 1GB". Send a different number to change it, or "Cancel" to forget it.`,
     { phone_number: phone });
 }

@@ -1,4 +1,4 @@
-// A phone number sent alone: ask what it is for, remember nothing, and never interrupt an open request. Mock-only.
+// A phone number sent alone: ask what it is for, and never interrupt an open request. Mock-only.
 import { boot, send, db, geminiCalls, purchaseRpcs } from "./harness/harness.ts";
 import { honestModel } from "./harness/models.ts";
 import type { ModelFn } from "./harness/harness.ts";
@@ -15,18 +15,13 @@ Deno.test("a lone phone number gets a 'what is it for?' prompt from the backend,
     await boot(honestModel);
     const r = await send({ message: typed });
     eq(r.json.intent, "phone_only", `'${typed}': intent`);
-    assert(r.json.answer.includes(PHONE) && /Buy 500 airtime for/.test(r.json.answer) && /Buy 1GB for/.test(r.json.answer), `'${typed}': ${r.json.answer}`);
+    assert(r.json.answer.includes(PHONE) && /Buy 500 airtime/.test(r.json.answer) && /Buy 1GB/.test(r.json.answer) && /10 minutes/.test(r.json.answer), `'${typed}': ${r.json.answer}`);
     eq(geminiCalls.length, 0, `'${typed}': Gemini not consulted`);
     eq(purchaseRpcs().length, 0, `'${typed}': nothing bought`);
   }
 });
 
-Deno.test("it remembers nothing: no number is stored for the next request", async () => {
-  await boot(honestModel);
-  await send({ message: PHONE });
-  const stored = JSON.stringify(db.tables.ai_conversations[0]?.conversation_context ?? {});
-  assert(!stored.includes(PHONE) && !stored.includes("08011112222"), `number was stored: ${stored}`);
-});
+// Remembering the number for 10 minutes (and forgetting it on cancel) is covered in remember_test.ts.
 
 Deno.test("a number that is not a valid phone number is called out; other numbers are left alone", async () => {
   await boot(honestModel);

@@ -21,7 +21,7 @@ import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleCancelRequest } from "./account/cancel-handler.ts";
-import { handlePhoneOnly } from "./router/phone-only.ts";
+import { freshTypedPhone, handlePhoneOnly } from "./router/phone-only.ts";
 import { createReplyTrace, recordFinalReply, type ReplyTrace } from "./conversation/reply-trace.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
 
@@ -1036,6 +1036,14 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
           }
         }
       }
+      // A price question is never a purchase, whatever the model says: it must not open a confirmation
+      // (a model once turned "How much is 5gb airtel" into a purchase for a number from earlier in the chat).
+      if (String(ai.intent || "").toLowerCase() === "purchase_intent"
+        && /\b(?:how much|prices?|costs?|farashin|nawa)\b/i.test(String(originalMessage || ""))
+        && !PURCHASE_VERB.test(String(originalMessage || ""))) {
+        ai.intent = "product_price";
+      }
+
       // Airtime recipient: only a number typed in THIS message, or a saved contact named in it.
       // Gemini output and numbers from earlier turns (for example a data purchase) are never used.
       // The one exception is a short follow-up inside an airtime conversation that is already
@@ -1048,7 +1056,7 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
         const continuedRecipient = activeAirtimeContext && !explicitAirtimeRequest
           ? (parsePhone(String(conversationContext?.phone_number || "")).phone || null)
           : null;
-        const airtimeRecipient = typedRecipient || contactRecipient || continuedRecipient || null;
+        const airtimeRecipient = typedRecipient || contactRecipient || continuedRecipient || freshTypedPhone(conversationContext) || null;
         ai.phone_number = airtimeRecipient;
         const { phone: _modelPhone, ...otherInput } = (ai.customer_input && typeof ai.customer_input === "object" ? ai.customer_input : {}) as any;
         ai.customer_input = airtimeRecipient ? { ...otherInput, phone: airtimeRecipient } : otherInput;

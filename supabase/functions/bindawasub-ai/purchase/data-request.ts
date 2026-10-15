@@ -6,6 +6,7 @@
 // invented, and no money moves: this module only lists options or records a pending
 // confirmation that still needs an explicit "yes" (or a confirm tap) from the customer.
 import { looksHausa } from "../router/language.ts";
+import { freshTypedPhone } from "../router/phone-only.ts";
 import { describePlan, productSpecification } from "../catalog/format.ts";
 import { productSize, sameSize } from "../catalog/size.ts";
 import { classifyConfirmation, normalizeNigerianPhone, parseDataPurchaseRequest, parseNetwork, parsePhone, parseVariant } from "./request.ts";
@@ -113,6 +114,11 @@ export async function handleDataSizeRequest(ctx: DataRequestContext): Promise<Re
     }
     phone = contact.phone;
   }
+  let usedRemembered = false;
+  if (!phone && !request.phoneInvalid) {
+    const remembered = freshTypedPhone(ctx.conversationContext);
+    if (remembered) { phone = remembered; usedRemembered = true; }
+  }
   if (request.phoneInvalid) {
     return reply(ctx, { products: [], missing_fields: ["phone"] },
       hausa ? "Lambar wayar da ka rubuta ba daidai ba ce. Da fatan ka sake aiko ta (misali 08012345678)."
@@ -148,10 +154,11 @@ export async function handleDataSizeRequest(ctx: DataRequestContext): Promise<Re
     : networks.size > 1
       ? `I found ${request.size.label} plans on ${networks.size} networks. Compare the network, data type, validity and price, then choose the one you want.`
       : `I found ${matches.length === 1 ? "1 matching plan" : `${matches.length} matching plans`} for ${request.size.label}. Choose the one you want.`;
+  const lead2 = usedRemembered ? `${lead} Using ${phone}, the number you sent.` : lead;
   return reply(ctx, {
     products: choices, phone_number: phone, customer_input: phone ? { phone } : {},
     missing_fields: phone ? [] : ["phone"], requires_confirmation: false,
-  }, lead + "\n" + matches.map((p, i) => `${i + 1}. ${choiceLine(p)}`).join("\n") + (phone ? "" : "\nI'll ask for the recipient number after you choose."));
+  }, lead2 + "\n" + matches.map((p, i) => `${i + 1}. ${choiceLine(p)}`).join("\n") + (phone ? "" : "\nI'll ask for the recipient number after you choose."));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -175,7 +182,7 @@ export async function handleSelectionFollowUp(ctx: DataRequestContext): Promise<
   // A list older than the window is forgotten first: it must not answer "cancel" (or anything else).
   if (expired) { await savePending(ctx, {}, { pending_selection: null }); return null; }
   if (confirmation === "cancel") {
-    await savePending(ctx, NO_PENDING, { pending_selection: null });
+    await savePending(ctx, NO_PENDING, { pending_selection: null, typed_phone: null });
     return reply(ctx, { products: [], cancelled: true }, "Okay, I cancelled that request. No money was deducted.");
   }
   if (confirmation === "confirm") return null; // nothing chosen yet, so nothing to confirm

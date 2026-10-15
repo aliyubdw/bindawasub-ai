@@ -81,7 +81,7 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
       if ((updated || []).length) {
         if (ctx.conversationContext?.pending_selection) {
           await supabase.from("ai_conversations")
-            .update({ conversation_context: { ...ctx.conversationContext, pending_selection: null } })
+            .update({ conversation_context: { ...ctx.conversationContext, pending_selection: null, typed_phone: null } })
             .eq("id", conversationId).eq("user_id", userId);
         }
         const { data: others } = await supabase
@@ -98,7 +98,7 @@ export async function handleCancelRequest(ctx: CancelContext): Promise<Response 
   // Nothing to cancel: reset the open flow so it does not linger, and say so plainly.
   await supabase.from("ai_conversations").update({
     conversation_context: {
-      ...(ctx.conversationContext || {}), pending_selection: null, service_type: null, network: null,
+      ...(ctx.conversationContext || {}), pending_selection: null, typed_phone: null, service_type: null, network: null,
       phone_number: null, airtime_amount: null, last_intent: "cancelled",
     },
     pending_product_id: null, pending_phone_number: null, pending_at: null, pending_service_type: null,
