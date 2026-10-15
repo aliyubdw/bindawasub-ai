@@ -33,7 +33,7 @@
  "web|Buy 500 airtime": "gemini|airtime_purchase",
  "web|Buy 500 airtime for <PHONE>": "gemini|airtime_purchase",
  "web|Buy 500 airtime for Num": "gemini|airtime_purchase",
- "web|I want to buy airtime on MTN": "backend|product_enquiry",
+ "web|I want to buy airtime on MTN": "gemini|airtime_purchase",
  "web|Buy 1gb for Num": "backend|purchase_intent",
  "web|Buy 1gb": "backend|purchase_intent",
  "web|5gb": "gemini|unknown",
