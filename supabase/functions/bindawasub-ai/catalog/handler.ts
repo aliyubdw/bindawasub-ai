@@ -28,6 +28,10 @@ export async function handleProductEnquiry({
     /\b[0-9]+(?:\.[0-9]+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
   if (isPriceQuery) return null;
 
+  // A message about airtime is never a data-plan enquiry. Naming a network ("airtime 500 mtn") used to
+  // make this handler answer with that network's DATA plans instead of the airtime request.
+  if (/\b(?:airtime|recharge|talk\s?time)\b/i.test(originalMessage)) return null;
+
   const hasPurchaseVerbAndDataSize =
     PURCHASE_VERB.test(originalMessage) &&
     /\b\d+(?:\.\d+)?\s*(?:kb|mb|gb|tb)\b/i.test(originalMessage);
