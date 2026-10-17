@@ -52,6 +52,13 @@ export function seed(extra: Record<string, Row[]> = {}): Record<string, Row[]> {
     service_fields: [
       { service_id: "svc-data", field_key: "phone", label: "Phone number", data_type: "phone", required: true, sensitive: false, validation: {}, display_order: 1, metadata: {}, active: true },
     ],
+    // Airtime is configured and active in production, so the default test data mirrors that.
+    service_networks: [
+      { id: "an-mtn", service_id: "svc-airtime", code: "MTN", name: "MTN", active: true },
+      { id: "an-airtel", service_id: "svc-airtime", code: "AIRTEL", name: "Airtel", active: true },
+      { id: "an-glo", service_id: "svc-airtime", code: "GLO", name: "Glo", active: true },
+      { id: "an-9mobile", service_id: "svc-airtime", code: "9MOBILE", name: "9mobile", active: true },
+    ],
     products: catalog(),
     saved_beneficiaries: [
       { id: "b1", user_id: "user-1", name: "Mom", phone_number: "08031234567" },

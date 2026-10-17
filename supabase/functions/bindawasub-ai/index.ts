@@ -21,6 +21,7 @@ import { routeAiIntent } from "./ai/intent-router.ts";
 import { isInternalTelegramRequest as isInternalTelegramRequestCheck, resolveRequestChannel } from "./telegram/handler.ts";
 import { authenticateRequest } from "./auth/authenticate.ts";
 import { handleCancelRequest } from "./account/cancel-handler.ts";
+import { airtimeGate } from "./airtime/availability.ts";
 import { freshTypedPhone, handlePhoneOnly } from "./router/phone-only.ts";
 import { createReplyTrace, recordFinalReply, type ReplyTrace } from "./conversation/reply-trace.ts";
 import { loadOrCreateConversation, touchConversation, logAiMessage, persistAssistantMessage, logAiActivity } from "./conversation/state.ts";
@@ -154,6 +155,10 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
     );
 
 
+    // Airtime switched off: answer once, clearly, before any airtime flow can start.
+    const airtimeEarlyGate = await airtimeGate({ supabase, userId, conversationId, conversationContext, body, originalMessage, corsHeaders });
+    if (airtimeEarlyGate) return airtimeEarlyGate;
+
     const earlyAction = await routeExplicitAction(
       {
         supabase,
@@ -247,6 +252,10 @@ async function handleRequest(req: Request, trace: ReplyTrace): Promise<Response>
     });
 
 
+
+    // Same gate with the conversation loaded: follow-up numbers and amounts, and a pending airtime "yes".
+    const airtimeLateGate = await airtimeGate({ supabase, userId, conversationId, conversationContext, body, originalMessage, corsHeaders });
+    if (airtimeLateGate) return airtimeLateGate;
 
     // Explicit actions that depend on conversation/AI state.
     const routedAction = await routeExplicitAction(

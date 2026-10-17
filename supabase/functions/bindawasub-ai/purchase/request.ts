@@ -65,7 +65,8 @@ const CANCEL_RE =
   /^(?:no|nope|nah|cancel|stop|a'a|ba na so|kar a yi|kar a|a soke|soke)(?![a-z0-9])/i;
 
 export function classifyConfirmation(text: string): "confirm" | "cancel" | null {
-  const value = String(text || "").trim();
+  // Button labels carry a leading emoji ("❌ Cancel", "✅ Confirm"); look past leading symbols.
+  const value = String(text || "").trim().replace(/^[^\p{L}\p{N}]+/u, "");
   if (!value) return null;
   if (CONFIRM_RE.test(value)) return "confirm";
   if (CANCEL_RE.test(value) && !DATA_SIZE.test(value) && !PURCHASE_VERB.test(value)) return "cancel";
