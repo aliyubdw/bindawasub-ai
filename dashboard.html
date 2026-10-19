@@ -2,106 +2,160 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#087f5b">
-  <title>My Dashboard | Bindawasub AI</title>
-  <link rel="stylesheet" href="./customer/css/dashboard.css?v=1">
+  <meta name="description" content="Your Bindawasub AI account, digital services and recent activity in one place.">
+  <title>Overview | Bindawasub AI</title>
+  <link rel="stylesheet" href="./customer/css/dashboard.css?v=20261019-2">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="./dashboard.html" aria-label="Bindawasub dashboard home">
-        <span class="brand-mark">B</span><span><strong>Bindawasub</strong><small>AI · Customer portal</small></span>
+      <a class="brand" href="./dashboard.html" aria-label="Bindawasub AI home">
+        <span class="brand-mark">B<span class="brand-spark">✦</span></span>
+        <span class="brand-copy"><strong>Bindawasub<span> AI</span></strong><small>Your everyday AI assistant</small></span>
       </a>
+      <div class="nav-label">WORKSPACE</div>
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="nav-item active" href="./dashboard.html"><span>⌂</span> Overview</a>
-        <a class="nav-item" href="./index.html"><span>✦</span> AI Assistant</a>
-        <a class="nav-item" href="#transactions"><span>▤</span> Transactions</a>
-        <a class="nav-item" href="#funding"><span>＋</span> Wallet funding</a>
+        <a class="nav-item active" href="./dashboard.html" aria-current="page"><span class="nav-symbol">⌂</span>Overview</a>
+        <a class="nav-item" href="./index.html"><span class="nav-symbol">✳</span>AI Assistant<span class="nav-tag">AI</span></a>
+        <a class="nav-item" href="./index.html#chatScreen"><span class="nav-symbol">↗</span>Buy data & airtime</a>
+        <a class="nav-item" href="./index.html#chatScreen"><span class="nav-symbol">ϟ</span>Bills & subscriptions</a>
+        <a class="nav-item" href="#transactions"><span class="nav-symbol">↔</span>Transactions</a>
+        <a class="nav-item" href="#funding"><span class="nav-symbol">＋</span>Wallet funding</a>
       </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-assist">
+        <span class="assist-icon">✦</span>
+        <strong>Need a hand?</strong>
+        <p>Ask your AI assistant to help with your next purchase.</p>
+        <a href="./index.html">Chat with Bindawasub <span>↗</span></a>
+      </div>
       <div class="sidebar-bottom">
-        <div class="secure-note"><span>●</span><div><strong>Your account</strong><small>Private and secure</small></div></div>
-        <button id="logoutButton" class="logout-button" type="button">Log out</button>
+        <div class="secure-note"><span class="secure-check">✓</span><div><strong>Private by design</strong><small>Your account, your data</small></div></div>
+        <button id="logoutButton" class="logout-button" type="button"><span>↪</span> Log out</button>
       </div>
     </aside>
+
     <main class="main-content">
       <header class="topbar">
-        <div><p class="eyebrow">CUSTOMER PORTAL</p><h1>Overview</h1></div>
-        <a class="avatar" href="#profile" id="avatarInitials" aria-label="My profile">B</a>
+        <div class="mobile-brand"><span class="brand-mark">B<span class="brand-spark">✦</span></span><strong>Bindawasub AI</strong></div>
+        <div class="topbar-heading"><p class="eyebrow">YOUR PERSONAL SERVICES HUB</p><h1>Overview</h1></div>
+        <div class="topbar-actions">
+          <a class="icon-button" href="./index.html" aria-label="Open AI assistant" title="Open AI assistant">✳</a>
+          <a class="avatar" href="#profile" id="avatarInitials" aria-label="Open profile">B</a>
+        </div>
       </header>
+
       <section class="welcome-row">
-        <div><p class="eyebrow">YOUR BINDWASUB ACCOUNT</p><h2 id="welcomeTitle">Welcome back</h2><p>Manage your wallet, services and recent activity in one place.</p></div>
-        <a class="button button-light" href="./index.html">✦ Open AI assistant</a>
+        <div class="welcome-copy">
+          <div class="welcome-kicker"><span class="sparkle">✦</span> YOUR AI, READY WHEN YOU ARE</div>
+          <h2 id="welcomeTitle">Welcome back</h2>
+          <p>What can we take care of for you today?</p>
+          <a class="button button-light" href="./index.html"><span>✳</span> Start a conversation <span class="button-arrow">↗</span></a>
+        </div>
+        <div class="welcome-art" aria-hidden="true">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <div class="ai-orb"><span>✳</span></div>
+          <span class="float-chip chip-one">Data & airtime</span>
+          <span class="float-chip chip-two">Smart spending</span>
+          <span class="float-dot dot-one"></span><span class="float-dot dot-two"></span>
+        </div>
       </section>
-      <section class="summary-grid" aria-label="Account summary">
-        <article class="summary-card wallet-card">
-          <div class="card-label"><span class="card-icon">₦</span><span>Available wallet balance</span></div>
-          <p class="metric" id="walletBalance">Loading…</p>
-          <p class="card-foot" id="walletCurrency">Your Bindawasub wallet</p>
-          <a class="text-link" href="#funding">View funding details <span>→</span></a>
-        </article>
-        <article class="summary-card">
-          <div class="card-label"><span class="card-icon green">▤</span><span>Total transactions</span></div>
-          <p class="metric" id="transactionCount">—</p>
-          <p class="card-foot">All recorded purchases</p>
-        </article>
-        <article class="summary-card">
-          <div class="card-label"><span class="card-icon green">✓</span><span>Successful purchases</span></div>
-          <p class="metric" id="successfulCount">—</p>
-          <p class="card-foot">Based on your account history</p>
-        </article>
-        <article class="summary-card">
-          <div class="card-label"><span class="card-icon green">↗</span><span>Total spent</span></div>
-          <p class="metric" id="totalSpent">—</p>
-          <p class="card-foot">Successful purchases only</p>
-        </article>
+
+      <section class="assistant-section" aria-labelledby="assistantTitle">
+        <div class="assistant-intro">
+          <div class="assistant-icon">✳</div>
+          <div><h2 id="assistantTitle">How can I help?</h2><p>Just say what you need in your own words.</p></div>
+        </div>
+        <a class="assistant-composer" href="./index.html" aria-label="Open Bindawasub AI to start typing a request">
+          <span class="composer-placeholder">Try “Buy 1GB MTN data for me”</span><span class="composer-send">↗</span>
+        </a>
+        <div class="prompt-row" aria-label="Example AI requests">
+          <a href="./index.html" class="prompt-chip"><span>＋</span> Buy data</a>
+          <a href="./index.html" class="prompt-chip"><span>◷</span> Check my spending</a>
+          <a href="./index.html" class="prompt-chip"><span>↔</span> Recent transactions</a>
+          <a href="./index.html" class="prompt-chip"><span>♡</span> Buy for someone</a>
+        </div>
       </section>
+
       <section class="section-block">
-        <div class="section-heading"><div><p class="eyebrow">GET THINGS DONE</p><h2>Quick actions</h2></div></div>
-        <div class="quick-grid">
-          <a class="quick-card" href="./index.html#chatScreen"><span class="quick-icon">⌁</span><strong>Buy data</strong><small>Browse available data plans</small><span class="quick-arrow">→</span></a>
-          <a class="quick-card" href="./index.html#chatScreen"><span class="quick-icon">▣</span><strong>Buy airtime</strong><small>Top up any supported network</small><span class="quick-arrow">→</span></a>
-          <a class="quick-card" href="./index.html#chatScreen"><span class="quick-icon">ϟ</span><strong>Pay a bill</strong><small>Electricity, TV and PINs</small><span class="quick-arrow">→</span></a>
-          <a class="quick-card" href="./index.html#chatScreen"><span class="quick-icon">✦</span><strong>Ask Bindawasub AI</strong><small>Use natural language to get help</small><span class="quick-arrow">→</span></a>
+        <div class="section-heading"><div><p class="eyebrow">YOUR ACCOUNT AT A GLANCE</p><h2>Account overview</h2></div><span class="live-note"><span></span> From your account</span></div>
+        <div class="summary-grid" aria-label="Account summary">
+          <article class="summary-card wallet-card">
+            <div class="card-topline"><span class="card-icon">₦</span><span class="card-caption">WALLET BALANCE</span></div>
+            <p class="metric" id="walletBalance">Loading…</p>
+            <p class="card-foot" id="walletCurrency">Your Bindawasub wallet</p>
+            <a class="text-link" href="#funding">Funding details <span>↗</span></a>
+          </article>
+          <article class="summary-card">
+            <div class="card-topline"><span class="card-icon icon-soft">↔</span><span class="card-caption">TRANSACTIONS</span></div>
+            <p class="metric" id="transactionCount">—</p>
+            <p class="card-foot">Recorded activity on your account</p>
+            <a class="text-link" href="#transactions">View activity <span>↗</span></a>
+          </article>
+          <article class="summary-card">
+            <div class="card-topline"><span class="card-icon icon-soft">✓</span><span class="card-caption">SUCCESSFUL PURCHASES</span></div>
+            <p class="metric" id="successfulCount">—</p>
+            <p class="card-foot">Purchases marked successful</p>
+            <span class="metric-foot">Based on your records</span>
+          </article>
+          <article class="summary-card">
+            <div class="card-topline"><span class="card-icon icon-soft">↗</span><span class="card-caption">TOTAL SPENT</span></div>
+            <p class="metric" id="totalSpent">—</p>
+            <p class="card-foot">Successful purchases only</p>
+            <span class="metric-foot">All-time account summary</span>
+          </article>
         </div>
       </section>
-      <section class="section-block activity-layout">
+
+      <section class="section-block service-section">
+        <div class="section-heading"><div><p class="eyebrow">MADE SIMPLE WITH AI</p><h2>What would you like to do?</h2></div><a class="subtle-link" href="./index.html">Explore with AI <span>↗</span></a></div>
+        <div class="service-grid">
+          <a class="service-card" href="./index.html"><span class="service-icon data-icon">▥</span><span class="service-copy"><strong>Buy data</strong><small>Find a data plan that fits</small></span><span class="service-arrow">↗</span></a>
+          <a class="service-card" href="./index.html"><span class="service-icon airtime-icon">◉</span><span class="service-copy"><strong>Buy airtime</strong><small>Top up a supported network</small></span><span class="service-arrow">↗</span></a>
+          <a class="service-card" href="./index.html"><span class="service-icon bills-icon">ϟ</span><span class="service-copy"><strong>Pay a bill</strong><small>Explore available bill services</small></span><span class="service-arrow">↗</span></a>
+          <a class="service-card" href="./index.html"><span class="service-icon ai-icon">✳</span><span class="service-copy"><strong>Ask Bindawasub AI</strong><small>Tell us what you need</small></span><span class="service-arrow">↗</span></a>
+        </div>
+      </section>
+
+      <section class="section-block lower-grid">
         <article class="panel" id="transactions">
-          <div class="panel-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h2>Recent transactions</h2></div><button id="refreshTransactions" class="small-button" type="button">Refresh</button></div>
-          <div id="transactionList" class="transaction-list"><div class="loading-state">Loading your transactions…</div></div>
-          <a class="panel-link" href="./index.html">View activity in AI assistant <span>→</span></a>
+          <div class="panel-heading"><div><p class="eyebrow">YOUR RECENT ACTIVITY</p><h2>Recent transactions</h2><p class="panel-subtitle">A clear view of your latest purchases.</p></div><button id="refreshTransactions" class="small-button" type="button">↻ Refresh</button></div>
+          <div id="transactionList" class="transaction-list"><div class="loading-state"><span class="loading-dot"></span> Loading your transactions…</div></div>
+          <a class="panel-link" href="./index.html">Ask AI about your activity <span>↗</span></a>
         </article>
-        <article class="panel" id="funding">
-          <div class="panel-heading"><div><p class="eyebrow">WALLET</p><h2>Funding & support</h2></div><span class="panel-icon">₦</span></div>
-          <p class="panel-copy">Fund your wallet using the existing Bindawasub funding flow. Your transfer may require verification before your balance changes.</p>
-          <a class="button button-primary full-width" href="./index.html">Open wallet funding</a>
-          <div class="notice"><span>ⓘ</span><p>For your security, this dashboard does not collect payment details or credit your wallet directly.</p></div>
-        </article>
-      </section>
-      <section class="section-block" id="profile">
-        <div class="panel profile-panel">
-          <div class="panel-heading"><div><p class="eyebrow">PERSONAL DETAILS</p><h2>My profile</h2></div><span class="panel-icon">◉</span></div>
-          <div class="profile-grid">
-            <div><small>Full name</small><strong id="profileName">Loading…</strong></div>
-            <div><small>Email address</small><strong id="profileEmail">—</strong></div>
-            <div><small>Phone number</small><strong id="profilePhone">—</strong></div>
-            <div><small>Preferred language</small><strong id="profileLanguage">—</strong></div>
-          </div>
-          <p id="dashboardMessage" class="message" role="status" aria-live="polite"></p>
+        <div class="right-column">
+          <article class="panel funding-panel" id="funding">
+            <div class="panel-heading"><div><p class="eyebrow">WALLET</p><h2>Funding & support</h2></div><span class="panel-icon">₦</span></div>
+            <p class="panel-copy">Continue through the existing Bindawasub funding flow. Your balance updates only after funding is verified.</p>
+            <a class="button button-primary full-width" href="./index.html">Open wallet funding <span>↗</span></a>
+            <div class="notice"><span>ⓘ</span><p>This dashboard does not collect payment details or credit your wallet directly.</p></div>
+          </article>
+          <article class="panel profile-panel" id="profile">
+            <div class="panel-heading"><div><p class="eyebrow">YOUR DETAILS</p><h2>My profile</h2></div><span class="panel-icon profile-icon">◉</span></div>
+            <div class="profile-grid">
+              <div><small>Full name</small><strong id="profileName">Loading…</strong></div>
+              <div><small>Email address</small><strong id="profileEmail">—</strong></div>
+              <div><small>Phone number</small><strong id="profilePhone">—</strong></div>
+              <div><small>Preferred language</small><strong id="profileLanguage">—</strong></div>
+            </div>
+            <p id="dashboardMessage" class="message" role="status" aria-live="polite"></p>
+          </article>
         </div>
       </section>
-      <footer>© Bindawasub AI · Your everyday services, made simpler.</footer>
+      <footer><span class="footer-mark">B</span><span>© Bindawasub AI</span><span class="footer-separator">·</span><span>Your everyday services, made simpler.</span><span class="footer-spacer"></span><span class="footer-secure">✓ Secure customer portal</span></footer>
     </main>
   </div>
   <nav class="mobile-nav" aria-label="Mobile navigation">
-    <a class="active" href="./dashboard.html"><span>⌂</span><small>Home</small></a>
-    <a href="./index.html"><span>✦</span><small>AI Chat</small></a>
-    <a href="#transactions"><span>▤</span><small>Activity</small></a>
+    <a class="active" href="./dashboard.html" aria-current="page"><span>⌂</span><small>Home</small></a>
+    <a href="./index.html"><span>✳</span><small>AI Assistant</small></a>
+    <a href="#transactions"><span>↔</span><small>Activity</small></a>
     <a href="#profile"><span>◉</span><small>Profile</small></a>
   </nav>
   <script src="./customer/js/state.js?v=20260929-2"></script>
   <script src="./customer/js/api.js?v=20261002-1"></script>
-  <script src="./customer/js/dashboard.js?v=1"></script>
+  <script src="./customer/js/dashboard.js?v=20261019-2"></script>
 </body>
 </html>
