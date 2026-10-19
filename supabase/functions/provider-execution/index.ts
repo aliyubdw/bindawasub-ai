@@ -221,8 +221,9 @@ async function executePurchase(req:Request, body:any) {
 
   let lastFailure:any=null;
   for(let i=0;i<candidates.length;i++){
-    const {mapping,service,provider}=candidates[i];
-    let endpoint:any=service?.endpoint ? service.endpoint : null;
+    const {mapping,service,provider,endpoint:routeEndpoint}=candidates[i];
+    // Service routes (airtime) carry their endpoint on the candidate itself; plan mappings (data) load theirs below.
+    let endpoint:any=routeEndpoint||service?.endpoint||null;
     if(mapping?.endpoint_id){
       const r=await db.from("api_endpoints").select("*").eq("id",mapping.endpoint_id).eq("provider_id",provider.id).eq("service_type",serviceType).eq("operation","purchase").eq("active",true).maybeSingle();
       if(r.error) throw new Error("Purchase endpoint lookup failed: "+r.error.message);

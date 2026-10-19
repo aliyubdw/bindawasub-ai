@@ -11,6 +11,7 @@ export const db: {
   authUsers: Record<string, Row>;
 } = { tables: {}, rpcCalls: [], rpcHandlers: {}, authUsers: {} };
 
+const at = (row: Row, col: string) => col.split('.').reduce((o: any, k) => (o == null ? undefined : o[k]), row);
 let idCounter = 0;
 const nextId = () => `mock-id-${++idCounter}`;
 
@@ -49,16 +50,27 @@ class Query {
     return this;
   }
   or(expr: string) {
-    const parts = expr.split(",").map((e) => e.split("."));
-    this.filters.push((r) => parts.some(([col, , , v]) => (v === "null" ? (r[col] ?? null) !== null : false)));
+    // PostgREST syntax: "col.is.null,col.lte.<value>,col.not.is.null"
+    const tests = expr.split(",").map((part) => {
+      const [col, op, ...rest] = part.split(".");
+      return (r: Row) => {
+        const v = r[col] ?? null;
+        if (op === "is" && rest[0] === "null") return v === null;
+        if (op === "not" && rest[0] === "is" && rest[1] === "null") return v !== null;
+        if (op === "lte") return v !== null && String(v) <= rest.join(".");
+        if (op === "gte") return v !== null && String(v) >= rest.join(".");
+        return false;
+      };
+    });
+    this.filters.push((r) => tests.some((t) => t(r)));
     return this;
   }
   update(patch: Row) { this.op = "update"; this.patch = patch; return this; }
   delete() { this.op = "delete"; return this; }
-  eq(col: string, val: any) { this.filters.push((r) => r[col] === val); return this; }
-  neq(col: string, val: any) { this.filters.push((r) => r[col] !== val); return this; }
-  in(col: string, vals: any[]) { this.filters.push((r) => vals.includes(r[col])); return this; }
-  is(col: string, val: any) { this.filters.push((r) => (r[col] ?? null) === val); return this; }
+  eq(col: string, val: any) { this.filters.push((r) => at(r, col) === val); return this; }
+  neq(col: string, val: any) { this.filters.push((r) => at(r, col) !== val); return this; }
+  in(col: string, vals: any[]) { this.filters.push((r) => vals.includes(at(r, col))); return this; }
+  is(col: string, val: any) { this.filters.push((r) => (at(r, col) ?? null) === val); return this; }
   gte(col: string, val: any) { this.filters.push((r) => r[col] >= val); return this; }
   lte(col: string, val: any) { this.filters.push((r) => r[col] <= val); return this; }
   gt(col: string, val: any) { this.filters.push((r) => r[col] > val); return this; }

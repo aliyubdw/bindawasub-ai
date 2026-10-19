@@ -23,6 +23,10 @@ function geminiResponse(obj: Row) {
 
 export const telegramSent: { method: string; payload: any }[] = [];
 let recommendHandler: ((req: Request) => Promise<Response>) | null = null;
+export const providerCalls: { url: string; method: string; headers: any; body: any }[] = [];
+export let providerReply: () => Response | Promise<Response> = () =>
+  new Response(JSON.stringify({ status: true, data: { reference: "SME-REF-1", msg: "Airtime sent" } }), { status: 200 });
+export const setProviderReply = (f: () => Response | Promise<Response>) => { providerReply = f; };
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: any, init?: any) => {
   const url = String(typeof input === "string" ? input : input?.url);
@@ -31,6 +35,10 @@ globalThis.fetch = (async (input: any, init?: any) => {
     const message = JSON.parse(sent.input).current_user_message as string;
     geminiCalls.push(message);
     return geminiResponse(currentModel(message, { products: db.tables.products }));
+  }
+  if (url.startsWith("https://smeplug.ng/")) {
+    providerCalls.push({ url, method: String(init?.method || "GET"), headers: init?.headers, body: safeParse(init?.body) });
+    return await providerReply();
   }
   if (url.startsWith("https://api.telegram.org/")) {
     telegramSent.push({ method: url.split("/").pop()!, payload: safeParse(init.body) });
@@ -52,6 +60,8 @@ export async function boot(model: ModelFn, extraSeed: Record<string, Row[]> = {}
   externalCalls.length = 0;
   geminiCalls.length = 0;
   telegramSent.length = 0;
+  providerCalls.length = 0;
+  providerReply = () => new Response(JSON.stringify({ status: true, data: { reference: "SME-REF-1", msg: "Airtime sent" } }), { status: 200 });
   db.authUsers["good-token"] = { id: "auth-1" };
   if (!handler) await import("../../index.ts");
   if (!handler) throw new Error("Edge Function did not register a Deno.serve handler");
@@ -117,6 +127,22 @@ export async function loadRecommend() {
 }
 export async function callRecommend(body: Row, token = "mock-service-role") {
   const res = await recommendHandler!(new Request("https://mock.supabase.test/functions/v1/recommend-products", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
+  }));
+  return { status: res.status, json: await res.json() };
+}
+
+// ---- provider-execution Edge Function, run in-process against a fake SMEPlug ----
+let providerExecutionHandler: ((req: Request) => Promise<Response>) | null = null;
+export async function loadProviderExecution() {
+  if (providerExecutionHandler) return;
+  const previous = (Deno as any).serve;
+  (Deno as any).serve = (h: any) => { providerExecutionHandler = h; return { finished: Promise.resolve(), shutdown() {} }; };
+  await import("../../../provider-execution/index.ts");
+  (Deno as any).serve = previous;
+}
+export async function callProviderExecution(body: Row, token = "mock-service-role") {
+  const res = await providerExecutionHandler!(new Request("https://mock.supabase.test/functions/v1/provider-execution", {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
   }));
   return { status: res.status, json: await res.json() };
