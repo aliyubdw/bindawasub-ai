@@ -28,13 +28,16 @@
 
   async function loadProfile() {
     const data = await getProfileStatus();
-    if (!data || !data.user) {
-      throw new Error("We could not find your Bindawasub profile. Please return to the chat and complete your profile.");
+    // The existing login flow sends customers without a completed Bindawasub
+    // profile back to index.html so they can finish profile setup there.
+    if (!data?.profile_complete || !data.user) {
+      window.location.replace("./index.html");
+      return null;
     }
     const user = data.user;
-    if (user.role === "admin") {
+    if (String(user.role || "").toLowerCase() === "admin") {
       window.location.replace("./admin/");
-      return;
+      return null;
     }
     $("welcomeTitle").textContent = "Welcome back, " + (user.name || "there");
     $("avatarInitials").textContent = initials(user.name);
@@ -44,7 +47,7 @@
     $("successfulCount").textContent = Number(user.successful_transaction_count || 0).toLocaleString("en-NG");
     $("totalSpent").textContent = naira(user.total_spent);
     $("profileName").textContent = user.name || "—";
-    $("profileEmail").textContent = user.email || "—";
+    $("profileEmail").textContent = user.email || data.email || "—";
     $("profilePhone").textContent = user.phone || "—";
     $("profileLanguage").textContent = ({english:"English",hausa:"Hausa",mixed:"English + Hausa"})[user.language] || user.language || "—";
     return user;
@@ -68,6 +71,7 @@
     const container = $("transactionList");
     container.innerHTML = '<div class="loading-state">Loading your transactions…</div>';
     try {
+      // This action only reads the authenticated customer's own history.
       const response = await callEdgeFunction({action:"transaction_history",message:"Show my recent transactions"});
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.success === false) throw new Error(data.error || "Unable to load transactions.");
@@ -82,7 +86,8 @@
     try {
       const authUser = await ensureSession();
       if (!authUser) return;
-      await loadProfile();
+      const profile = await loadProfile();
+      if (!profile) return; // redirecting to profile completion or admin portal
       await loadTransactions();
     } catch (error) {
       console.error("Dashboard initialization failed:", error);
@@ -95,7 +100,8 @@
   $("logoutButton").addEventListener("click", async function () {
     this.disabled = true;
     this.textContent = "Logging out…";
-    const { error } = await supabaseClient.auth.signOut();
+    // Match the existing app's local sign-out behavior; do not revoke other devices.
+    const { error } = await supabaseClient.auth.signOut({scope:"local"});
     if (error) {
       this.disabled = false;
       this.textContent = "Log out";
